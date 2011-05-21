@@ -39,6 +39,7 @@
 #include <sys/socket.h>
 
 #include <openobex/obex.h>
+#include <openobex/obex_const.h>
 
 #ifdef HAVE_CONFIG_H
 # include "config.h"
@@ -262,8 +263,8 @@ static void show_headers(obex_t *handle, obex_object_t *object) {
                 g_free(str);
                 break;
             case OBEX_HDR_TIME:
-		str = g_new0(char, hlen + 1);
-		memcpy(str, hv.bs, hlen);
+                str = g_new0(char, hlen + 1);
+                memcpy(str, hv.bs, hlen);
                 debug("OBEX_HDR_TIME: %s\n", str);
                 g_free(str);
                 break;
@@ -335,6 +336,7 @@ static void get_non_body_headers(obex_t *handle, obex_object_t *object,
     obex_headerdata_t hv;
     uint8_t hi;
     unsigned int hlen;
+    struct a_header *ah;
 
     xfer->target_size = GW_OBEX_UNKNOWN_LENGTH;
     xfer->modtime = -1;
@@ -350,7 +352,7 @@ static void get_non_body_headers(obex_t *handle, obex_object_t *object,
             case OBEX_HDR_APPARAM:
                 g_free(xfer->apparam_buf);
                 xfer->apparam_buf = g_try_malloc(hlen);
-		if (xfer->apparam_buf) {
+                if (xfer->apparam_buf) {
                     memcpy(xfer->apparam_buf, hv.bs, hlen);
                     xfer->apparam_size = hlen;
                 }
@@ -358,6 +360,26 @@ static void get_non_body_headers(obex_t *handle, obex_object_t *object,
                     xfer->apparam_size = 0;
                 break;
             default:
+                ah = g_new0(struct a_header, 1);
+                ah->hi = hi;
+                ah->hv_size = hlen;
+                switch (hi & OBEX_HDR_TYPE_MASK) {
+                    case OBEX_HDR_TYPE_UINT8:
+                    case OBEX_HDR_TYPE_UINT32:
+                        ah->hv = hv;
+                        break;
+                    case OBEX_HDR_TYPE_BYTES:
+                    case OBEX_HDR_TYPE_UNICODE:
+                        ah->hv.bs = g_try_malloc(hlen);
+                        if (ah->hv.bs) {
+                            memcpy((void *) ah->hv.bs, hv.bs, hlen);
+                            ah->hv_size = hlen;
+                        } else {
+                            ah->hv_size = hlen;
+                        }
+                        break;
+                }
+                xfer->aheaders = g_slist_append(xfer->aheaders, ah);
                 break;
         }
     }
@@ -462,7 +484,7 @@ static void obex_writestream(GwObex *ctx, obex_object_t *object) {
                 xfer->data_start += send_size;
 
             xfer->do_cb = TRUE;
-	    if (!xfer->close) {
+            if (!xfer->close) {
                 debug("OBEX_SuspendRequest at %s:%d (%s)\n", __FILE__, __LINE__, __PRETTY_FUNCTION__);
                 OBEX_SuspendRequest(ctx->handle, object);
             }
@@ -607,8 +629,8 @@ void obex_link_error(GwObex *ctx) {
             g_free(ctx->xfer->buf);
             ctx->xfer->buf = NULL;
             ctx->xfer->buf_size = 0;
-	}
-	ctx->xfer->do_cb = TRUE;
+        }
+        ctx->xfer->do_cb = TRUE;
     }
 }
 
@@ -649,7 +671,7 @@ gboolean gw_obex_cb(GIOChannel *chan, GIOCondition cond, gpointer data) {
         GW_OBEX_UNLOCK(ctx);
         if (ctx->xfer && ctx->xfer->cb)
             ctx->xfer->cb(ctx->xfer, ctx->xfer->cb_data);
-	else if (ctx->dc_cb)
+        else if (ctx->dc_cb)
             ctx->dc_cb(ctx, ctx->dc_data);
         return FALSE;
     }
@@ -841,6 +863,23 @@ gboolean gw_obex_get(GwObex *ctx,
                      const guint8 *apparam, gint apparam_size,
                      gchar **buf, gint *buf_size, int stream_fd,
                      gboolean async) {
+    GSList *aheaders;
+    gboolean ret;
+    struct a_header ah = {
+        .hi = OBEX_HDR_APPARAM,
+        .hv.bs = apparam,
+        .hv_size = apparam_size
+    };
+
+    aheaders = g_slist_append(NULL, &ah);
+    ret = gw_obex_get_with_aheaders(ctx, local, remote, type, aheaders, buf, buf_size, stream_fd, async);
+    return ret;
+}
+
+gboolean gw_obex_get_with_aheaders(GwObex *ctx,
+        const gchar *local, const gchar *remote, const gchar *type,
+        const GSList *aheaders, gchar **buf, gint *buf_size, int stream_fd,
+        gboolean async) {
     gboolean ret = FALSE;
     obex_headerdata_t hv;
     obex_object_t *object;
@@ -862,11 +901,6 @@ gboolean gw_obex_get(GwObex *ctx,
     if (ctx->conid != CONID_INVALID) {
         hv.bq4 = ctx->conid;
         OBEX_ObjectAddHeader(ctx->handle, object, OBEX_HDR_CONNECTION, hv, 4, 0);
-    }
-
-    if (apparam && apparam_size > 0) {
-        hv.bs = (unsigned char *)apparam;
-        OBEX_ObjectAddHeader(ctx->handle, object, OBEX_HDR_APPARAM, hv, apparam_size, 0);
     }
 
     if (type) {
@@ -902,6 +936,17 @@ gboolean gw_obex_get(GwObex *ctx,
             debug("open(%s): %s", local, strerror(errno));
             OBEX_ObjectDelete(ctx->handle, object);
             goto out;
+        }
+    }
+
+    if (aheaders) {
+        const GSList * hlist = aheaders;
+        struct a_header * ah;
+        while (hlist) {
+            ah = hlist->data;
+            hv = ah->hv;
+            OBEX_ObjectAddHeader(ctx->handle, object, ah->hi, hv, ah->hv_size, 0);
+            hlist = g_slist_next(hlist);
         }
     }
 
@@ -958,6 +1003,22 @@ gboolean gw_obex_put(GwObex *ctx,
                      const guint8 *apparam, gint apparam_size,
                      const gchar *buf, gint object_size, time_t object_time,
                      int stream_fd, gboolean async) {
+    GSList *aheaders;
+    gboolean ret;
+    struct a_header ah = {
+        .hi = OBEX_HDR_APPARAM,
+        .hv.bs = (unsigned char *)apparam,
+        .hv_size = apparam_size
+    };
+    aheaders = g_slist_append(NULL, &ah);
+    ret = gw_obex_put_with_aheaders(ctx, local, remote, type, aheaders, buf, object_size, object_time, stream_fd, async);
+    return ret;
+}
+
+gboolean gw_obex_put_with_aheaders(GwObex *ctx,
+        const gchar *local, const gchar *remote, const gchar *type,
+        const GSList *aheaders, const gchar *buf, gint object_size, time_t object_time,
+        int stream_fd, gboolean async) {
     gboolean ret = FALSE;
     obex_headerdata_t hv;
     obex_object_t *object;
@@ -1019,6 +1080,11 @@ gboolean gw_obex_put(GwObex *ctx,
         OBEX_ObjectAddHeader(ctx->handle, object, OBEX_HDR_CONNECTION, hv, 4, 0);
     }
 
+    if (type) {
+        hv.bs = (unsigned char *)type;
+        OBEX_ObjectAddHeader(ctx->handle, object, OBEX_HDR_TYPE, hv, strlen(type) + 1, 0);
+    }
+
     if (uname) {
         hv.bs = (unsigned char *)uname;
         OBEX_ObjectAddHeader(ctx->handle, object, OBEX_HDR_NAME, hv, uname_len, 0);
@@ -1026,14 +1092,15 @@ gboolean gw_obex_put(GwObex *ctx,
         uname = NULL;
     }
 
-    if (type) {
-        hv.bs = (unsigned char *)type;
-        OBEX_ObjectAddHeader(ctx->handle, object, OBEX_HDR_TYPE, hv, strlen(type) + 1, 0);
-    }
-
-    if (apparam && apparam_size > 0) {
-        hv.bs = (unsigned char *)apparam;
-        OBEX_ObjectAddHeader(ctx->handle, object, OBEX_HDR_APPARAM, hv, apparam_size, 0);
+    if (aheaders) {
+        const GSList *hlist = aheaders;
+        struct a_header *ah;
+        while (hlist) {
+            ah = hlist->data;
+            hv = ah->hv;
+            OBEX_ObjectAddHeader(ctx->handle, object, ah->hi, hv, ah->hv_size, 0);
+            hlist = g_slist_next(hlist);
+        }
     }
 
     /* Try to figure out modification time if none was given */
