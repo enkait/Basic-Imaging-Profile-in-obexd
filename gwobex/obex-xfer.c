@@ -75,6 +75,7 @@ struct gw_obex_xfer *gw_obex_xfer_new(struct gw_obex *ctx, gboolean async, int s
     xfer->stream_fd   = stream_fd;
     xfer->target_size = GW_OBEX_UNKNOWN_LENGTH;
     xfer->modtime     = -1;
+    xfer->aheaders    = NULL;
 
     if (async || (stream_fd >= 0 && ctx->obex_op == OBEX_CMD_PUT)) {
         xfer->buf = g_malloc(buf_size);
@@ -200,6 +201,10 @@ unsigned char *gw_obex_xfer_object_apparam(GwObexXfer *xfer, size_t *apparam_siz
     if (apparam_size)
         *apparam_size = xfer->apparam_size;
     return xfer->apparam_buf;
+}
+
+GSList *gw_obex_xfer_object_aheaders(GwObexXfer *xfer) {
+    return xfer->aheaders;
 }
 
 gboolean gw_obex_xfer_object_done(GwObexXfer *xfer) {
@@ -418,7 +423,23 @@ out:
     return ret;
 }
 
+void a_header_free(struct a_header *ah) {
+    switch (ah->hi & OBEX_HDR_TYPE_MASK) {
+        case OBEX_HDR_TYPE_BYTES:
+        case OBEX_HDR_TYPE_UNICODE:
+            g_free((gpointer)ah->hv.bs);
+            break;
+    }
+    g_free(ah);
+}
+
 void _gw_obex_xfer_free(struct gw_obex_xfer *xfer) {
+    GSList *aheaders = xfer->aheaders;
+    while (aheaders) {
+        a_header_free(aheaders->data);
+        aheaders = g_slist_next(aheaders);
+    }
+    g_slist_free(xfer->aheaders);
     g_free(xfer->buf);
     g_free(xfer->apparam_buf);
     g_free(xfer);

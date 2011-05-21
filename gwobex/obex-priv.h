@@ -214,4 +214,31 @@ gboolean gw_obex_put(GwObex *ctx,
                      const gchar *buf, gint buf_size, time_t object_time,
                      int stream_fd, gboolean async);
 
+
+/** Get an object from the server, specifying additional headers
+ * @param ctx Pointer returned by gw_obex_setup()
+ * @param local Local filename which contains the object
+ * @param remote Remote filename to store the object in
+ * @param type MIME-type of the object (NULL if not known)
+ * @param aheaders list of additional headers (NULL if empty)
+ * @returns TRUE on success, FALSE on failure
+ */
+gboolean gw_obex_get_with_aheaders(GwObex *ctx,
+                     const gchar *local, const gchar *remote, const gchar *type,
+                     const GSList *aheaders, gchar **buf, gint *buf_size, int stream_fd,
+                     gboolean async);
+
+/** Send an object to the server
+ * @param ctx Pointer returned by gw_obex_setup()
+ * @param local Local filename to store the objec in
+ * @param remote Remote filename which contains the object
+ * @param type MIME-type of the object (NULL if not known)
+ * @param aheaders list of additional headers (NULL if empty)
+ * @returns TRUE on success, FALSE on failure
+ */
+gboolean gw_obex_put_with_aheaders(GwObex *ctx,
+                     const gchar *local, const gchar *remote, const gchar *type,
+                     const GSList *aheaders, const gchar *buf, gint buf_size, time_t object_time,
+                     int stream_fd, gboolean async);
+
 #endif /* _OBEX_PRIV_H_ */
