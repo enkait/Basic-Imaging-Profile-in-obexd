@@ -427,7 +427,7 @@ void a_header_free(struct a_header *ah) {
     switch (ah->hi & OBEX_HDR_TYPE_MASK) {
         case OBEX_HDR_TYPE_BYTES:
         case OBEX_HDR_TYPE_UNICODE:
-            g_free((gpointer)ah->hv.bs);
+            g_free((gpointer) ah->hv.bs);
             break;
     }
     g_free(ah);

@@ -263,8 +263,8 @@ static void show_headers(obex_t *handle, obex_object_t *object) {
                 g_free(str);
                 break;
             case OBEX_HDR_TIME:
-                str = g_new0(char, hlen + 1);
-                memcpy(str, hv.bs, hlen);
+		str = g_new0(char, hlen + 1);
+		memcpy(str, hv.bs, hlen);
                 debug("OBEX_HDR_TIME: %s\n", str);
                 g_free(str);
                 break;
@@ -352,7 +352,7 @@ static void get_non_body_headers(obex_t *handle, obex_object_t *object,
             case OBEX_HDR_APPARAM:
                 g_free(xfer->apparam_buf);
                 xfer->apparam_buf = g_try_malloc(hlen);
-                if (xfer->apparam_buf) {
+		if (xfer->apparam_buf) {
                     memcpy(xfer->apparam_buf, hv.bs, hlen);
                     xfer->apparam_size = hlen;
                 }
@@ -484,7 +484,7 @@ static void obex_writestream(GwObex *ctx, obex_object_t *object) {
                 xfer->data_start += send_size;
 
             xfer->do_cb = TRUE;
-            if (!xfer->close) {
+	    if (!xfer->close) {
                 debug("OBEX_SuspendRequest at %s:%d (%s)\n", __FILE__, __LINE__, __PRETTY_FUNCTION__);
                 OBEX_SuspendRequest(ctx->handle, object);
             }
@@ -629,8 +629,8 @@ void obex_link_error(GwObex *ctx) {
             g_free(ctx->xfer->buf);
             ctx->xfer->buf = NULL;
             ctx->xfer->buf_size = 0;
-        }
-        ctx->xfer->do_cb = TRUE;
+	}
+	ctx->xfer->do_cb = TRUE;
     }
 }
 
@@ -671,7 +671,7 @@ gboolean gw_obex_cb(GIOChannel *chan, GIOCondition cond, gpointer data) {
         GW_OBEX_UNLOCK(ctx);
         if (ctx->xfer && ctx->xfer->cb)
             ctx->xfer->cb(ctx->xfer, ctx->xfer->cb_data);
-        else if (ctx->dc_cb)
+	else if (ctx->dc_cb)
             ctx->dc_cb(ctx, ctx->dc_data);
         return FALSE;
     }
@@ -940,8 +940,8 @@ gboolean gw_obex_get_with_aheaders(GwObex *ctx,
     }
 
     if (aheaders) {
-        const GSList * hlist = aheaders;
-        struct a_header * ah;
+        const GSList *hlist = aheaders;
+        struct a_header *ah;
         while (hlist) {
             ah = hlist->data;
             hv = ah->hv;
@@ -1007,7 +1007,7 @@ gboolean gw_obex_put(GwObex *ctx,
     gboolean ret;
     struct a_header ah = {
         .hi = OBEX_HDR_APPARAM,
-        .hv.bs = (unsigned char *)apparam,
+        .hv.bs = (unsigned char *) apparam,
         .hv_size = apparam_size
     };
     aheaders = g_slist_append(NULL, &ah);
