@@ -423,6 +423,18 @@ out:
     return ret;
 }
 
+void a_header_copy(struct a_header *ah) {
+    if(!ah) return NULL;
+    a_header *res = g_memdup(ak, sizeof(struct a_header));
+    switch (res->hi & OBEX_HDR_TYPE_MASK) {
+        case OBEX_HDR_TYPE_BYTES:
+        case OBEX_HDR_TYPE_UNICODE:
+            res->hv.bs = g_memdup(ah->hv.bs, ah->hv_size);
+            break;
+    }
+    return res;
+}
+
 void a_header_free(struct a_header *ah) {
     switch (ah->hi & OBEX_HDR_TYPE_MASK) {
         case OBEX_HDR_TYPE_BYTES:
