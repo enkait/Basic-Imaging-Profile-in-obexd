@@ -145,6 +145,7 @@ static GDBusMethodTable transfer_methods[] = {
 static void transfer_free(struct transfer_data *transfer)
 {
 	struct session_data *session = transfer->session;
+    GSList *aheaders = transfer->aheaders;
 
 	DBG("%p", transfer);
 
@@ -171,6 +172,11 @@ static void transfer_free(struct transfer_data *transfer)
 	g_free(transfer->type);
 	g_free(transfer->path);
 	g_free(transfer->buffer);
+    while (aheaders) {
+        a_header_free(aheaders->data);
+        aheaders = g_slist_next(aheaders);
+    }
+    g_slist_free(transfer->aheaders);
 	g_free(transfer);
 }
 
@@ -178,6 +184,7 @@ struct transfer_data *transfer_register(struct session_data *session,
 						const char *filename,
 						const char *name,
 						const char *type,
+	                    struct transfer_params *params;
 						GSList *aheaders)
 {
 	struct transfer_data *transfer;
@@ -188,6 +195,7 @@ struct transfer_data *transfer_register(struct session_data *session,
 	transfer->name = g_strdup(name);
 	transfer->type = g_strdup(type);
 	transfer->params = params;
+	transfer->aheaders = aheaders;
 
 	/* for OBEX specific mime types we don't need to register a transfer */
 	if (type != NULL &&
