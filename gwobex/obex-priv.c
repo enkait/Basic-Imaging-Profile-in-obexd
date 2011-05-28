@@ -863,21 +863,12 @@ gboolean gw_obex_get(GwObex *ctx,
                      const guint8 *apparam, gint apparam_size,
                      gchar **buf, gint *buf_size, int stream_fd,
                      gboolean async) {
-    GSList *aheaders;
-    gboolean ret;
-    struct a_header ah = {
-        .hi = OBEX_HDR_APPARAM,
-        .hv.bs = apparam,
-        .hv_size = apparam_size
-    };
-
-    aheaders = g_slist_append(NULL, &ah);
-    ret = gw_obex_get_with_aheaders(ctx, local, remote, type, aheaders, buf, buf_size, stream_fd, async);
-    return ret;
+    return gw_obex_get_with_aheaders(ctx, local, remote, type, apparam, apparam_size, NULL, buf, buf_size, stream_fd, async);
 }
 
 gboolean gw_obex_get_with_aheaders(GwObex *ctx,
         const gchar *local, const gchar *remote, const gchar *type,
+        const guint8 *apparam, gint apparam_size,
         const GSList *aheaders, gchar **buf, gint *buf_size, int stream_fd,
         gboolean async) {
     gboolean ret = FALSE;
@@ -937,6 +928,11 @@ gboolean gw_obex_get_with_aheaders(GwObex *ctx,
             OBEX_ObjectDelete(ctx->handle, object);
             goto out;
         }
+    }
+    
+    if (apparam && apparam_size > 0) {
+        hv.bs = (unsigned char *)apparam;
+        OBEX_ObjectAddHeader(ctx->handle, object, OBEX_HDR_APPARAM, hv, apparam_size, 0);
     }
 
     if (aheaders) {
@@ -1003,20 +999,12 @@ gboolean gw_obex_put(GwObex *ctx,
                      const guint8 *apparam, gint apparam_size,
                      const gchar *buf, gint object_size, time_t object_time,
                      int stream_fd, gboolean async) {
-    GSList *aheaders;
-    gboolean ret;
-    struct a_header ah = {
-        .hi = OBEX_HDR_APPARAM,
-        .hv.bs = (unsigned char *) apparam,
-        .hv_size = apparam_size
-    };
-    aheaders = g_slist_append(NULL, &ah);
-    ret = gw_obex_put_with_aheaders(ctx, local, remote, type, aheaders, buf, object_size, object_time, stream_fd, async);
-    return ret;
+    return gw_obex_put_with_aheaders(ctx, local, remote, type, apparam, apparam_size, NULL, buf, object_size, object_time, stream_fd, async);
 }
 
 gboolean gw_obex_put_with_aheaders(GwObex *ctx,
         const gchar *local, const gchar *remote, const gchar *type,
+        const guint8 *apparam, gint apparam_size,
         const GSList *aheaders, const gchar *buf, gint object_size, time_t object_time,
         int stream_fd, gboolean async) {
     gboolean ret = FALSE;
@@ -1090,6 +1078,11 @@ gboolean gw_obex_put_with_aheaders(GwObex *ctx,
         OBEX_ObjectAddHeader(ctx->handle, object, OBEX_HDR_NAME, hv, uname_len, 0);
         g_free(uname);
         uname = NULL;
+    }
+    
+    if (apparam && apparam_size > 0) {
+        hv.bs = (unsigned char *)apparam;
+        OBEX_ObjectAddHeader(ctx->handle, object, OBEX_HDR_APPARAM, hv, apparam_size, 0);
     }
 
     if (aheaders) {
