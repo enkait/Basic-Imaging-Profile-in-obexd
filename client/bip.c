@@ -11,10 +11,21 @@
 #include "session.h"
 #include "bip.h"
 
+static void put_image_callback(struct session_data *session, GError *err,
+        void *user_data)
+{
+    DBusMessage *message = session->msg;
+    DBusMessage *reply = dbus_message_new_method_return(message);
+    printf("callback called!!!!FTW!!\n");
+    g_dbus_send_message(session->conn, reply);
+    dbus_message_unref(session->msg);
+    session->msg = NULL;
+}
+
 static DBusMessage * put_image(DBusConnection *connection,
 				DBusMessage *message, void *user_data)
 {
-	//struct session_data *session = user_data;
+	struct session_data *session = user_data;
 	const char *image_file;
 
 	if (dbus_message_get_args(message, NULL,
@@ -23,13 +34,21 @@ static DBusMessage * put_image(DBusConnection *connection,
 		return g_dbus_create_error(message,
 				"org.openobex.Error.InvalidArguments", NULL);
 
-    if(!image_file || strlen(image_file)==0) {
+    if (!image_file || strlen(image_file)==0) {
         return g_dbus_create_error(message,"org.openobex.Error.InvalidArguments", NULL);
     }
 
     printf("requested put_image on file %s\n", image_file);
 
-	return dbus_message_new_method_return(message);
+    if (session_put_with_aheaders(session, "x-bt/img-img", image_file, "pliczek", NULL, put_image_callback) < 0) {
+        return g_dbus_create_error(message,
+                "org.openobex.Error.Failed",
+                "Failed");
+    }
+
+    session->msg = dbus_message_ref(message);
+	
+    return NULL;
 }
 
 static GDBusMethodTable image_push_methods[] = {
