@@ -510,6 +510,21 @@ gboolean gw_obex_copy(GwObex *ctx, const gchar *src, const gchar *dst,
 GwObexXfer *gw_obex_put_async(GwObex *ctx, const char *name, const char *type,
                               gint size, time_t time, gint *error);
 
+/** Start a PUT operation asynchronously with additional headers
+ *
+ * @param ctx   Pointer returned by gw_obex_setup()
+ * @param name  Name of the object (null terminated UTF-8)
+ * @param type  Type of the object (null terminated UTF-8), or NULL
+ * @param aheaders      List of additional headers
+ * @param size  Size of the object (GW_OBEX_UNKNOWN_LENGTH if not known)
+ * @param time  Last modification time of the object (-1 if not known)
+ * @param error Place to store error code on failure (NULL if not interested)
+ *
+ * @returns a new GwObexXfer object on success, NULL on failure
+ */
+GwObexXfer *gw_obex_put_async_with_aheaders(GwObex *ctx, const char *name, const char *type,
+                              const GSList *aheaders,
+                              gint size, time_t time, gint *error);
 
 /** Start a GET operation asynchronously
  *
@@ -537,6 +552,20 @@ GwObexXfer *gw_obex_get_async(GwObex *ctx, const char *name, const char *type, g
 GwObexXfer *gw_obex_get_async_with_apparam(GwObex *ctx, const char *name, const char *type,
 		const guint8  *apparam, gint apparam_size, gint *error);
 
+/** Start a GET operation asynchronously with additional headers
+ *
+ * @param ctx   Pointer returned by gw_obex_setup()
+ * @param name  Name of the object (null terminated UTF-8)
+ * @param type  Type of the object (null terminated UTF-8), or NULL
+ * @param aheaders      List of additional headers
+ * @param error Place to store error code on failure (NULL if not interested)
+ *
+ * @returns a new GwObexXfer object on success, NULL on failure
+ */
+
+GwObexXfer *gw_obex_get_async_with_aheaders(GwObex *ctx, const char *name, const char *type,
+		const guint8 *apparam, gint apparam_size,
+        const GSList *aheaders, gint *error);
 
 /** Set a callback function for a GwObexXfer object
  * The callback function will be called in the following situations:

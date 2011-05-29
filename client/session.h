@@ -90,3 +90,7 @@ void *session_get_data(struct session_data *session);
 void session_set_data(struct session_data *session, void *priv);
 int session_put(struct session_data *session, char *buf,
 				const char *targetname);
+int session_put_with_aheaders(struct session_data *session, const char *type,
+		const char *filename, const char *targetname,
+		const GSList *aheaders,
+		session_callback_t func);
