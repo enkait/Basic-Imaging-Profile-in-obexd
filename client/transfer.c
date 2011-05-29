@@ -34,6 +34,7 @@
 #include <glib.h>
 #include <gdbus.h>
 #include <gw-obex.h>
+#include <obex-xfer.h>
 
 #include "log.h"
 #include "transfer.h"
@@ -184,7 +185,7 @@ struct transfer_data *transfer_register(struct session_data *session,
 						const char *filename,
 						const char *name,
 						const char *type,
-	                    struct transfer_params *params;
+	                    struct transfer_params *params,
 						GSList *aheaders)
 {
 	struct transfer_data *transfer;
@@ -429,6 +430,8 @@ int transfer_get(struct transfer_data *transfer, transfer_callback_t func,
 {
 	struct session_data *session = transfer->session;
 	gw_obex_xfer_cb_t cb;
+	guint8 *apparam = NULL;
+    gint apparam_size = 0;
 
 	if (transfer->xfer != NULL)
 		return -EALREADY;
@@ -448,6 +451,11 @@ int transfer_get(struct transfer_data *transfer, transfer_callback_t func,
 		transfer->fd = fd;
 		cb = get_xfer_progress;
 	}
+    
+    if (transfer->params != NULL) {
+        apparam = transfer->params->data;
+        apparam_size = transfer->params->size;
+    }
 
 	if (transfer->params != NULL)
 		transfer->xfer = gw_obex_get_async_with_apparam(session->obex,
@@ -506,9 +514,9 @@ int transfer_put(struct transfer_data *transfer, transfer_callback_t func,
 
 done:
 	size = transfer->size < UINT32_MAX ? transfer->size : 0;
-	transfer->xfer = gw_obex_put_async(session->obex, transfer->name,
-						transfer->type, size,
-						-1, NULL);
+	transfer->xfer = gw_obex_put_async_with_aheaders(session->obex, transfer->name,
+						transfer->type, transfer->aheaders,
+                        size, -1, NULL);
 	if (transfer->xfer == NULL)
 		return -ENOTCONN;
 

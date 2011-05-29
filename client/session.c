@@ -34,6 +34,7 @@
 #include <glib.h>
 #include <gdbus.h>
 #include <gw-obex.h>
+#include <obex-xfer.h>
 
 #include <bluetooth/bluetooth.h>
 #include <bluetooth/rfcomm.h>
@@ -1205,47 +1206,7 @@ int session_get(struct session_data *session, const char *type,
 	}
 
 	transfer = transfer_register(session, filename, targetname, type,
-					params);
-	if (transfer == NULL) {
-		if (params != NULL) {
-			g_free(params->data);
-			g_free(params);
-		}
-		return -EIO;
-	}
-
-	if (func != NULL) {
-		struct session_callback *callback;
-		callback = g_new0(struct session_callback, 1);
-		callback->func = func;
-		session->callback = callback;
-	}
-
-	err = session_request(session, session_prepare_get, transfer);
-	if (err < 0)
-		return err;
-
-	return 0;
-}
-
-int session_get_with_aheaders(struct session_data *session, const char *type,
-		const char *filename, const char *targetname,
-		const GSList *aheaders, session_callback_t func)
-{
-	struct transfer_data *transfer;
-    GSList *aheaders_dst = NULL, *aheaders_src = aheaders;
-	int err;
-
-	if (session->obex == NULL)
-		return -ENOTCONN;
-	
-    while (aheaders_src != NULL) {
-		aheaders_dst = g_slist_append(aheaders_dst, a_header_copy(aheaders->data));
-        aheaders_src = g_slist_next(aheaders_src);
-	}
-
-	transfer = transfer_register(session, filename, targetname, type,
-					params);
+					params, NULL);
 	if (transfer == NULL) {
 		if (params != NULL) {
 			g_free(params->data);
@@ -1441,7 +1402,7 @@ int session_send(struct session_data *session, const char *filename,
 		return -ENOTCONN;
 
 	transfer = transfer_register(session, filename, targetname, NULL,
-					NULL);
+					NULL, NULL);
 	if (transfer == NULL)
 		return -EINVAL;
 
@@ -1471,7 +1432,7 @@ int session_pull(struct session_data *session,
 	if (session->obex == NULL)
 		return -ENOTCONN;
 
-	transfer = transfer_register(session, NULL, filename, type, NULL);
+	transfer = transfer_register(session, NULL, filename, type, NULL, NULL);
 	if (transfer == NULL) {
 		return -EIO;
 	}
@@ -1571,12 +1532,59 @@ int session_put(struct session_data *session, char *buf, const char *targetname)
 	if (session->pending != NULL)
 		return -EISCONN;
 
-	transfer = transfer_register(session, NULL, targetname, NULL, NULL);
+	transfer = transfer_register(session, NULL, targetname, NULL, NULL, NULL);
 	if (transfer == NULL)
 		return -EIO;
 
 	transfer->size = strlen(buf);
 	transfer->buffer = buf;
+
+	err = session_request(session, session_prepare_put, transfer);
+	if (err < 0)
+		return err;
+
+	return 0;
+}
+
+int session_put_with_aheaders(struct session_data *session, const char *type,
+		const char *filename, const char *targetname,
+		const GSList *aheaders,
+		session_callback_t func)
+{
+	struct transfer_data *transfer;
+    GSList *aheaders_copy = NULL;
+    int err;
+
+	if (session->obex == NULL)
+		return -ENOTCONN;
+
+	if (session->pending != NULL)
+		return -EISCONN;
+
+    if (aheaders) {
+        const GSList *aheaders_src = aheaders;
+        while(aheaders_src) {
+            aheaders_copy = g_slist_append(aheaders_copy,
+                    a_header_copy(aheaders_src->data));
+            aheaders_src = g_slist_next(aheaders_src);
+        }
+    }
+
+	transfer = transfer_register(session, filename, targetname, type, NULL, aheaders_copy);
+	if (transfer == NULL) {
+        while(aheaders_copy) {
+            a_header_free(aheaders_copy->data);
+        }
+        g_slist_free(aheaders_copy);
+		return -EIO;
+    }
+	
+    if (func != NULL) {
+		struct session_callback *callback;
+		callback = g_new0(struct session_callback, 1);
+		callback->func = func;
+		session->callback = callback;
+	}
 
 	err = session_request(session, session_prepare_put, transfer);
 	if (err < 0)
