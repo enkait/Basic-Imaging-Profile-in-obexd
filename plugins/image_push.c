@@ -98,6 +98,10 @@ void *image_push_connect(struct obex_session *os, int *err)
 {
     printf("IMAGE PUSH CONNECT\n");
 	manager_register_session(os);
+
+    if (err)
+        *err = 0;
+
 	return NULL;
 }
 
