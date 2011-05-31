@@ -10,6 +10,7 @@
 #include "transfer.h"
 #include "session.h"
 #include "bip.h"
+#include "gwobex/obex-xfer.h"
 
 static void put_image_callback(struct session_data *session, GError *err,
         void *user_data)

@@ -44,7 +44,10 @@ struct request_data {
 struct image_push_session {
     struct obex_session *os;
     struct request_data *reqdata;
+    guint8 *buf;
+    gint bufsize;
 };
 
 void free_image_descriptor(struct image_descriptor *id);
 void free_request_data(struct request_data *rd);
+void free_image_push_session(struct image_push_session *session);

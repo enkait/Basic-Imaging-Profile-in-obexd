@@ -50,6 +50,7 @@
 #include "mimetype.h"
 #include "service.h"
 #include "imgimg.h"
+#include "image_push.h"
 
 static const uint8_t IMAGE_PUSH_TARGET[TARGET_SIZE] = {
 			0xE3, 0x3D, 0x95, 0x45, 0x83, 0x74, 0x4A, 0xD7,
@@ -58,8 +59,9 @@ static const uint8_t IMAGE_PUSH_TARGET[TARGET_SIZE] = {
 static void *imgimg_open(const char *name, int oflag, mode_t mode,
 					void *context, size_t *size, int *err)
 {
+    struct image_push_session *session = context;
     printf("imging_open\n");
-    return NULL;
+    return session;
 }
 
 static int imgimg_close(void *object)
@@ -70,7 +72,14 @@ static int imgimg_close(void *object)
 
 static ssize_t imgimg_write(void *object, const void *buf, size_t count)
 {
+    struct image_push_session *session = object;
     printf("imging_write\n");
+    session->buf = g_try_realloc(session->buf, session->bufsize+count);
+    if (!session->buf) {
+        return -ENOMEM;
+    }
+    g_memmove(session->buf+session->bufsize,buf,count);
+    session->bufsize += count;
     return count;
 }
 
