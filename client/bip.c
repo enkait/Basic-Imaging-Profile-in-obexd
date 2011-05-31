@@ -40,13 +40,15 @@ static DBusMessage * put_image(DBusConnection *connection,
 
     printf("requested put_image on file %s\n", image_file);
 
-    if (session_put_with_aheaders(session, "x-bt/img-img", image_file, "pliczek", NULL, put_image_callback) < 0) {
+    if (session_put_with_aheaders(session, "x-bt/img-img", image_file, image_file, NULL, put_image_callback) < 0) {
         return g_dbus_create_error(message,
                 "org.openobex.Error.Failed",
                 "Failed");
     }
 
+    printf("lol\n");
     session->msg = dbus_message_ref(message);
+    printf("lol\n");
 	
     return NULL;
 }
