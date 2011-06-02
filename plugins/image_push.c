@@ -108,10 +108,16 @@ void free_image_descriptor(struct image_descriptor *id) {
 }
 
 void free_request_data(struct request_data *rd) {
-    if(!rd)
+    if (!rd)
         return;
     free_image_descriptor(rd->imgdesc);
     g_free(rd);
+}
+
+void free_image_push_session(struct image_push_session *session) {
+    free_request_data(session->reqdata);
+    g_free(session->image_path);
+    g_free(session);
 }
 
 void *image_push_connect(struct obex_session *os, int *err)
@@ -144,27 +150,27 @@ int image_push_chkput(struct obex_session *os, void *user_data)
     g_free(ips->reqdata);
     ips->reqdata = g_new0(struct request_data, 1);
     ips->reqdata->imgdesc = g_new0(struct image_descriptor, 1);
-    
-
 	return 0;
 }
 
 int image_push_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 {
+    //struct image_push_session *ips = user_data;
 	obex_headerdata_t hd;
 	unsigned int hlen;
 	uint8_t hi;
-    printf("IMAGE PUSH PUT\n");
+    printf("IMAGE PUSH PUT %s\n", os->name);
 	while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen)) {
         printf("header numer=%d\n", hi);
     }
-
 	return 0;
 }
 
 void image_push_disconnect(struct obex_session *os, void *user_data)
 {
+    struct image_push_session *ips = user_data;
     printf("IMAGE PUSH DISCONNECT\n");
+    free_image_push_session(ips);
 	manager_unregister_session(os);
 }
 

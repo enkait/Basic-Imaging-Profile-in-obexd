@@ -56,16 +56,30 @@ static const uint8_t IMAGE_PUSH_TARGET[TARGET_SIZE] = {
 			0xE3, 0x3D, 0x95, 0x45, 0x83, 0x74, 0x4A, 0xD7,
 			0x9E, 0xC5, 0xC1, 0x6B, 0xE3, 0x1E, 0xDE, 0x8E };
 
+static const char * bip_root="/tmp/bip/";
+
 static void *imgimg_open(const char *name, int oflag, mode_t mode,
 					void *context, size_t *size, int *err)
 {
     struct image_push_session *session = context;
+    session->image_path = g_strconcat(bip_root, name, NULL);
+	session->fd = open(session->image_path, oflag, mode);
+	
+    if (session->fd < 0) {
+		if (err)
+			*err = -errno;
+		return NULL;
+	}
+
     printf("imging_open\n");
     return session;
 }
 
 static int imgimg_close(void *object)
 {
+    struct image_push_session *session = object;
+    if (close(session->fd) < 0)
+        return -errno;
     printf("imging_close\n");
 	return 0;
 }
@@ -73,14 +87,11 @@ static int imgimg_close(void *object)
 static ssize_t imgimg_write(void *object, const void *buf, size_t count)
 {
     struct image_push_session *session = object;
+	ssize_t ret = write(session->fd, buf, count);
     printf("imging_write\n");
-    session->buf = g_try_realloc(session->buf, session->bufsize+count);
-    if (!session->buf) {
-        return -ENOMEM;
-    }
-    g_memmove(session->buf+session->bufsize,buf,count);
-    session->bufsize += count;
-    return count;
+    if (ret < 0)
+        return -errno;
+    return ret;
 }
 
 static struct obex_mime_type_driver imgimg = {
