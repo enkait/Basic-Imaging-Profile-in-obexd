@@ -51,7 +51,7 @@ static DBusMessage * put_image(DBusConnection *connection,
     session->msg = dbus_message_ref(message);
     printf("lol\n");
 	
-    return NULL;
+    return dbus_message_new_method_return(message);
 }
 
 static GDBusMethodTable image_push_methods[] = {

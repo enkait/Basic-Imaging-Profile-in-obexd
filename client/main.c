@@ -83,7 +83,6 @@ static void create_callback(struct session_data *session, GError *err,
 		goto done;
 	}
 
-    printf("lol\n");
 	if (session->target != NULL) {
 		session_register(session);
 		session_set_owner(session, data->sender, owner_exit);
