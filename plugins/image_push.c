@@ -145,11 +145,13 @@ int image_push_get(struct obex_session *os, obex_object_t *obj, gboolean *stream
 int image_push_chkput(struct obex_session *os, void *user_data)
 {
     struct image_push_session *ips = user_data;
+    int ret;
     printf("IMAGE PUSH CHKPUT\n");
     
     g_free(ips->reqdata);
     ips->reqdata = g_new0(struct request_data, 1);
     ips->reqdata->imgdesc = g_new0(struct image_descriptor, 1);
+	ret = obex_put_stream_start(os, "adfasdfasd");
 	return 0;
 }
 
