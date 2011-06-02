@@ -9,7 +9,8 @@ doc_files = doc/obexd-api.txt doc/agent-api.txt doc/client-api.txt
 
 test_files = test/simple-agent test/send-files \
 		test/pull-business-card test/exchange-business-cards \
-		test/list-folders test/pbap-client test/ftp-client
+		test/list-folders test/pbap-client test/ftp-client \
+		test/image_push_test
 
 gdbus_sources = gdbus/gdbus.h gdbus/mainloop.c gdbus/watch.c \
 					gdbus/object.c gdbus/polkit.c
@@ -63,6 +64,9 @@ builtin_sources += plugins/mas.c plugins/messages.h
 
 builtin_modules += irmc
 builtin_sources += plugins/irmc.c
+
+builtin_modules += image_push
+builtin_sources += plugins/image_push.c
 
 builtin_modules += syncevolution
 builtin_sources += plugins/syncevolution.c
@@ -119,7 +123,8 @@ client_obex_client_SOURCES = $(gdbus_sources) $(gwobex_sources) $(btio_sources) 
 				src/log.h src/log.c \
 				client/pbap.h client/pbap.c \
 				client/sync.h client/sync.c \
-				client/transfer.h client/transfer.c
+				client/transfer.h client/transfer.c \
+				client/bip.h client/bip.c
 
 client_obex_client_LDADD = @GLIB_LIBS@ @DBUS_LIBS@ @OPENOBEX_LIBS@ @BLUEZ_LIBS@
 endif

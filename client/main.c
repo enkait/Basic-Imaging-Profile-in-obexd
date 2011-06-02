@@ -83,6 +83,7 @@ static void create_callback(struct session_data *session, GError *err,
 		goto done;
 	}
 
+    printf("lol\n");
 	if (session->target != NULL) {
 		session_register(session);
 		session_set_owner(session, data->sender, owner_exit);
@@ -91,7 +92,9 @@ static void create_callback(struct session_data *session, GError *err,
 				DBUS_TYPE_OBJECT_PATH, &session->path,
 				DBUS_TYPE_INVALID);
 		goto done;
-	}
+	} else {
+        printf("session->target !=NULL\n");
+    }
 
 	g_dbus_send_reply(data->connection, data->message, DBUS_TYPE_INVALID);
 
