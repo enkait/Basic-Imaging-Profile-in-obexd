@@ -157,9 +157,9 @@ int image_push_chkput(struct obex_session *os, void *user_data)
 	return ret;
 }
 
-gpointer *encode_length_prefix(const gunichar2 *data, unsigned int length, unsigned int *newsize) {
+guint8 *encode_length_prefix(const gunichar2 *data, unsigned int length, unsigned int *newsize) {
     guint16 len = length*2;
-    gpointer *buf = g_try_malloc(2+2*length);
+    guint8 *buf = g_try_malloc(2+2*length);
     len = GUINT16_TO_BE(len);
     if(!buf)
         return NULL;
@@ -175,7 +175,7 @@ int obex_handle_write(struct obex_session *os, obex_object_t *obj, const char *d
     unsigned int headersize;
 
     gunichar2 *buf = g_utf8_to_utf16(data,size,NULL,&newlen,NULL);
-    hd.bs = (guint8 *) encode_length_prefix(buf, newlen, &headersize);
+    hd.bs = encode_length_prefix(buf, newlen, &headersize);
 
     return OBEX_ObjectAddHeader(os->obex, obj,
             IMG_HANDLE_HDR, hd, headersize, 0);
