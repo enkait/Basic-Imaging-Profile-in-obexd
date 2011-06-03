@@ -11,19 +11,41 @@
 #include "session.h"
 #include "bip.h"
 #include "gwobex/obex-xfer.h"
+#include "gwobex/obex-priv.h"
+
+/* gunichar2 byte order? */
+gunichar2 *extract_handle(struct session_data *session, unsigned int *size);
+
+gunichar2 *extract_handle(struct session_data *session, unsigned int *size) {
+    struct gw_obex_xfer *xfer = session->obex->xfer;
+    struct a_header *ah = a_header_find(xfer->aheaders, IMG_HANDLE_HDR);
+    gunichar2 *buf;
+    if(!ah)
+        return NULL;
+    buf = g_try_malloc(ah->hv_size-2);
+    g_memmove(buf,ah->hv.bs+2,ah->hv_size-2);
+    *size = ah->hv_size-2;
+    return buf;
+}
 
 static void put_image_callback(struct session_data *session, GError *err,
         void *user_data)
 {
     DBusMessage *message = session->msg;
     DBusMessage *reply = dbus_message_new_method_return(message);
-    printf("callback called!!!!FTW!!\n");
+    unsigned int utf16size;
+    glong size;
+    gunichar2 *utf16_handle = extract_handle(session, &utf16size);
+    char *handle = g_utf16_to_utf8(utf16_handle,utf16size,NULL,&size,NULL);
+    g_free(utf16_handle);
+    printf("callback called!!!!FTW!! %s\n", handle);
+
     g_dbus_send_message(session->conn, reply);
     dbus_message_unref(session->msg);
     session->msg = NULL;
 }
 
-static DBusMessage * put_image(DBusConnection *connection,
+static DBusMessage *put_image(DBusConnection *connection,
 				DBusMessage *message, void *user_data)
 {
 	struct session_data *session = user_data;
@@ -46,7 +68,6 @@ static DBusMessage * put_image(DBusConnection *connection,
                 "org.openobex.Error.Failed",
                 "Failed");
     }
-
     printf("lol\n");
     session->msg = dbus_message_ref(message);
     printf("lol\n");

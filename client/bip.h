@@ -5,6 +5,8 @@
 
 #define IMAGE_PUSH_INTERFACE "org.openobex.ImagePush"
 
+#define IMG_HANDLE_HDR OBEX_HDR_TYPE_BYTES|0x30
+
 gboolean bip_register_interface(DBusConnection *connection, const char *path,
 				void *user_data, GDBusDestroyFunction destroy);
 void bip_unregister_interface(DBusConnection *connection, const char *path,

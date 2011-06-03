@@ -472,6 +472,16 @@ void a_header_free(struct a_header *ah) {
     g_free(ah);
 }
 
+struct a_header *a_header_find(GSList *aheaders, uint8_t hi) {
+    while (aheaders) {
+        if (((struct a_header *) aheaders->data)->hi == hi) {
+            return aheaders->data;
+        }
+        aheaders = g_slist_next(aheaders);
+    }
+    return NULL;
+}
+
 void _gw_obex_xfer_free(struct gw_obex_xfer *xfer) {
     GSList *aheaders = xfer->aheaders;
     while (aheaders) {
