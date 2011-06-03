@@ -18,8 +18,11 @@ gunichar2 *extract_handle(struct session_data *session, unsigned int *size);
 
 gunichar2 *extract_handle(struct session_data *session, unsigned int *size) {
     struct gw_obex_xfer *xfer = session->obex->xfer;
-    struct a_header *ah = a_header_find(xfer->aheaders, IMG_HANDLE_HDR);
+    struct a_header *ah;
     gunichar2 *buf;
+    if(!xfer)
+        return NULL;
+    ah = a_header_find(xfer->aheaders, IMG_HANDLE_HDR);
     if(!ah)
         return NULL;
     buf = g_try_malloc(ah->hv_size-2);
@@ -31,31 +34,36 @@ gunichar2 *extract_handle(struct session_data *session, unsigned int *size) {
 static void put_image_callback(struct session_data *session, GError *err,
         void *user_data)
 {
-    DBusMessage *message = session->msg;
-    DBusMessage *reply = dbus_message_new_method_return(message);
     unsigned int utf16size;
     glong size;
-    gunichar2 *utf16_handle = extract_handle(session, &utf16size);
-    char *handle = g_utf16_to_utf8(utf16_handle,utf16size,NULL,&size,NULL);
+    gunichar2 *utf16_handle;
+    char *handle;
+    if(err) {
+        printf("report error\n");
+    }
+    utf16_handle = extract_handle(session, &utf16size);
+    if(!utf16_handle) {
+        printf("report error\n");
+    }
+    printf("%p\n", utf16_handle);
+    handle = g_utf16_to_utf8(utf16_handle,utf16size,NULL,&size,NULL);
     g_free(utf16_handle);
     printf("callback called!!!!FTW!! %s\n", handle);
-
-    g_dbus_send_message(session->conn, reply);
     dbus_message_unref(session->msg);
     session->msg = NULL;
 }
 
 static DBusMessage *put_image(DBusConnection *connection,
-				DBusMessage *message, void *user_data)
+        DBusMessage *message, void *user_data)
 {
-	struct session_data *session = user_data;
-	const char *image_file;
+    struct session_data *session = user_data;
+    const char *image_file;
 
-	if (dbus_message_get_args(message, NULL,
-				DBUS_TYPE_STRING, &image_file,
-				DBUS_TYPE_INVALID) == FALSE)
-		return g_dbus_create_error(message,
-				"org.openobex.Error.InvalidArguments", NULL);
+    if (dbus_message_get_args(message, NULL,
+                DBUS_TYPE_STRING, &image_file,
+                DBUS_TYPE_INVALID) == FALSE)
+        return g_dbus_create_error(message,
+                "org.openobex.Error.InvalidArguments", NULL);
 
     if (!image_file || strlen(image_file)==0) {
         return g_dbus_create_error(message,"org.openobex.Error.InvalidArguments", NULL);
@@ -71,32 +79,32 @@ static DBusMessage *put_image(DBusConnection *connection,
     printf("lol\n");
     session->msg = dbus_message_ref(message);
     printf("lol\n");
-	
+
     return dbus_message_new_method_return(message);
 }
 
 static GDBusMethodTable image_push_methods[] = {
-//	{ "GetImagingCapabilities",	"", "s",	get_imaging_capabilities },
-	{ "PutImage",	"s", "",	put_image	},
-	{ }
+    //	{ "GetImagingCapabilities",	"", "s",	get_imaging_capabilities },
+    { "PutImage",	"s", "",	put_image	},
+    { }
 };
 
 gboolean bip_register_interface(DBusConnection *connection, const char *path,
-				void *user_data, GDBusDestroyFunction destroy)
+        void *user_data, GDBusDestroyFunction destroy)
 {
     struct session_data * session = user_data;
     /** should be memcmp0 from obex.c */
     if(memcmp(session->target, IMAGE_PUSH_UUID, session->target_len)==0) {
         printf("PUSH_INTERFACE\n");
-	    return g_dbus_register_interface(connection, path, IMAGE_PUSH_INTERFACE,
-			image_push_methods, NULL, NULL, user_data, destroy);
+        return g_dbus_register_interface(connection, path, IMAGE_PUSH_INTERFACE,
+                image_push_methods, NULL, NULL, user_data, destroy);
     }
     printf("FALSE\n");
     return FALSE;
 }
 
 void bip_unregister_interface(DBusConnection *connection, const char *path,
-				void *user_data)
+        void *user_data)
 {
-	g_dbus_unregister_interface(connection, path, IMAGE_PUSH_INTERFACE);
+    g_dbus_unregister_interface(connection, path, IMAGE_PUSH_INTERFACE);
 }
