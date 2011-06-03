@@ -154,7 +154,7 @@ int image_push_chkput(struct obex_session *os, void *user_data)
     ips->reqdata = g_new0(struct request_data, 1);
     ips->reqdata->imgdesc = g_new0(struct image_descriptor, 1);
 	ret = obex_put_stream_start(os, "adfasdfasd");
-	return 0;
+	return ret;
 }
 
 gpointer *encode_length_prefix(const gunichar2 *data, unsigned int length, unsigned int *newsize) {
