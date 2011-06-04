@@ -27,7 +27,7 @@ gunichar2 *extract_handle(struct session_data *session, unsigned int *size) {
         return NULL;
     buf = g_try_malloc(ah->hv_size-2);
     g_memmove(buf,ah->hv.bs+2,ah->hv_size-2);
-    *size = ah->hv_size-2;
+    *size = (ah->hv_size-3)/2;
     return buf;
 }
 
@@ -39,13 +39,12 @@ static void put_image_callback(struct session_data *session, GError *err,
     gunichar2 *utf16_handle;
     char *handle;
     if(err) {
-        printf("report error\n");
+        printf("report error err\n");
     }
     utf16_handle = extract_handle(session, &utf16size);
     if(!utf16_handle) {
-        printf("report error\n");
+        printf("report error utf16\n");
     }
-    printf("%p\n", utf16_handle);
     handle = g_utf16_to_utf8(utf16_handle,utf16size,NULL,&size,NULL);
     g_free(utf16_handle);
     printf("callback called!!!!FTW!! %s\n", handle);
@@ -76,9 +75,7 @@ static DBusMessage *put_image(DBusConnection *connection,
                 "org.openobex.Error.Failed",
                 "Failed");
     }
-    printf("lol\n");
     session->msg = dbus_message_ref(message);
-    printf("lol\n");
 
     return dbus_message_new_method_return(message);
 }

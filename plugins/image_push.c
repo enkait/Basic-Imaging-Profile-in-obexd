@@ -158,14 +158,15 @@ int image_push_chkput(struct obex_session *os, void *user_data)
 }
 
 guint8 *encode_length_prefix(const gunichar2 *data, unsigned int length, unsigned int *newsize) {
-    guint16 len = length*2;
-    guint8 *buf = g_try_malloc(2+2*length);
+    guint16 len = length;
+    guint8 *buf = g_try_malloc(3+2*length);
     len = GUINT16_TO_BE(len);
     if(!buf)
         return NULL;
     g_memmove(buf,&len,2);
     g_memmove(buf+2,data,2*length);
-    *newsize = 2*length+2+2;
+    buf[2*length+2]='\0';
+    *newsize = 2*length+3;
     return buf;
 }
 
