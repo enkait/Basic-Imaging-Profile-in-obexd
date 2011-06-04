@@ -54,6 +54,9 @@
 #define MAX_TIMEOUTS 20
 #define MAX_TIMEOUTS_FIRST 60
 
+static void get_non_body_headers(obex_t *handle, obex_object_t *object,
+                                     struct gw_obex_xfer *xfer);
+
 static gboolean file_is_dir(const char *filename) {
     struct stat st;
 
