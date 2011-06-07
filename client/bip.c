@@ -106,7 +106,7 @@ gboolean bip_register_interface(DBusConnection *connection, const char *path,
     if(memcmp(session->target, IMAGE_PUSH_UUID, session->target_len)==0) {
         printf("PUSH_INTERFACE\n");
         return g_dbus_register_interface(connection, path, IMAGE_PUSH_INTERFACE,
-                image_push_methods, NULL, NULL, user_data, destroy);
+                image_push_methods, image_push_signals, NULL, user_data, destroy);
     }
     printf("FALSE\n");
     return FALSE;
