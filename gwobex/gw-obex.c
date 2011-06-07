@@ -286,6 +286,7 @@ void gw_obex_close(GwObex *ctx) {
     GW_OBEX_LOCK(ctx);
     if (ctx->xfer) {
         GwObexXfer *xfer = ctx->xfer;
+        printf("%d\n", ctx->xfer->async);
         GW_OBEX_UNLOCK(ctx);
         gw_obex_xfer_close(ctx->xfer, NULL);
         GW_OBEX_LOCK(ctx);
