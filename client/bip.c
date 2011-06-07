@@ -50,6 +50,13 @@ static void put_image_callback(struct session_data *session, GError *err,
     printf("callback called!!!!FTW!! %s\n", handle);
     dbus_message_unref(session->msg);
     session->msg = NULL;
+	
+	/* fix to handle partial content */
+	g_dbus_emit_signal(session->conn, session->path,
+			IMAGE_PUSH_INTERFACE, "PutImageCompleted",
+			DBUS_TYPE_STRING, &handle,
+			DBUS_TYPE_BOOLEAN, 0,
+			DBUS_TYPE_INVALID);
 }
 
 static DBusMessage *put_image(DBusConnection *connection,
@@ -84,6 +91,11 @@ static GDBusMethodTable image_push_methods[] = {
     //	{ "GetImagingCapabilities",	"", "s",	get_imaging_capabilities },
     { "PutImage",	"s", "",	put_image	},
     { }
+};
+
+static GDBusSignalTable image_push_signals[] = {
+	{ "PutImageCompleted",	"sb" },
+	{ }
 };
 
 gboolean bip_register_interface(DBusConnection *connection, const char *path,
