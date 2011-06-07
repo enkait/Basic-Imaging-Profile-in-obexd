@@ -57,6 +57,10 @@ def parse_options():
 def image_push(session, filename):
     session.PutImage(os.path.abspath(filename))
 
+def image_push_completed(handle, thumbnail):
+    print "Image pushed, received handle: "+handle
+    print "Is thumbnail requested? "+thumbnail
+
 if  __name__ == '__main__':
 
     dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
@@ -74,6 +78,10 @@ if  __name__ == '__main__':
 
     path = "/test/agent"
     agent = Agent(bus, path, options.verbose)
+	
+    bus.add_signal_receiver(image_push_completed,
+								dbus_interface="org.openobex.ImagePush",
+								signal_name="PutImageCompleted")
 
     client = dbus.Interface(bus.get_object("org.openobex.client", "/"),
                             "org.openobex.Client")
