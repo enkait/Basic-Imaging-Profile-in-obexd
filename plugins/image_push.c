@@ -187,7 +187,7 @@ int obex_handle_write(struct obex_session *os, obex_object_t *obj, const char *d
 char *get_handle(struct image_push_session *ips) {
     char *handle = g_try_malloc(7);
     printf("%d\n", ips->next_handle);
-    snprintf(handle, 7, "%d", ips->next_handle);
+    snprintf(handle, 7, "%07d", ips->next_handle);
     ips->next_handle++;
     return handle;
 }
@@ -232,7 +232,8 @@ int image_push_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 	unsigned int hlen;
 	uint8_t hi;
     int len;
-    char * imagename;
+    char *imagename;
+    char *handle;
     printf("IMAGE PUSH PUT %s\n", os->name);
 	while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen)) {
         printf("header numer=%d\n", hi);
@@ -247,7 +248,9 @@ int image_push_put(struct obex_session *os, obex_object_t *obj, void *user_data)
     rename(ips->image_path, imagename);
     printf("imagename=%s\n", imagename);
     g_free(imagename);
-    obex_handle_write(os, obj, "0000000", 7);
+    handle = get_handle(ips);
+    obex_handle_write(os, obj, handle, 7);
+    g_free(handle);
 	return 0;
 }
 
