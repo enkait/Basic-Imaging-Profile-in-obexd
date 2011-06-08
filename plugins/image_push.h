@@ -45,8 +45,11 @@ struct image_push_session {
     struct obex_session *os;
     struct request_data *reqdata;
     int fd;
+    int next_handle;
     char *image_path;
 };
+
+char *get_handle(struct image_push_session *ips);
 
 void free_image_descriptor(struct image_descriptor *id);
 void free_request_data(struct request_data *rd);
