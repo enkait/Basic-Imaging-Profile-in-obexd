@@ -185,9 +185,9 @@ int obex_handle_write(struct obex_session *os, obex_object_t *obj, const char *d
 }
 
 char *get_handle(struct image_push_session *ips) {
-    char *handle = g_try_malloc(7);
+    char *handle = g_try_malloc(8);
     printf("%d\n", ips->next_handle);
-    snprintf(handle, 7, "%07d", ips->next_handle);
+    snprintf(handle, 8, "%07d", ips->next_handle);
     ips->next_handle++;
     return handle;
 }
