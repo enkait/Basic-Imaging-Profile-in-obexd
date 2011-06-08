@@ -38,12 +38,20 @@ static void put_image_callback(struct session_data *session, GError *err,
     glong size;
     gunichar2 *utf16_handle;
     char *handle;
+    int required = 1;
     if(err) {
-        printf("report error err\n");
+	    g_dbus_emit_signal(session->conn, session->path,
+	        IMAGE_PUSH_INTERFACE, "PutImageFailed",
+            DBUS_TYPE_STRING, &err->message,
+		    DBUS_TYPE_INVALID);
+        return;
     }
     utf16_handle = extract_handle(session, &utf16size);
     if(!utf16_handle) {
-        printf("report error utf16\n");
+	    g_dbus_emit_signal(session->conn, session->path,
+	        IMAGE_PUSH_INTERFACE, "PutImageFailed",
+            DBUS_TYPE_STRING, &("Improper handle returned"),
+		    DBUS_TYPE_INVALID);
     }
     handle = g_utf16_to_utf8(utf16_handle,utf16size,NULL,&size,NULL);
     g_free(utf16_handle);
@@ -53,10 +61,11 @@ static void put_image_callback(struct session_data *session, GError *err,
 	
 	/* fix to handle partial content */
 	g_dbus_emit_signal(session->conn, session->path,
-			IMAGE_PUSH_INTERFACE, "PutImageCompleted",
-			DBUS_TYPE_STRING, &handle,
-			DBUS_TYPE_BOOLEAN, 0,
-			DBUS_TYPE_INVALID);
+		IMAGE_PUSH_INTERFACE, "PutImageCompleted",
+		DBUS_TYPE_STRING, &handle,
+		DBUS_TYPE_BOOLEAN, &required,
+		DBUS_TYPE_INVALID);
+    return;
 }
 
 static DBusMessage *put_image(DBusConnection *connection,
@@ -95,6 +104,7 @@ static GDBusMethodTable image_push_methods[] = {
 
 static GDBusSignalTable image_push_signals[] = {
 	{ "PutImageCompleted",	"sb" },
+	{ "PutImageFailed",	"s" },
 	{ }
 };
 

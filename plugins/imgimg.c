@@ -56,14 +56,20 @@ static const uint8_t IMAGE_PUSH_TARGET[TARGET_SIZE] = {
 			0xE3, 0x3D, 0x95, 0x45, 0x83, 0x74, 0x4A, 0xD7,
 			0x9E, 0xC5, 0xC1, 0x6B, 0xE3, 0x1E, 0xDE, 0x8E };
 
-static const char * bip_root="/tmp/bip/";
+static const char * bip_temp_template = "/tmp/bip/.tmpXXXXXX";
 
 static void *imgimg_open(const char *name, int oflag, mode_t mode,
 					void *context, size_t *size, int *err)
 {
     struct image_push_session *session = context;
-    session->image_path = g_strconcat(bip_root, name, NULL);
-	session->fd = open(session->image_path, oflag, mode);
+    char * tmpname = strdup(bip_temp_template);
+    if (!name) {
+        if (err)
+            *err = -errno;
+        return NULL;
+    }
+	session->fd = mkstemp(tmpname);
+    session->image_path = tmpname;
 	
     if (session->fd < 0) {
 		if (err)
