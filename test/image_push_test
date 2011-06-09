@@ -44,12 +44,13 @@ class Agent(dbus.service.Object):
     def Release(self):
         mainloop.quit()
 
-
 def parse_options():
     parser.add_option("-d", "--device", dest="device",
                       help="Device to connect", metavar="DEVICE")
     parser.add_option("-p", "--push", action="append", dest="image_file",
                       help="Push image", metavar="FILE")
+    parser.add_option("-c", "--capabilities", action="store_true", dest="imaging_capabilities",
+                      help="Get imaging capabilities")
     parser.add_option("-v", "--verbose", action="store_true", dest="verbose")
 
     return parser.parse_args()
@@ -61,6 +62,9 @@ bip = None
 def image_push(session, filename):
     session.PutImage(os.path.abspath(filename))
 
+def imaging_capabilities(session):
+    print session.GetImagingCapabilities()
+
 def image_push_completed(handle, thumbnail):
     global L, cur, bip
     print "Image pushed, received handle: "+handle
@@ -70,7 +74,6 @@ def image_push_completed(handle, thumbnail):
     print L[cur]
     print bip
     image_push(bip, L[cur])
-
 
 def image_push_failed(reason):
     print "Image push failed, reason: "+reason
@@ -119,5 +122,8 @@ if  __name__ == '__main__':
     if options.image_file:
        print options.image_file[0]
        image_push(bip, options.image_file[0])
+    if options.capabilities:
+       print "capabilities"
+       imaging_capabilities()
 
     mainloop.run()

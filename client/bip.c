@@ -166,8 +166,6 @@ static DBusMessage *get_imaging_capabilities(DBusConnection *connection,
     return NULL;
 }
 
-
-
 static GDBusMethodTable image_push_methods[] = {
     { "GetImagingCapabilities",	"", "s",	get_imaging_capabilities    },
     { "PutImage",	"s", "",	put_image   },
