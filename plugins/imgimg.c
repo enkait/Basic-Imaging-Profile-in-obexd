@@ -51,6 +51,20 @@
 #include "service.h"
 #include "imgimg.h"
 #include "image_push.h"
+#include "filesystem.h"
+
+#define EOL_CHARS "\n"
+
+#define CAPABILITIES_BEGIN "<imaging-capabilities version=\"1.0\">" EOL_CHARS
+
+#define IMAGE_FORMATS EOL_CHARS "<image-formats encoding=\"JPEG\" pixel=\"0*0-65535*65535\" >" EOL_CHARS \
+                      "<image-formats encoding=\"GIF\" pixel=\"0*0-65535*65535\" >" EOL_CHARS \
+                      "<image-formats encoding=\"WBMP\" pixel=\"0*0-65535*65535\" >" EOL_CHARS \
+                      "<image-formats encoding=\"PNG\" pixel=\"0*0-65535*65535\" >" EOL_CHARS \
+                      "<image-formats encoding=\"JPEG2000\" pixel=\"0*0-65535*65535\" >" EOL_CHARS \
+                      "<image-formats encoding=\"BMP\" pixel=\"0*0-65535*65535\" >" EOL_CHARS \
+
+#define CAPABILITIES_END "</imaging-capabilities>" EOL_CHARS
 
 static const uint8_t IMAGE_PUSH_TARGET[TARGET_SIZE] = {
 			0xE3, 0x3D, 0x95, 0x45, 0x83, 0x74, 0x4A, 0xD7,
@@ -109,13 +123,50 @@ static struct obex_mime_type_driver imgimg = {
 	.write = imgimg_write,
 };
 
+static void *img_capabilities_open(const char *name, int oflag, mode_t mode,
+					void *context, size_t *size, int *err)
+{
+    GString *capabilities = g_string_new(CAPABILITIES_BEGIN);
+    capabilities = g_string_append(capabilities, IMAGE_FORMATS);
+    capabilities = g_string_append(capabilities, CAPABILITIES_END);
+    
+    if (err)
+        *err = 0;
+
+    return capabilities;
+}
+
+static ssize_t img_capabilities_read(void *object, void *buf, size_t count,
+					uint8_t *hi, unsigned int *flags)
+{
+	if (flags)
+		*flags = 0;
+
+	*hi = OBEX_HDR_BODY;
+	return string_read(object, buf, count);
+}
+
+static struct obex_mime_type_driver img_capabilities = {
+    .target = IMAGE_PUSH_TARGET,
+    .target_size = TARGET_SIZE,
+    .mimetype = "x-bt/img-capabilities",
+	.open = img_capabilities_open,
+	.close = string_free,
+	.read = img_capabilities_read,
+};
+
 static int imgimg_init(void)
 {
+    int res;
+    if ((res = obex_mime_type_driver_register(&img_capabilities)) < 0) {
+        return res;
+    }
 	return obex_mime_type_driver_register(&imgimg);
 }
 
 static void imgimg_exit(void)
 {
+	obex_mime_type_driver_unregister(&img_capabilities);
 	obex_mime_type_driver_unregister(&imgimg);
 }
 

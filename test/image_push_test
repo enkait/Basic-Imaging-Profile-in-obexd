@@ -48,18 +48,29 @@ class Agent(dbus.service.Object):
 def parse_options():
     parser.add_option("-d", "--device", dest="device",
                       help="Device to connect", metavar="DEVICE")
-    parser.add_option("-p", "--push", dest="image_file",
+    parser.add_option("-p", "--push", action="append", dest="image_file",
                       help="Push image", metavar="FILE")
     parser.add_option("-v", "--verbose", action="store_true", dest="verbose")
 
     return parser.parse_args()
 
+L = []
+cur = 0
+bip = None
+
 def image_push(session, filename):
     session.PutImage(os.path.abspath(filename))
 
 def image_push_completed(handle, thumbnail):
+    global L, cur, bip
     print "Image pushed, received handle: "+handle
     print "Is thumbnail requested? "+str(thumbnail)
+    cur+=1
+    print cur
+    print L[cur]
+    print bip
+    image_push(bip, L[cur])
+
 
 def image_push_failed(reason):
     print "Image push failed, reason: "+reason
@@ -104,7 +115,9 @@ if  __name__ == '__main__':
     bip = dbus.Interface(bus.get_object("org.openobex.client", session_path),
                  "org.openobex.ImagePush")
 
+    L = options.image_file
     if options.image_file:
-       image_push(bip, options.image_file)
+       print options.image_file[0]
+       image_push(bip, options.image_file[0])
 
     mainloop.run()

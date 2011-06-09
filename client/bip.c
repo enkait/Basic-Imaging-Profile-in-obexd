@@ -73,6 +73,7 @@ static DBusMessage *put_image(DBusConnection *connection,
 {
     struct session_data *session = user_data;
     const char *image_file;
+    int err;
 
     if (dbus_message_get_args(message, NULL,
                 DBUS_TYPE_STRING, &image_file,
@@ -86,7 +87,7 @@ static DBusMessage *put_image(DBusConnection *connection,
 
     printf("requested put_image on file %s\n", image_file);
 
-    if (session_put_with_aheaders(session, "x-bt/img-img", image_file, image_file, NULL, put_image_callback) < 0) {
+    if ((err=session_put_with_aheaders(session, "x-bt/img-img", image_file, image_file, NULL, put_image_callback)) < 0) {
         return g_dbus_create_error(message,
                 "org.openobex.Error.Failed",
                 "Failed");
@@ -96,9 +97,80 @@ static DBusMessage *put_image(DBusConnection *connection,
     return dbus_message_new_method_return(message);
 }
 
+static void get_imaging_capabilities_callback(
+        struct session_data *session, GError *err,
+        void *user_data)
+{
+	DBusMessage *reply;
+	DBusMessageIter iter;
+    char *capabilities;
+    int i;
+	struct transfer_data *transfer = session->pending->data;
+    printf("get_imaging_capabilities_callback called\n");
+    if(err) {
+        reply = g_dbus_create_error(session->msg,
+            "org.openobex.Error", "%s", err->message);
+        goto done;
+    }
+	
+    reply = dbus_message_new_method_return(session->msg);
+	
+    if (transfer->filled == 0)
+        goto done;
+
+    for (i = transfer->filled - 1; i > 0; i--) {
+		if (transfer->buffer[i] != '\0')
+			break;
+
+		transfer->filled--;
+	}
+
+    if (transfer->buffer[transfer->filled - 1] != '\0') {
+        printf("null terminating\n");
+        capabilities = g_try_malloc(transfer->filled + 1);
+        g_memmove(capabilities, transfer->buffer, transfer->filled);
+        capabilities[transfer->filled]='\0';
+    }
+    else {
+        capabilities = g_memdup(transfer->buffer, transfer->filled);
+    }
+
+    dbus_message_iter_init_append(reply, &iter);
+    dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING,
+        &capabilities);
+    g_free(capabilities);
+
+done:
+    g_dbus_send_message(session->conn, reply);
+    dbus_message_unref(reply);
+    dbus_message_unref(session->msg);
+
+    return;
+}
+
+static DBusMessage *get_imaging_capabilities(DBusConnection *connection,
+        DBusMessage *message, void *user_data)
+{
+    struct session_data *session = user_data;
+    int err;
+
+    printf("requested get imaging capabilities\n");
+
+    if ((err=session_get(session, "x-bt/img-capabilities", NULL, NULL, NULL, 0, get_imaging_capabilities_callback)) < 0) {
+        return g_dbus_create_error(message,
+                "org.openobex.Error.Failed",
+                "Failed");
+    }
+    session->msg = dbus_message_ref(message);
+
+    return NULL;
+}
+
+
+
 static GDBusMethodTable image_push_methods[] = {
-    //	{ "GetImagingCapabilities",	"", "s",	get_imaging_capabilities },
-    { "PutImage",	"s", "",	put_image	},
+    { "GetImagingCapabilities",	"", "s",	get_imaging_capabilities    },
+    { "PutImage",	"s", "",	put_image   },
     { }
 };
 
