@@ -97,6 +97,21 @@ static DBusMessage *put_image(DBusConnection *connection,
     return dbus_message_new_method_return(message);
 }
 
+char *get_null_terminated(char *buffer, int len);
+char *get_null_terminated(char *buffer, int len) {
+    char *newbuffer;
+    if (buffer[len-1] != '\0') {
+        newbuffer = g_try_malloc(len + 1);
+        g_memmove(newbuffer, buffer, len);
+        newbuffer[len]='\0';
+        printf("null terminating\n");
+    }
+    else {
+        newbuffer = g_memdup(buffer, len);
+    }
+    return newbuffer;
+}
+
 static void get_imaging_capabilities_callback(
         struct session_data *session, GError *err,
         void *user_data)
@@ -125,15 +140,7 @@ static void get_imaging_capabilities_callback(
 		transfer->filled--;
 	}
 
-    if (transfer->buffer[transfer->filled - 1] != '\0') {
-        printf("null terminating\n");
-        capabilities = g_try_malloc(transfer->filled + 1);
-        g_memmove(capabilities, transfer->buffer, transfer->filled);
-        capabilities[transfer->filled]='\0';
-    }
-    else {
-        capabilities = g_memdup(transfer->buffer, transfer->filled);
-    }
+    capabilities = get_null_terminated(transfer->buffer, transfer->filled);
 
     dbus_message_iter_init_append(reply, &iter);
     dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING,
