@@ -49,7 +49,8 @@ def parse_options():
                       help="Device to connect", metavar="DEVICE")
     parser.add_option("-p", "--push", action="append", dest="image_file",
                       help="Push image", metavar="FILE")
-    parser.add_option("-c", "--capabilities", action="store_true", dest="imaging_capabilities",
+    parser.add_option("-c", "--capabilities", action="store_true",
+                      dest="capabilities",
                       help="Get imaging capabilities")
     parser.add_option("-v", "--verbose", action="store_true", dest="verbose")
 
@@ -63,6 +64,7 @@ def image_push(session, filename):
     session.PutImage(os.path.abspath(filename))
 
 def imaging_capabilities(session):
+    print "omg"
     print session.GetImagingCapabilities()
 
 def image_push_completed(handle, thumbnail):
@@ -117,13 +119,13 @@ if  __name__ == '__main__':
 
     bip = dbus.Interface(bus.get_object("org.openobex.client", session_path),
                  "org.openobex.ImagePush")
+    
+    print "capabilities"
+    imaging_capabilities(bip)
 
     L = options.image_file
     if options.image_file:
        print options.image_file[0]
        image_push(bip, options.image_file[0])
-    if options.capabilities:
-       print "capabilities"
-       imaging_capabilities()
 
     mainloop.run()

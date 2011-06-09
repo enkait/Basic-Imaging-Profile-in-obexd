@@ -142,7 +142,10 @@ void *image_push_connect(struct obex_session *os, int *err)
 int image_push_get(struct obex_session *os, obex_object_t *obj, gboolean *stream,
 							void *user_data)
 {
+    int ret = obex_get_stream_start(os, "");
     printf("IMAGE PUSH GET\n");
+    if (ret < 0)
+        return ret;
 	return 0;
 }
 

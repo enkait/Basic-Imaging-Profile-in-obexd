@@ -57,7 +57,7 @@
 
 #define CAPABILITIES_BEGIN "<imaging-capabilities version=\"1.0\">" EOL_CHARS
 
-#define IMAGE_FORMATS EOL_CHARS "<image-formats encoding=\"JPEG\" pixel=\"0*0-65535*65535\" >" EOL_CHARS \
+#define IMAGE_FORMATS "<image-formats encoding=\"JPEG\" pixel=\"0*0-65535*65535\" >" EOL_CHARS \
                       "<image-formats encoding=\"GIF\" pixel=\"0*0-65535*65535\" >" EOL_CHARS \
                       "<image-formats encoding=\"WBMP\" pixel=\"0*0-65535*65535\" >" EOL_CHARS \
                       "<image-formats encoding=\"PNG\" pixel=\"0*0-65535*65535\" >" EOL_CHARS \

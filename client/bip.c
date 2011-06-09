@@ -161,14 +161,16 @@ static DBusMessage *get_imaging_capabilities(DBusConnection *connection,
                 "org.openobex.Error.Failed",
                 "Failed");
     }
+
     session->msg = dbus_message_ref(message);
 
     return NULL;
 }
 
 static GDBusMethodTable image_push_methods[] = {
-    { "GetImagingCapabilities",	"", "s",	get_imaging_capabilities    },
-    { "PutImage",	"s", "",	put_image   },
+    { "GetImagingCapabilities",	"", "s", get_imaging_capabilities,
+        G_DBUS_METHOD_FLAG_ASYNC },
+    { "PutImage", "s", "", put_image },
     { }
 };
 
