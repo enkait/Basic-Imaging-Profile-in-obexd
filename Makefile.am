@@ -129,7 +129,7 @@ client_obex_client_SOURCES = $(gdbus_sources) $(gwobex_sources) $(btio_sources) 
 				client/transfer.h client/transfer.c \
 				client/bip.h client/bip.c
 
-client_obex_client_LDADD = @GLIB_LIBS@ @DBUS_LIBS@ @OPENOBEX_LIBS@ @BLUEZ_LIBS@
+client_obex_client_LDADD = @GLIB_LIBS@ @DBUS_LIBS@ @OPENOBEX_LIBS@ @BLUEZ_LIBS@ @MAGICKWAND_LIBS@
 endif
 
 service_DATA = $(service_in_files:.service.in=.service)

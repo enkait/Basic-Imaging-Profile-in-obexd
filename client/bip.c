@@ -12,6 +12,7 @@
 #include "bip.h"
 #include "gwobex/obex-xfer.h"
 #include "gwobex/obex-priv.h"
+#include "wand/MagickWand.h"
 
 /* gunichar2 byte order? */
 gunichar2 *extract_handle(struct session_data *session, unsigned int *size);
@@ -86,6 +87,9 @@ static DBusMessage *put_image(DBusConnection *connection,
     }
 
     printf("requested put_image on file %s\n", image_file);
+
+    MagickWandGenesis();
+    MagickWandTerminus();
 
     if ((err=session_put_with_aheaders(session, "x-bt/img-img", image_file, image_file, NULL, put_image_callback)) < 0) {
         return g_dbus_create_error(message,

@@ -67,6 +67,11 @@ fi
 AC_CHECK_LIB(dl, dlopen, dummy=yes,
 			AC_MSG_ERROR(dynamic linking loader is required))
 
+PKG_CHECK_MODULES(MAGICKWAND, MagickWand >= 6.5, dummy=yes,
+				AC_MSG_ERROR(MagickWand 6.5 or later is required))
+AC_SUBST(MAGICKWAND_CFLAGS)
+AC_SUBST(MAGICKWAND_LIBS)
+
 PKG_CHECK_MODULES(GLIB, glib-2.0 >= 2.16, dummy=yes,
 				AC_MSG_ERROR(libglib 2.16 or later is required))
 AC_SUBST(GLIB_CFLAGS)
