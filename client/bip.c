@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <glib.h>
 #include <gdbus.h>
+#include <unistd.h>
 
 #include "log.h"
 #include "transfer.h"
@@ -14,10 +15,22 @@
 #include "gwobex/obex-priv.h"
 #include "wand/MagickWand.h"
 
-/* gunichar2 byte order? */
-gunichar2 *extract_handle(struct session_data *session, unsigned int *size);
+#define EOL_CHARS "\n"
 
-gunichar2 *extract_handle(struct session_data *session, unsigned int *size) {
+#define IMG_DESCRIPTOR_BEGIN "<image-descriptor version=\"1.0\">" EOL_CHARS
+
+#define IMG_DESCRIPTOR_FORMAT "<image encoding=\"%s\" pixel=\"%zu*%zu\" size=\"%lu\"/>" EOL_CHARS
+
+#define IMG_DESCRIPTOR_WITH_TRANSFORM_FORMAT "<image encoding=\"%s\" pixel=\"%zu*%zu\" size=\"%lu\" transform=\"%s\"/>" EOL_CHARS
+
+#define IMG_DESCRIPTOR_END "</image-descriptor>" EOL_CHARS
+
+#define IMG_DESCRIPTOR_HDR OBEX_HDR_TYPE_BYTES | 0x71
+
+#define BIP_TEMP_FOLDER /tmp/bip/
+
+/* gunichar2 byte order? */
+static gunichar2 *extract_handle(struct session_data *session, unsigned int *size) {
     struct gw_obex_xfer *xfer = session->obex->xfer;
     struct a_header *ah;
     gunichar2 *buf;
@@ -35,7 +48,7 @@ gunichar2 *extract_handle(struct session_data *session, unsigned int *size) {
 static void put_image_callback(struct session_data *session, GError *err,
         void *user_data)
 {
-    unsigned int utf16size;
+    unsigned int utf16size = 0;
     glong size;
     gunichar2 *utf16_handle;
     char *handle;
@@ -69,12 +82,153 @@ static void put_image_callback(struct session_data *session, GError *err,
     return;
 }
 
+struct image_attributes {
+    char * format;
+    size_t width, height;
+    unsigned long length;
+    char * transform;
+};
+
+static int get_image_attributes(const char * image_file, struct image_attributes * attr) {
+    int err;
+    MagickWand *wand;
+    MagickSizeType size;
+    MagickWandGenesis();
+    wand = NewMagickWand();
+    err = MagickPingImage(wand, image_file);
+    if (err == MagickFalse) {
+        return -1;
+    }
+    attr->format = g_strdup(MagickGetImageFormat(wand));
+    attr->width = MagickGetImageWidth(wand);
+    attr->height = MagickGetImageHeight(wand);
+    MagickGetImageLength(wand, &size);
+    attr->length = (unsigned long) size;
+    MagickWandTerminus();
+    return 0;
+}
+
+static void create_image_descriptor(struct image_attributes *attr, struct a_header *ah) {
+    GString *descriptor = g_string_new(IMG_DESCRIPTOR_BEGIN);
+    if (attr->transform) {
+        g_string_append_printf(descriptor,
+            IMG_DESCRIPTOR_WITH_TRANSFORM_FORMAT,
+            attr->format, attr->width, attr->height, attr->length, attr->transform);
+    }
+    else {
+        g_string_append_printf(descriptor,
+            IMG_DESCRIPTOR_FORMAT,
+            attr->format, attr->width, attr->height, attr->length);
+    }
+    descriptor = g_string_append(descriptor, IMG_DESCRIPTOR_END);
+    ah->hi = IMG_DESCRIPTOR_HDR;
+    ah->hv.bs = (guint8 *) g_string_free(descriptor, FALSE);
+    ah->hv_size = attr->length;
+}
+
+static int make_modified_image(const char *image_path, const char *modified_path, struct image_attributes *attr) {
+    MagickWand *wand;
+    MagickWandGenesis();
+    wand = NewMagickWand();
+    if (MagickReadImage(wand, image_path) == MagickFalse)
+        return -1;
+    if (g_strcmp0(attr->transform, "crop") == 0) {
+        printf("crop\n");
+        if(MagickCropImage(wand, attr->width, attr->height, 0, 0) == MagickFalse)
+            return -1;
+    }
+    else if (g_strcmp0(attr->transform, "fill") == 0) {
+        printf("fill\n");
+        if(MagickExtentImage(wand, attr->width, attr->height, 0, 0) == MagickFalse)
+            return -1;
+    }
+    else if (g_strcmp0(attr->transform, "stretch") == 0){
+        printf("stretch\n");
+        if(MagickResizeImage(wand, attr->width, attr->height, LanczosFilter, 1.0) == MagickFalse)
+            return -1;
+    }
+    else {
+        return -1;
+    }
+    if (MagickSetImageFormat(wand, attr->format) == MagickFalse) {
+        return -1;
+    }
+    if (MagickWriteImage(wand, modified_path) == MagickFalse) {
+        return -1;
+    }
+    MagickWandTerminus();
+    return 0;
+}
+
+static DBusMessage *put_modified_image(DBusConnection *connection,
+        DBusMessage *message, void *user_data)
+{
+    struct session_data *session = user_data;
+    const char *image_path;
+    int err, fd;
+    struct image_attributes attr;
+    struct a_header descriptor;
+    GSList *aheaders = NULL;
+    GString *new_image_path;
+
+    if (dbus_message_get_args(message, NULL,
+            DBUS_TYPE_STRING, &image_path,
+            DBUS_TYPE_STRING, &attr.format,
+            DBUS_TYPE_UINT32, &attr.width,
+            DBUS_TYPE_UINT32, &attr.height,
+            DBUS_TYPE_STRING, &attr.transform,
+            DBUS_TYPE_INVALID) == FALSE)
+        return g_dbus_create_error(message,
+                "org.openobex.Error.InvalidArguments", NULL);
+
+    if (!image_path || strlen(image_path)==0) {
+        return g_dbus_create_error(message,"org.openobex.Error.InvalidArguments", NULL);
+    }
+
+    printf("requested put_modified_image on file %s\n", image_path);
+    new_image_path = g_string_new(image_path);
+    new_image_path = g_string_append(new_image_path, "XXXXXX");
+    if ((fd = mkstemp(new_image_path->str)) < 0) {
+        return g_dbus_create_error(message,
+            "org.openobex.Error.CanNotCreateTemporaryFile", NULL);
+    }
+    close(fd);
+
+    printf("new path: %s\n", new_image_path->str);
+
+    if (make_modified_image(image_path, new_image_path->str, &attr) < 0) {
+        return g_dbus_create_error(message,
+            "org.openobex.Error.CanNotCreateModifiedImage", NULL);
+    }
+
+    if (get_image_attributes(image_path, &attr) < 0) {
+        return g_dbus_create_error(message,
+            "org.openobex.Error.InvalidArguments", NULL);
+    }
+
+    create_image_descriptor(&attr, &descriptor);
+    aheaders = g_slist_append(NULL, &descriptor);
+
+    if ((err=session_put_with_aheaders(session, "x-bt/img-img",
+            new_image_path->str, image_path, aheaders, put_image_callback)) < 0) {
+        return g_dbus_create_error(message,
+                "org.openobex.Error.Failed",
+                "Failed");
+    }
+    session->msg = dbus_message_ref(message);
+
+    return dbus_message_new_method_return(message);
+}
+
 static DBusMessage *put_image(DBusConnection *connection,
         DBusMessage *message, void *user_data)
 {
     struct session_data *session = user_data;
     const char *image_file;
     int err;
+    struct image_attributes attr;
+    struct a_header descriptor;
+    GSList * aheaders = NULL;
 
     if (dbus_message_get_args(message, NULL,
                 DBUS_TYPE_STRING, &image_file,
@@ -88,10 +242,16 @@ static DBusMessage *put_image(DBusConnection *connection,
 
     printf("requested put_image on file %s\n", image_file);
 
-    MagickWandGenesis();
-    MagickWandTerminus();
+    if (get_image_attributes(image_file, &attr) < 0) {
+        return g_dbus_create_error(message,
+            "org.openobex.Error.InvalidArguments", NULL);
+    }
 
-    if ((err=session_put_with_aheaders(session, "x-bt/img-img", image_file, image_file, NULL, put_image_callback)) < 0) {
+    create_image_descriptor(&attr, &descriptor);
+    aheaders = g_slist_append(NULL, &descriptor);
+
+    if ((err=session_put_with_aheaders(session, "x-bt/img-img",
+            image_file, image_file, aheaders, put_image_callback)) < 0) {
         return g_dbus_create_error(message,
                 "org.openobex.Error.Failed",
                 "Failed");
@@ -182,6 +342,7 @@ static GDBusMethodTable image_push_methods[] = {
     { "GetImagingCapabilities",	"", "s", get_imaging_capabilities,
         G_DBUS_METHOD_FLAG_ASYNC },
     { "PutImage", "s", "", put_image },
+    { "PutImage", "ssuus", "", put_modified_image },
     { }
 };
 
