@@ -91,7 +91,7 @@
   </attribute>								\
 </record>"
 
-#define IMG_HANDLE_HDR OBEX_HDR_TYPE_BYTES|0x30
+#define IMG_HANDLE_HDR OBEX_HDR_TYPE_BYTES | 0x30
 
 static const uint8_t IMAGE_PUSH_TARGET[TARGET_SIZE] = {
 			0xE3, 0x3D, 0x95, 0x45, 0x83, 0x74, 0x4A, 0xD7,

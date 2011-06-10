@@ -61,7 +61,7 @@ cur = 0
 bip = None
 
 def image_push(session, filename):
-    session.PutImage(os.path.abspath(filename))
+    session.PutImage(os.path.abspath(filename),"BMP",1000,200,"fill")
 
 def imaging_capabilities(session):
     print "omg"
@@ -120,9 +120,6 @@ if  __name__ == '__main__':
     bip = dbus.Interface(bus.get_object("org.openobex.client", session_path),
                  "org.openobex.ImagePush")
     
-    print "capabilities"
-    imaging_capabilities(bip)
-
     L = options.image_file
     if options.image_file:
        print options.image_file[0]
