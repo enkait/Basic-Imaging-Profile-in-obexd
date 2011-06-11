@@ -31,7 +31,8 @@
 
 /* gunichar2 byte order? */
 static gunichar2 *extract_handle(struct session_data *session, unsigned int *size) {
-    struct gw_obex_xfer *xfer = session->obex->xfer;
+	struct transfer_data *transfer = session->pending->data;
+	GwObexXfer *xfer = transfer->xfer;
     struct a_header *ah;
     gunichar2 *buf;
     if(!xfer)
@@ -48,6 +49,7 @@ static gunichar2 *extract_handle(struct session_data *session, unsigned int *siz
 static void put_image_callback(struct session_data *session, GError *err,
         void *user_data)
 {
+	struct transfer_data *transfer = session->pending->data;
     unsigned int utf16size = 0;
     glong size;
     gunichar2 *utf16_handle;
@@ -58,6 +60,7 @@ static void put_image_callback(struct session_data *session, GError *err,
 	        IMAGE_PUSH_INTERFACE, "PutImageFailed",
             DBUS_TYPE_STRING, &err->message,
 		    DBUS_TYPE_INVALID);
+        transfer_unregister(transfer);
         return;
     }
     utf16_handle = extract_handle(session, &utf16size);
@@ -79,6 +82,7 @@ static void put_image_callback(struct session_data *session, GError *err,
 		DBUS_TYPE_STRING, &handle,
 		DBUS_TYPE_BOOLEAN, &required,
 		DBUS_TYPE_INVALID);
+    transfer_unregister(transfer);
     return;
 }
 
@@ -209,11 +213,13 @@ static DBusMessage *put_modified_image(DBusConnection *connection,
     create_image_descriptor(&attr, &descriptor);
     aheaders = g_slist_append(NULL, &descriptor);
 
+    printf("session->pending: %p\n", session->pending);
+
     if ((err=session_put_with_aheaders(session, "x-bt/img-img",
             new_image_path->str, image_path, aheaders, put_image_callback)) < 0) {
         return g_dbus_create_error(message,
                 "org.openobex.Error.Failed",
-                "Failed");
+                "217Failed");
     }
     session->msg = dbus_message_ref(message);
 
@@ -254,7 +260,7 @@ static DBusMessage *put_image(DBusConnection *connection,
             image_file, image_file, aheaders, put_image_callback)) < 0) {
         return g_dbus_create_error(message,
                 "org.openobex.Error.Failed",
-                "Failed");
+                "258Failed");
     }
     session->msg = dbus_message_ref(message);
 
@@ -316,6 +322,7 @@ done:
     dbus_message_unref(reply);
     dbus_message_unref(session->msg);
 
+    transfer_unregister(transfer);
     return;
 }
 
@@ -330,7 +337,7 @@ static DBusMessage *get_imaging_capabilities(DBusConnection *connection,
     if ((err=session_get(session, "x-bt/img-capabilities", NULL, NULL, NULL, 0, get_imaging_capabilities_callback)) < 0) {
         return g_dbus_create_error(message,
                 "org.openobex.Error.Failed",
-                "Failed");
+                "334Failed");
     }
 
     session->msg = dbus_message_ref(message);
