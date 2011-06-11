@@ -583,8 +583,9 @@ gboolean gw_obex_xfer_close(GwObexXfer *xfer, gint *err) {
         xfer->idle_source = NULL;
     }
 
-    //ctx->xfer = NULL;
-    //xfer->ctx = NULL;
+    /* Disassociate from the GwObex object */
+    ctx->xfer = NULL;
+    xfer->ctx = NULL;
 
     GW_OBEX_UNLOCK(ctx);
 
