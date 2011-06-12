@@ -112,7 +112,12 @@ static int get_image_attributes(const char * image_file, struct image_attributes
     return 0;
 }
 
-static void create_image_descriptor(struct image_attributes *attr, struct a_header *ah) {
+static void free_image_attributes(struct image_attributes *attr) {
+    g_free(attr->format);
+    g_free(attr->transform);
+}
+
+static void create_image_descriptor(const struct image_attributes *attr, struct a_header *ah) {
     GString *descriptor = g_string_new(IMG_DESCRIPTOR_BEGIN);
     if (attr->transform) {
         g_string_append_printf(descriptor,
@@ -126,8 +131,8 @@ static void create_image_descriptor(struct image_attributes *attr, struct a_head
     }
     descriptor = g_string_append(descriptor, IMG_DESCRIPTOR_END);
     ah->hi = IMG_DESCRIPTOR_HDR;
+    ah->hv_size = descriptor->len;
     ah->hv.bs = (guint8 *) g_string_free(descriptor, FALSE);
-    ah->hv_size = attr->length;
 }
 
 static int make_modified_image(const char *image_path, const char *modified_path, struct image_attributes *attr) {
@@ -164,26 +169,60 @@ static int make_modified_image(const char *image_path, const char *modified_path
     return 0;
 }
 
+static DBusMessage *put_transformed_image(DBusMessage *message, struct session_data *session,
+        const char *local_image, const char *remote_image, const char *transform)
+{
+    int err;
+    struct image_attributes attr;
+    struct a_header descriptor;
+    GSList * aheaders = NULL;
+
+    attr.format = NULL;
+    attr.transform = g_strdup(transform);
+    if (get_image_attributes(local_image, &attr) < 0) {
+        free_image_attributes(&attr);
+        return g_dbus_create_error(message,
+            "org.openobex.Error.InvalidArguments", NULL);
+    }
+
+    create_image_descriptor(&attr, &descriptor);
+    printf("descriptor: %p %d\n", descriptor.hv.bs, descriptor.hv_size);
+    aheaders = g_slist_append(NULL, &descriptor);
+
+    if ((err=session_put_with_aheaders(session, "x-bt/img-img",
+            local_image, remote_image, aheaders, put_image_callback)) < 0) {
+        free_image_attributes(&attr);
+        return g_dbus_create_error(message,
+                "org.openobex.Error.Failed",
+                "258Failed");
+    }
+    session->msg = dbus_message_ref(message);
+    free_image_attributes(&attr);
+
+    return dbus_message_new_method_return(message);
+}
+
 static DBusMessage *put_modified_image(DBusConnection *connection,
         DBusMessage *message, void *user_data)
 {
     struct session_data *session = user_data;
-    const char *image_path;
-    int err, fd;
+    const char *image_path, *format, *transform;
+    int fd;
     struct image_attributes attr;
-    struct a_header descriptor;
-    GSList *aheaders = NULL;
     GString *new_image_path;
+    DBusMessage *result;
 
     if (dbus_message_get_args(message, NULL,
             DBUS_TYPE_STRING, &image_path,
-            DBUS_TYPE_STRING, &attr.format,
+            DBUS_TYPE_STRING, &format,
             DBUS_TYPE_UINT32, &attr.width,
             DBUS_TYPE_UINT32, &attr.height,
-            DBUS_TYPE_STRING, &attr.transform,
+            DBUS_TYPE_STRING, &transform,
             DBUS_TYPE_INVALID) == FALSE)
         return g_dbus_create_error(message,
                 "org.openobex.Error.InvalidArguments", NULL);
+    attr.format = g_strdup(format);
+    attr.transform = g_strdup(transform);
 
     if (!image_path || strlen(image_path)==0) {
         return g_dbus_create_error(message,"org.openobex.Error.InvalidArguments", NULL);
@@ -205,70 +244,32 @@ static DBusMessage *put_modified_image(DBusConnection *connection,
             "org.openobex.Error.CanNotCreateModifiedImage", NULL);
     }
 
-    if (get_image_attributes(image_path, &attr) < 0) {
-        return g_dbus_create_error(message,
-            "org.openobex.Error.InvalidArguments", NULL);
-    }
+    result = put_transformed_image(message, session, new_image_path->str, image_path, attr.transform);
 
-    create_image_descriptor(&attr, &descriptor);
-    aheaders = g_slist_append(NULL, &descriptor);
-
-    printf("session->pending: %p\n", session->pending);
-
-    if ((err=session_put_with_aheaders(session, "x-bt/img-img",
-            new_image_path->str, image_path, aheaders, put_image_callback)) < 0) {
-        return g_dbus_create_error(message,
-                "org.openobex.Error.Failed",
-                "217Failed");
-    }
-    session->msg = dbus_message_ref(message);
-
-    return dbus_message_new_method_return(message);
+    free_image_attributes(&attr);
+    return result;
 }
 
 static DBusMessage *put_image(DBusConnection *connection,
         DBusMessage *message, void *user_data)
 {
     struct session_data *session = user_data;
-    const char *image_file;
-    int err;
-    struct image_attributes attr;
-    struct a_header descriptor;
-    GSList * aheaders = NULL;
-
+    const char *image_path;
+    
     if (dbus_message_get_args(message, NULL,
-                DBUS_TYPE_STRING, &image_file,
+                DBUS_TYPE_STRING, &image_path,
                 DBUS_TYPE_INVALID) == FALSE)
         return g_dbus_create_error(message,
                 "org.openobex.Error.InvalidArguments", NULL);
-
-    if (!image_file || strlen(image_file)==0) {
+    
+    if (!image_path || strlen(image_path)==0) {
         return g_dbus_create_error(message,"org.openobex.Error.InvalidArguments", NULL);
     }
 
-    printf("requested put_image on file %s\n", image_file);
-
-    if (get_image_attributes(image_file, &attr) < 0) {
-        return g_dbus_create_error(message,
-            "org.openobex.Error.InvalidArguments", NULL);
-    }
-
-    create_image_descriptor(&attr, &descriptor);
-    aheaders = g_slist_append(NULL, &descriptor);
-
-    if ((err=session_put_with_aheaders(session, "x-bt/img-img",
-            image_file, image_file, aheaders, put_image_callback)) < 0) {
-        return g_dbus_create_error(message,
-                "org.openobex.Error.Failed",
-                "258Failed");
-    }
-    session->msg = dbus_message_ref(message);
-
-    return dbus_message_new_method_return(message);
+    return put_transformed_image(message, session, image_path, image_path, NULL);
 }
 
-char *get_null_terminated(char *buffer, int len);
-char *get_null_terminated(char *buffer, int len) {
+static char *get_null_terminated(char *buffer, int len) {
     char *newbuffer;
     if (buffer[len-1] != '\0') {
         newbuffer = g_try_malloc(len + 1);
