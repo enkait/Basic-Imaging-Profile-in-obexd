@@ -54,7 +54,7 @@ static void put_image_callback(struct session_data *session, GError *err,
     glong size;
     gunichar2 *utf16_handle;
     char *handle;
-    int required = 1;
+    int required;
     if(err) {
 	    g_dbus_emit_signal(session->conn, session->path,
 	        IMAGE_PUSH_INTERFACE, "PutImageFailed",
@@ -63,6 +63,7 @@ static void put_image_callback(struct session_data *session, GError *err,
         transfer_unregister(transfer);
         return;
     }
+    required = (session->obex->obex_rsp == OBEX_RSP_PARTIAL_CONTENT)?(1):(0);
     utf16_handle = extract_handle(session, &utf16size);
     if(!utf16_handle) {
 	    g_dbus_emit_signal(session->conn, session->path,
