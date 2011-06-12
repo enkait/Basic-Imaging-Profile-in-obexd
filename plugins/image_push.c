@@ -99,6 +99,9 @@ static const uint8_t IMAGE_PUSH_TARGET[TARGET_SIZE] = {
 
 static const char * bip_root="/tmp/bip/";
 
+static const gchar * valid_name_chars="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.";
+static const gchar rep_char='_';
+
 void free_image_descriptor(struct image_descriptor *id) {
     if(!id)
         return;
@@ -232,11 +235,10 @@ int image_push_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 {
     struct image_push_session *ips = user_data;
 	obex_headerdata_t hd;
-	unsigned int hlen;
+	unsigned int hlen, len;
 	uint8_t hi;
-    int len;
-    char *imagename;
     char *handle;
+    GString *imagename;
     printf("IMAGE PUSH PUT %s\n", os->name);
 	while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen)) {
         printf("header numer=%d\n", hi);
@@ -247,15 +249,12 @@ int image_push_put(struct obex_session *os, obex_object_t *obj, void *user_data)
         }
     }
     len = strlen(bip_root) + strlen(os->name) + 7;
-    imagename = g_try_malloc(len);
-    imagename[0]='\0';
-    strcat(imagename, bip_root);
-    strcat(imagename, os->name);
-    strcat(imagename, "XXXXXX");
-    close(mkstemp(imagename));
-    rename(ips->image_path, imagename);
-    printf("imagename=%s\n", imagename);
-    g_free(imagename);
+    imagename = g_string_new(bip_root);
+    imagename = g_string_append(imagename, g_strcanon(os->name,valid_name_chars,rep_char));
+    close(mkstemp(imagename->str));
+    rename(ips->image_path, imagename->str);
+    printf("imagename=%s\n", imagename->str);
+    g_string_free(imagename, TRUE);
     handle = get_handle(ips);
     obex_handle_write(os, obj, handle, 7);
     g_free(handle);
