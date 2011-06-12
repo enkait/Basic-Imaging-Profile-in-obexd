@@ -456,6 +456,7 @@ struct a_header *a_header_copy(struct a_header *ah) {
     switch (res->hi & OBEX_HDR_TYPE_MASK) {
         case OBEX_HDR_TYPE_BYTES:
         case OBEX_HDR_TYPE_UNICODE:
+            printf("ah->hv.bs=%p ah->hv_size=%d\n", ah->hv.bs, ah->hv_size);
             res->hv.bs = g_memdup(ah->hv.bs, ah->hv_size);
             break;
     }
