@@ -242,11 +242,6 @@ int image_push_put(struct obex_session *os, obex_object_t *obj, void *user_data)
     printf("IMAGE PUSH PUT %s\n", os->name);
 	while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen)) {
         printf("header numer=%d\n", hi);
-        if (hi & OBEX_HDR_TYPE_BYTES) {
-            GString * string = g_string_new_len((const char *)hd.bs, hlen);
-            string = g_string_append(string, "\n");
-            printf("%s\n", string->str);
-        }
     }
     len = strlen(bip_root) + strlen(os->name) + 7;
     imagename = g_string_new(bip_root);
