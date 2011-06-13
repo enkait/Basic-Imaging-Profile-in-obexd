@@ -125,6 +125,19 @@ GwObexXfer *gw_obex_put_async(GwObex *ctx, const char *name, const char *type,
     return ret ? ctx->xfer : NULL;
 }
 
+GwObexXfer *gw_obex_put_async_with_aheaders(GwObex *ctx, const char *name, const char *type,
+                              const GSList *aheaders,
+                              gint size, time_t time, gint *error) {
+    gboolean ret;
+    GW_OBEX_LOCK(ctx);
+    CHECK_DISCONNECT(NULL, error, ctx);
+    ret = gw_obex_put_with_aheaders(ctx, NULL, name, type, NULL, 0, aheaders, NULL, size, time, -1, TRUE);
+    if (ret == FALSE)
+        gw_obex_get_error(ctx, error);
+    GW_OBEX_UNLOCK(ctx);
+    return ret ? ctx->xfer : NULL;
+}
+
 GwObexXfer *gw_obex_get_async(GwObex *ctx, const char *name, const char *type, gint *error) {
     gboolean ret;
     GW_OBEX_LOCK(ctx);
@@ -142,6 +155,19 @@ GwObexXfer *gw_obex_get_async_with_apparam(GwObex *ctx, const char *name, const 
     GW_OBEX_LOCK(ctx);
     CHECK_DISCONNECT(NULL, error, ctx);
     ret = gw_obex_get(ctx, NULL, name, type, apparam, apparam_size, NULL, NULL, -1, TRUE);
+    if (ret == FALSE)
+        gw_obex_get_error(ctx, error);
+    GW_OBEX_UNLOCK(ctx);
+    return ret ? ctx->xfer : NULL;
+}
+
+GwObexXfer *gw_obex_get_async_with_aheaders(GwObex *ctx, const char *name, const char *type,
+		const guint8 *apparam, gint apparam_size,
+        const GSList *aheaders, gint *error) {
+    gboolean ret;
+    GW_OBEX_LOCK(ctx);
+    CHECK_DISCONNECT(NULL, error, ctx);
+    ret = gw_obex_get_with_aheaders(ctx, NULL, name, type, apparam, apparam_size, aheaders, NULL, NULL, -1, TRUE);
     if (ret == FALSE)
         gw_obex_get_error(ctx, error);
     GW_OBEX_UNLOCK(ctx);
@@ -423,6 +449,19 @@ out:
     return ret;
 }
 
+struct a_header *a_header_copy(struct a_header *ah) {
+    struct a_header *res;
+    if(!ah) return NULL;
+    res = g_memdup(ah, sizeof(struct a_header));
+    switch (res->hi & OBEX_HDR_TYPE_MASK) {
+        case OBEX_HDR_TYPE_BYTES:
+        case OBEX_HDR_TYPE_UNICODE:
+            res->hv.bs = g_memdup(ah->hv.bs, ah->hv_size);
+            break;
+    }
+    return res;
+}
+
 void a_header_free(struct a_header *ah) {
     switch (ah->hi & OBEX_HDR_TYPE_MASK) {
         case OBEX_HDR_TYPE_BYTES:
@@ -431,6 +470,16 @@ void a_header_free(struct a_header *ah) {
             break;
     }
     g_free(ah);
+}
+
+struct a_header *a_header_find(GSList *aheaders, uint8_t hi) {
+    while (aheaders) {
+        if (((struct a_header *) aheaders->data)->hi == hi) {
+            return aheaders->data;
+        }
+        aheaders = g_slist_next(aheaders);
+    }
+    return NULL;
 }
 
 void _gw_obex_xfer_free(struct gw_obex_xfer *xfer) {

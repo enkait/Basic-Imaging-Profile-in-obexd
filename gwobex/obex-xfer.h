@@ -93,6 +93,10 @@ struct a_header {
 
 void a_header_free(struct a_header *ah);
 
+struct a_header *a_header_copy(struct a_header *ah);
+
+struct a_header *a_header_find(GSList *aheaders, uint8_t hi);
+
 struct gw_obex_xfer *gw_obex_xfer_new(struct gw_obex *ctx, gboolean async, int stream_fd);
 
 void _gw_obex_xfer_free(struct gw_obex_xfer *xfer);
