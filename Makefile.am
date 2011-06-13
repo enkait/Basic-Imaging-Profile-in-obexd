@@ -78,6 +78,9 @@ builtin_sources += plugins/irmc.c
 builtin_modules += image_push
 builtin_sources += plugins/image_push.c
 
+builtin_modules += image_pull
+builtin_sources += plugins/image_pull.c
+
 builtin_modules += syncevolution
 builtin_sources += plugins/syncevolution.c
 
