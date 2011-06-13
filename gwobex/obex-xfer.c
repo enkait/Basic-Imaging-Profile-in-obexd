@@ -459,6 +459,7 @@ out:
     return ret;
 }
 
+<<<<<<< HEAD
 struct a_header *make_a_header(uint8_t hi, obex_headerdata_t hv,
                                unsigned int hlen) {
     struct a_header *ah = g_new0(struct a_header, 1);
@@ -488,6 +489,11 @@ struct a_header *a_header_copy(struct a_header *ah) {
     struct a_header *res;
     if (ah == NULL)
         return NULL;
+=======
+struct a_header *a_header_copy(struct a_header *ah) {
+    struct a_header *res;
+    if(!ah) return NULL;
+>>>>>>> Merging some missplaced changes.
     res = g_memdup(ah, sizeof(struct a_header));
     switch (res->hi & OBEX_HDR_TYPE_MASK) {
         case OBEX_HDR_TYPE_BYTES:
@@ -509,6 +515,20 @@ void a_header_free(struct a_header *ah) {
 }
 
 struct a_header *a_header_find(GSList *aheaders, uint8_t hi) {
+<<<<<<< HEAD
+=======
+    while (aheaders) {
+        if (((struct a_header *) aheaders->data)->hi == hi) {
+            return aheaders->data;
+        }
+        aheaders = g_slist_next(aheaders);
+    }
+    return NULL;
+}
+
+void _gw_obex_xfer_free(struct gw_obex_xfer *xfer) {
+    GSList *aheaders = xfer->aheaders;
+>>>>>>> Merging some missplaced changes.
     while (aheaders) {
         struct a_header *ah = aheaders->data;
         if (ah->hi == hi)
