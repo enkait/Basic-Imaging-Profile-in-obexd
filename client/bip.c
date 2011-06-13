@@ -73,7 +73,7 @@ static void put_image_callback(struct session_data *session, GError *err,
     }
     handle = g_utf16_to_utf8(utf16_handle,utf16size,NULL,&size,NULL);
     g_free(utf16_handle);
-    printf("callback called!!!!FTW!! %s\n", handle);
+    printf("callback called %s\n", handle);
     dbus_message_unref(session->msg);
     session->msg = NULL;
 	
