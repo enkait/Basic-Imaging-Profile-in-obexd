@@ -54,6 +54,9 @@ builtin_sources += plugins/filesystem.c plugins/filesystem.h
 builtin_modules += imgimg
 builtin_sources += plugins/imgimg.c plugins/imgimg.h
 
+builtin_modules += imglisting
+builtin_sources += plugins/imglisting.c plugins/imglisting.h
+
 if NOKIA_PCSUITE
 builtin_modules += pcsuite
 builtin_sources += plugins/pcsuite.c
