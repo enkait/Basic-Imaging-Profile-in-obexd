@@ -57,12 +57,12 @@
 
 #define CAPABILITIES_BEGIN "<imaging-capabilities version=\"1.0\">" EOL_CHARS
 
-#define IMAGE_FORMATS "<image-formats encoding=\"JPEG\" pixel=\"0*0-65535*65535\" >" EOL_CHARS \
-                      "<image-formats encoding=\"GIF\" pixel=\"0*0-65535*65535\" >" EOL_CHARS \
-                      "<image-formats encoding=\"WBMP\" pixel=\"0*0-65535*65535\" >" EOL_CHARS \
-                      "<image-formats encoding=\"PNG\" pixel=\"0*0-65535*65535\" >" EOL_CHARS \
-                      "<image-formats encoding=\"JPEG2000\" pixel=\"0*0-65535*65535\" >" EOL_CHARS \
-                      "<image-formats encoding=\"BMP\" pixel=\"0*0-65535*65535\" >" EOL_CHARS \
+#define IMAGE_FORMATS "<image-formats encoding=\"JPEG\" pixel=\"0*0-65535*65535\">" EOL_CHARS \
+                      "<image-formats encoding=\"GIF\" pixel=\"0*0-65535*65535\">" EOL_CHARS \
+                      "<image-formats encoding=\"WBMP\" pixel=\"0*0-65535*65535\">" EOL_CHARS \
+                      "<image-formats encoding=\"PNG\" pixel=\"0*0-65535*65535\">" EOL_CHARS \
+                      "<image-formats encoding=\"JPEG2000\" pixel=\"0*0-65535*65535\">" EOL_CHARS \
+                      "<image-formats encoding=\"BMP\" pixel=\"0*0-65535*65535\">" EOL_CHARS \
 
 #define CAPABILITIES_END "</imaging-capabilities>" EOL_CHARS
 

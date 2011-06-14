@@ -347,6 +347,75 @@ static DBusMessage *get_imaging_capabilities(DBusConnection *connection,
     return NULL;
 }
 
+static void get_images_listing_callback(
+        struct session_data *session, GError *err,
+        void *user_data)
+{
+	DBusMessage *reply;
+	DBusMessageIter iter;
+    char *listing;
+    int i;
+	struct transfer_data *transfer = session->pending->data;
+    printf("get_images_listing_callback called\n");
+    if(err) {
+        reply = g_dbus_create_error(session->msg,
+            "org.openobex.Error", "%s", err->message);
+        goto done;
+    }
+	
+    reply = dbus_message_new_method_return(session->msg);
+	
+    if (transfer->filled == 0)
+        goto done;
+
+    for (i = transfer->filled - 1; i > 0; i--) {
+		if (transfer->buffer[i] != '\0')
+			break;
+
+		transfer->filled--;
+	}
+
+    listing = get_null_terminated(transfer->buffer, transfer->filled);
+
+    dbus_message_iter_init_append(reply, &iter);
+    dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING,
+        &listing);
+    g_free(listing);
+
+done:
+    g_dbus_send_message(session->conn, reply);
+    dbus_message_unref(reply);
+    dbus_message_unref(session->msg);
+
+    transfer_unregister(transfer);
+    return;
+}
+
+static DBusMessage *get_images_listing(DBusConnection *connection,
+        DBusMessage *message, void *user_data)
+{
+    struct session_data *session = user_data;
+    int err;
+
+    printf("requested get images listing\n");
+
+    if ((err=session_get(session, "x-bt/img-listing", NULL, NULL, NULL, 0, get_images_listing_callback)) < 0) {
+        return g_dbus_create_error(message,
+                "org.openobex.Error.Failed",
+                "334Failed");
+    }
+
+    session->msg = dbus_message_ref(message);
+
+    return NULL;
+}
+
+static GDBusMethodTable image_pull_methods[] = {
+    { "GetImagesListing",	"", "s", get_images_listing,
+        G_DBUS_METHOD_FLAG_ASYNC },
+    { }
+};
+
 static GDBusMethodTable image_push_methods[] = {
     { "GetImagingCapabilities",	"", "s", get_imaging_capabilities,
         G_DBUS_METHOD_FLAG_ASYNC },
@@ -371,6 +440,11 @@ gboolean bip_register_interface(DBusConnection *connection, const char *path,
         return g_dbus_register_interface(connection, path, IMAGE_PUSH_INTERFACE,
                 image_push_methods, image_push_signals, NULL, user_data, destroy);
     }
+    else if(memcmp(session->target, IMAGE_PULL_UUID, session->target_len)==0) {
+        printf("PULL_INTERFACE\n");
+        return g_dbus_register_interface(connection, path, IMAGE_PULL_INTERFACE,
+                image_pull_methods, NULL, NULL, user_data, destroy);
+    }
     printf("FALSE\n");
     return FALSE;
 }
@@ -378,5 +452,11 @@ gboolean bip_register_interface(DBusConnection *connection, const char *path,
 void bip_unregister_interface(DBusConnection *connection, const char *path,
         void *user_data)
 {
-    g_dbus_unregister_interface(connection, path, IMAGE_PUSH_INTERFACE);
+    struct session_data * session = user_data;
+    if(memcmp(session->target, IMAGE_PUSH_UUID, session->target_len)==0) {
+        g_dbus_unregister_interface(connection, path, IMAGE_PUSH_INTERFACE);
+    }
+    else if(memcmp(session->target, IMAGE_PULL_UUID, session->target_len)==0) {
+        g_dbus_unregister_interface(connection, path, IMAGE_PULL_INTERFACE);
+    }
 }
