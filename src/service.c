@@ -69,7 +69,7 @@ GSList *obex_service_driver_list(uint16_t services)
 
 		if (driver->service & services) {
 			list = g_slist_append(list, driver);
-			services &= ~driver->service;
+//			services &= ~driver->service;
 		}
 	}
 
@@ -82,13 +82,13 @@ int obex_service_driver_register(struct obex_service_driver *driver)
 		error("Invalid driver");
 		return -EINVAL;
 	}
-
+/*
 	if (obex_service_driver_list(driver->service)) {
 		error("Permission denied: service %s already registered",
 			driver->name);
 		return -EPERM;
 	}
-
+*/
 	DBG("driver %p service %s registered", driver, driver->name);
 
 	/* Drivers that support who has priority */
