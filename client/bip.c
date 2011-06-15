@@ -434,6 +434,7 @@ gboolean bip_register_interface(DBusConnection *connection, const char *path,
         void *user_data, GDBusDestroyFunction destroy)
 {
     struct session_data * session = user_data;
+    printf("INTERFACE\n");
     /** should be memcmp0 from obex.c */
     if(memcmp(session->target, IMAGE_PUSH_UUID, session->target_len)==0) {
         printf("PUSH_INTERFACE\n");

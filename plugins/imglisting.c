@@ -85,9 +85,8 @@ static gint ctime_compare(gconstpointer a, gconstpointer b) {
     return g_strcmp0(ail->image, bil->image);
 }
 
-static GString *create_images_listing() {
+static GString *create_images_listing(int *err) {
     GString *listing_obj = g_string_new(IMG_LISTING_BEGIN);
-    DIR *img_dir = opendir(bip_dir);
     struct dirent* file;
     struct stat file_stat;
     GSList *images = NULL;
@@ -95,6 +94,14 @@ static GString *create_images_listing() {
     char *handle_str = g_try_malloc(8);
     char ctime[18], mtime[18];
     int handle = 0;
+    DIR *img_dir = opendir(bip_dir);
+
+    if (!img_dir) {
+        if (err)
+            *err = -errno;
+        return NULL;
+    }
+
     while ((file = readdir(img_dir))) {
         GString *str = g_string_new(bip_dir);
         str = g_string_append(str, file->d_name);
@@ -131,7 +138,7 @@ static void *imglisting_open(const char *name, int oflag, mode_t mode,
     if (err)
         *err = 0;
     printf("imglisting_open\n");
-    return create_images_listing();
+    return create_images_listing(err);
 }
 
 static ssize_t imglisting_read(void *object, void *buf, size_t count,

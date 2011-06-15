@@ -144,7 +144,7 @@ void image_pull_disconnect(struct obex_session *os, void *user_data)
 
 static struct obex_service_driver image_pull = {
 	.name = "OBEXD Image Pull Server",
-	.service = OBEX_BIP,
+	.service = OBEX_BIP_PULL,
 	.channel = IMAGE_PULL_CHANNEL,
 	.record = IMAGE_PULL_RECORD,
 	.target = IMAGE_PULL_TARGET,

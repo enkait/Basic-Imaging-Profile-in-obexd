@@ -800,10 +800,13 @@ struct session_data *session_create(const char *source,
 	if (!g_ascii_strncasecmp(service, "OPP", 3)) {
 		sdp_uuid16_create(&session->uuid, OBEX_OBJPUSH_SVCLASS_ID);
 	} else if (!g_ascii_strncasecmp(service, "BIP:PUSH", 8)) {
-        //based on: http://bluez-libs.sourcearchive.com/documentation/2.15-2/sdp_8h-source.html
 		sdp_uuid16_create(&session->uuid, IMAGING_RESPONDER_SVCLASS_ID);
 		session->target = IMAGE_PUSH_UUID;
 		session->target_len = IMAGE_PUSH_UUID_LEN;
+	} else if (!g_ascii_strncasecmp(service, "BIP:PULL", 8)) {
+		sdp_uuid16_create(&session->uuid, IMAGING_RESPONDER_SVCLASS_ID);
+		session->target = IMAGE_PULL_UUID;
+		session->target_len = IMAGE_PULL_UUID_LEN;
 	} else if (!g_ascii_strncasecmp(service, "FTP", 3)) {
 		sdp_uuid16_create(&session->uuid, OBEX_FILETRANS_SVCLASS_ID);
 		session->target = OBEX_FTP_UUID;
@@ -1735,6 +1738,7 @@ int session_register(struct session_data *session)
 					NULL, NULL, session, NULL) == FALSE)
 		return -EIO;
 
+        printf("here\n");
 	switch (session->uuid.value.uuid16) {
 	case OBEX_FILETRANS_SVCLASS_ID:
 		result = g_dbus_register_interface(session->conn,
