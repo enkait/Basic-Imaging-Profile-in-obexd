@@ -123,7 +123,7 @@ static GString *create_images_listing(int *err) {
         strftime(mtime, 17, "%Y%m%dT%H%M%SZ", gmtime(&listing->mtime));
 	    strftime(ctime, 17, "%Y%m%dT%H%M%SZ", gmtime(&listing->ctime));
         snprintf(handle_str, 8, "%07d", handle++);
-        g_string_printf(listing_obj, IMG_LISTING_ELEMENT, handle_str, ctime, mtime);
+        g_string_append_printf(listing_obj, IMG_LISTING_ELEMENT, handle_str, ctime, mtime);
         img_listing_free(listing);
         images = g_slist_next(images);
     }
