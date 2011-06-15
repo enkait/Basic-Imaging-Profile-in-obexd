@@ -135,6 +135,7 @@ static GString *create_images_listing(int *err) {
 static void *imglisting_open(const char *name, int oflag, mode_t mode,
 					void *context, size_t *size, int *err)
 {
+    //struct image_pull_session *session = context;
     if (err)
         *err = 0;
     printf("imglisting_open\n");
@@ -146,7 +147,6 @@ static ssize_t imglisting_read(void *object, void *buf, size_t count,
 {
 	if (flags)
 		*flags = 0;
-
 	*hi = OBEX_HDR_BODY;
     printf("imglisting_read\n");
 	return string_read(object, buf, count);

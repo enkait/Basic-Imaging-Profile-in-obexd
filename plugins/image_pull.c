@@ -93,6 +93,13 @@
 
 #define IMG_HANDLE_HDR OBEX_HDR_TYPE_BYTES | 0x30
 
+#define NBRETURNEDHANDLES_TAG 0x01
+#define NBRETURNEDHANDLES_LEN 0x02
+#define LISTSTARTOFFSET_TAG 0x02
+#define LISTSTARTOFFSET_LEN 0x02
+#define LATESTCAPTUREDIMAGES_TAG 0x03
+#define LATESTCAPTUREDIMAGES_LEN 0x01
+
 static const uint8_t IMAGE_PULL_TARGET[TARGET_SIZE] = {
 			0x8E, 0xE9, 0xB3, 0xD0, 0x46, 0x08, 0x11, 0xD5,
 			0x84, 0x1A, 0x00, 0x02, 0xA5, 0x32, 0x5B, 0x4E };
@@ -115,9 +122,68 @@ void *image_pull_connect(struct obex_session *os, int *err) {
 	return ips;
 }
 
+static struct pull_aparam_field *parse_aparam(const uint8_t *buffer, uint32_t hlen)
+{
+	struct pull_aparam_field *param;
+	struct pull_aparam_header *hdr;
+	uint32_t len = 0;
+	uint16_t val16;
+
+	param = g_new0(struct pull_aparam_field, 1);
+
+	while (len < hlen) {
+		hdr = (void *) buffer + len;
+
+		switch (hdr->tag) {
+		case NBRETURNEDHANDLES_TAG:
+			if (hdr->len != NBRETURNEDHANDLES_LEN)
+				goto failed;
+
+			memcpy(&val16, hdr->val, sizeof(val16));
+			param->nbreturnedhandles = GUINT16_FROM_BE(val16);
+			break;
+
+		case LISTSTARTOFFSET_TAG:
+			if (hdr->len != LISTSTARTOFFSET_LEN)
+				goto failed;
+
+			memcpy(&val16, hdr->val, sizeof(val16));
+			param->liststartoffset = GUINT16_FROM_BE(val16);
+			break;
+		case LATESTCAPTUREDIMAGES_TAG:
+			if (hdr->len != LATESTCAPTUREDIMAGES_LEN)
+				goto failed;
+
+			param->latestcapturedimages = hdr->val[0];
+			break;
+		default:
+			goto failed;
+		}
+
+		len += hdr->len + sizeof(struct pull_aparam_header);
+	}
+
+	DBG("nb %x ls %x lc %x",
+			param->nbreturnedhandles, param->liststartoffset, param->latestcapturedimages);
+
+	return param;
+
+failed:
+	g_free(param);
+
+	return NULL;
+}
+
 int image_pull_get(struct obex_session *os, obex_object_t *obj,
         gboolean *stream, void *user_data) {
-    int ret = obex_get_stream_start(os, "");
+    struct image_pull_session *ips = user_data;
+	const uint8_t *buffer;
+    int ret;
+	ssize_t rsize = obex_aparam_read(os, obj, &buffer);
+
+    ips->aparam = parse_aparam(buffer, rsize);
+
+    ret = obex_get_stream_start(os, "");
     printf("IMAGE PULL GET\n");
     if (ret < 0)
         return ret;
@@ -146,7 +212,7 @@ static struct obex_service_driver image_pull = {
 	.name = "OBEXD Image Pull Server",
 	.service = OBEX_BIP_PULL,
 	.channel = IMAGE_PULL_CHANNEL,
-	.record = IMAGE_PULL_RECORD,
+	//.record = IMAGE_PULL_RECORD,
 	.target = IMAGE_PULL_TARGET,
 	.target_size = TARGET_SIZE,
 	.connect = image_pull_connect,
