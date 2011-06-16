@@ -50,7 +50,7 @@
 #include "mimetype.h"
 #include "service.h"
 #include "imglisting.h"
-#include "image_push.h"
+#include "image_pull.h"
 #include "filesystem.h"
 
 #define EOL_CHARS "\n"
@@ -85,7 +85,7 @@ static gint ctime_compare(gconstpointer a, gconstpointer b) {
     return g_strcmp0(ail->image, bil->image);
 }
 
-static GString *create_images_listing(int *err) {
+static GString *create_images_listing(int count, int offset, int *res_count, int *err) {
     GString *listing_obj = g_string_new(IMG_LISTING_BEGIN);
     struct dirent* file;
     struct stat file_stat;
@@ -118,7 +118,13 @@ static GString *create_images_listing(int *err) {
     }
     images = g_slist_sort(images, ctime_compare);
     
-    while (images) {
+    while (offset) {
+        images = g_slist_next(images);
+        offset--;
+    }
+
+    *res_count = 0;
+    while (images && count) {
         struct img_listing *listing = images->data;
         strftime(mtime, 17, "%Y%m%dT%H%M%SZ", gmtime(&listing->mtime));
 	    strftime(ctime, 17, "%Y%m%dT%H%M%SZ", gmtime(&listing->ctime));
@@ -126,6 +132,8 @@ static GString *create_images_listing(int *err) {
         g_string_append_printf(listing_obj, IMG_LISTING_ELEMENT, handle_str, ctime, mtime);
         img_listing_free(listing);
         images = g_slist_next(images);
+        (*res_count)++;
+        count--;
     }
     listing_obj = g_string_append(listing_obj, IMG_LISTING_END);
     g_free(handle_str);
@@ -135,11 +143,21 @@ static GString *create_images_listing(int *err) {
 static void *imglisting_open(const char *name, int oflag, mode_t mode,
 					void *context, size_t *size, int *err)
 {
-    //struct image_pull_session *session = context;
+    struct image_pull_session *session = context;
+    int res_count, count=0, offset=0;
+
+    if(session->aparam) {
+        printf("using aparams\n");
+        count = session->aparam->nbreturnedhandles;
+        offset = session->aparam->liststartoffset;
+    }
+
     if (err)
         *err = 0;
+
     printf("imglisting_open\n");
-    return create_images_listing(err);
+
+    return create_images_listing(count, offset, &res_count, err);
 }
 
 static ssize_t imglisting_read(void *object, void *buf, size_t count,
