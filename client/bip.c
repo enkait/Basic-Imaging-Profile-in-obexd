@@ -391,15 +391,68 @@ done:
     return;
 }
 
-static DBusMessage *get_images_listing(DBusConnection *connection,
+static struct images_listing_aparam *new_images_listing_aparam(uint16_t nb, uint16_t ls, uint8_t lc) {
+    struct images_listing_aparam *aparam = g_try_malloc(sizeof(struct images_listing_aparam));
+    aparam->nbtag = NBRETURNEDHANDLES_TAG;
+    aparam->nblen = NBRETURNEDHANDLES_LEN;
+    aparam->nb = nb;
+    aparam->lstag = LISTSTARTOFFSET_TAG;
+    aparam->lslen = LISTSTARTOFFSET_LEN;
+    aparam->ls = ls;
+    aparam->lctag = LATESTCAPTUREDIMAGES_TAG;
+    aparam->lclen = LATESTCAPTUREDIMAGES_LEN;
+    aparam->lc = lc;
+    return aparam;
+}
+
+static DBusMessage *get_images_listing_all(DBusConnection *connection,
         DBusMessage *message, void *user_data)
 {
     struct session_data *session = user_data;
+    struct images_listing_aparam *aparam;
     int err;
 
     printf("requested get images listing\n");
 
-    if ((err=session_get(session, "x-bt/img-listing", NULL, NULL, NULL, 0, get_images_listing_callback)) < 0) {
+    aparam = new_images_listing_aparam(GETALLIMAGES, 0, 0);
+
+    if ((err=session_get(session, "x-bt/img-listing", NULL, NULL, (const guint8 *)aparam,
+            sizeof(struct images_listing_aparam), get_images_listing_callback)) < 0) {
+        return g_dbus_create_error(message,
+                "org.openobex.Error.Failed",
+                "334Failed");
+    }
+
+    session->msg = dbus_message_ref(message);
+
+    return NULL;
+}
+
+static DBusMessage *get_images_listing_range(DBusConnection *connection,
+        DBusMessage *message, void *user_data)
+{
+    struct session_data *session = user_data;
+    struct images_listing_aparam *aparam;
+    uint16_t begin, end;
+    int err;
+
+    printf("requested get images listing\n");
+    
+    if (dbus_message_get_args(message, NULL,
+                DBUS_TYPE_UINT16, &begin,
+                DBUS_TYPE_UINT16, &end,
+                DBUS_TYPE_INVALID) == FALSE)
+        return g_dbus_create_error(message,
+                "org.openobex.Error.InvalidArguments", NULL);
+
+    if (end<=begin)
+        return g_dbus_create_error(message,
+                "org.openobex.Error.InvalidArguments", NULL);
+
+    aparam = new_images_listing_aparam(end-begin, begin, 0);
+
+    if ((err=session_get(session, "x-bt/img-listing", NULL, NULL, (const guint8 *)aparam,
+            sizeof(struct images_listing_aparam), get_images_listing_callback)) < 0) {
         return g_dbus_create_error(message,
                 "org.openobex.Error.Failed",
                 "334Failed");
@@ -411,7 +464,9 @@ static DBusMessage *get_images_listing(DBusConnection *connection,
 }
 
 static GDBusMethodTable image_pull_methods[] = {
-    { "GetImagesListing",	"", "s", get_images_listing,
+    { "GetImagesListing",	"", "s", get_images_listing_all,
+        G_DBUS_METHOD_FLAG_ASYNC },
+    { "GetImagesListing",	"qq", "s", get_images_listing_range,
         G_DBUS_METHOD_FLAG_ASYNC },
     { }
 };
