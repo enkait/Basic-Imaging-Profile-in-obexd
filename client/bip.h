@@ -33,7 +33,7 @@ struct images_listing_aparam {
     uint8_t lctag;
     uint8_t lclen;
     uint8_t lc;
-};
+} __attribute__ ((packed));
 
 gboolean bip_register_interface(DBusConnection *connection, const char *path,
 				void *user_data, GDBusDestroyFunction destroy);

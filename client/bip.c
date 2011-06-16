@@ -395,10 +395,10 @@ static struct images_listing_aparam *new_images_listing_aparam(uint16_t nb, uint
     struct images_listing_aparam *aparam = g_try_malloc(sizeof(struct images_listing_aparam));
     aparam->nbtag = NBRETURNEDHANDLES_TAG;
     aparam->nblen = NBRETURNEDHANDLES_LEN;
-    aparam->nb = nb;
+    aparam->nb = GUINT16_TO_BE(nb);
     aparam->lstag = LISTSTARTOFFSET_TAG;
     aparam->lslen = LISTSTARTOFFSET_LEN;
-    aparam->ls = ls;
+    aparam->ls = GUINT16_TO_BE(ls);
     aparam->lctag = LATESTCAPTUREDIMAGES_TAG;
     aparam->lclen = LATESTCAPTUREDIMAGES_LEN;
     aparam->lc = lc;
@@ -412,7 +412,7 @@ static DBusMessage *get_images_listing_all(DBusConnection *connection,
     struct images_listing_aparam *aparam;
     int err;
 
-    printf("requested get images listing\n");
+    printf("requested get images listing for all\n");
 
     aparam = new_images_listing_aparam(GETALLIMAGES, 0, 0);
 
@@ -433,23 +433,25 @@ static DBusMessage *get_images_listing_range(DBusConnection *connection,
 {
     struct session_data *session = user_data;
     struct images_listing_aparam *aparam;
-    uint16_t begin, end;
+    uint16_t count, begin;
     int err;
 
-    printf("requested get images listing\n");
+    printf("requested get images listing with range\n");
     
     if (dbus_message_get_args(message, NULL,
+                DBUS_TYPE_UINT16, &count,
                 DBUS_TYPE_UINT16, &begin,
-                DBUS_TYPE_UINT16, &end,
                 DBUS_TYPE_INVALID) == FALSE)
         return g_dbus_create_error(message,
                 "org.openobex.Error.InvalidArguments", NULL);
 
-    if (end<=begin)
+    if (count==0)
         return g_dbus_create_error(message,
                 "org.openobex.Error.InvalidArguments", NULL);
 
-    aparam = new_images_listing_aparam(end-begin, begin, 0);
+    aparam = new_images_listing_aparam(count, begin, 0);
+
+    printf("rozmiar aparam: %u\n", sizeof(struct images_listing_aparam));
 
     if ((err=session_get(session, "x-bt/img-listing", NULL, NULL, (const guint8 *)aparam,
             sizeof(struct images_listing_aparam), get_images_listing_callback)) < 0) {
@@ -466,7 +468,7 @@ static DBusMessage *get_images_listing_range(DBusConnection *connection,
 static GDBusMethodTable image_pull_methods[] = {
     { "GetImagesListing",	"", "s", get_images_listing_all,
         G_DBUS_METHOD_FLAG_ASYNC },
-    { "GetImagesListing",	"qq", "s", get_images_listing_range,
+    { "GetImagesListingRange",	"qq", "s", get_images_listing_range,
         G_DBUS_METHOD_FLAG_ASYNC },
     { }
 };
