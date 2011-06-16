@@ -266,7 +266,7 @@ void image_push_disconnect(struct obex_session *os, void *user_data)
 
 static struct obex_service_driver image_push = {
 	.name = "OBEXD Image Push Server",
-	.service = OBEX_BIP,
+	.service = OBEX_BIP_PUSH,
 	.channel = IMAGE_PUSH_CHANNEL,
 	.record = IMAGE_PUSH_RECORD,
 	.target = IMAGE_PUSH_TARGET,

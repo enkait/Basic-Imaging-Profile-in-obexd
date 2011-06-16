@@ -31,8 +31,9 @@
 
 #define OBEX_OPP	(1 << 1)
 #define OBEX_FTP	(1 << 2)
-#define OBEX_BIP	(1 << 3)
-#define OBEX_BIP_PULL	(1 << 9)
+#define OBEX_BIP	(1 << 9) | (1 << 10)
+#define OBEX_BIP_PUSH	(1 << 9)
+#define OBEX_BIP_PULL	(1 << 10)
 #define OBEX_PBAP	(1 << 4)
 #define OBEX_IRMC	(1 << 5)
 #define OBEX_PCSUITE	(1 << 6)
