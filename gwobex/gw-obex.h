@@ -515,6 +515,8 @@ GwObexXfer *gw_obex_put_async(GwObex *ctx, const char *name, const char *type,
  * @param ctx   Pointer returned by gw_obex_setup()
  * @param name  Name of the object (null terminated UTF-8)
  * @param type  Type of the object (null terminated UTF-8), or NULL
+ * @param apparam      Application parameters of the object
+ * @param apparam_size Application paramters' size
  * @param aheaders      List of additional headers
  * @param size  Size of the object (GW_OBEX_UNKNOWN_LENGTH if not known)
  * @param time  Last modification time of the object (-1 if not known)
@@ -523,6 +525,7 @@ GwObexXfer *gw_obex_put_async(GwObex *ctx, const char *name, const char *type,
  * @returns a new GwObexXfer object on success, NULL on failure
  */
 GwObexXfer *gw_obex_put_async_with_aheaders(GwObex *ctx, const char *name, const char *type,
+		                      const guint8 *apparam, gint apparam_size,
                               const GSList *aheaders,
                               gint size, time_t time, gint *error);
 

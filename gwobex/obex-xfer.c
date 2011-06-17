@@ -126,12 +126,13 @@ GwObexXfer *gw_obex_put_async(GwObex *ctx, const char *name, const char *type,
 }
 
 GwObexXfer *gw_obex_put_async_with_aheaders(GwObex *ctx, const char *name, const char *type,
-                              const GSList *aheaders,
-                              gint size, time_t time, gint *error) {
+		const guint8 *apparam, gint apparam_size,
+        const GSList *aheaders,
+        gint size, time_t time, gint *error) {
     gboolean ret;
     GW_OBEX_LOCK(ctx);
     CHECK_DISCONNECT(NULL, error, ctx);
-    ret = gw_obex_put_with_aheaders(ctx, NULL, name, type, NULL, 0, aheaders, NULL, size, time, -1, TRUE);
+    ret = gw_obex_put_with_aheaders(ctx, NULL, name, type, apparam, apparam_size, aheaders, NULL, size, time, -1, TRUE);
     if (ret == FALSE)
         gw_obex_get_error(ctx, error);
     GW_OBEX_UNLOCK(ctx);
