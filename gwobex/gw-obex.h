@@ -525,7 +525,7 @@ GwObexXfer *gw_obex_put_async(GwObex *ctx, const char *name, const char *type,
  * @returns a new GwObexXfer object on success, NULL on failure
  */
 GwObexXfer *gw_obex_put_async_with_aheaders(GwObex *ctx, const char *name, const char *type,
-		                      const guint8 *apparam, gint apparam_size,
+                              const guint8 *apparam, gint apparam_size,
                               const GSList *aheaders,
                               gint size, time_t time, gint *error);
 
@@ -553,7 +553,7 @@ GwObexXfer *gw_obex_get_async(GwObex *ctx, const char *name, const char *type, g
  */
 
 GwObexXfer *gw_obex_get_async_with_apparam(GwObex *ctx, const char *name, const char *type,
-		const guint8  *apparam, gint apparam_size, gint *error);
+        const guint8  *apparam, gint apparam_size, gint *error);
 
 /** Start a GET operation asynchronously with additional headers
  *
@@ -567,7 +567,7 @@ GwObexXfer *gw_obex_get_async_with_apparam(GwObex *ctx, const char *name, const 
  */
 
 GwObexXfer *gw_obex_get_async_with_aheaders(GwObex *ctx, const char *name, const char *type,
-		const guint8 *apparam, gint apparam_size,
+        const guint8 *apparam, gint apparam_size,
         const GSList *aheaders, gint *error);
 
 /** Set a callback function for a GwObexXfer object
