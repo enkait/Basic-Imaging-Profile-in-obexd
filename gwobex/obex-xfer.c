@@ -475,7 +475,7 @@ void a_header_free(struct a_header *ah) {
 
 struct a_header *a_header_find(GSList *aheaders, uint8_t hi) {
     while (aheaders) {
-        if (((struct a_header *) aheaders->data)->hi == hi) {
+        if (((struct a_header *)aheaders->data)->hi == hi) {
             return aheaders->data;
         }
         aheaders = g_slist_next(aheaders);
