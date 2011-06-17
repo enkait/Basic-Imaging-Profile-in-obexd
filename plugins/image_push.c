@@ -245,7 +245,7 @@ int image_push_put(struct obex_session *os, obex_object_t *obj, void *user_data)
     }
     len = strlen(bip_root) + strlen(os->name) + 7;
     imagename = g_string_new(bip_root);
-    imagename = g_string_append(imagename, g_strcanon(os->name,valid_name_chars,rep_char));
+    imagename = g_string_append(imagename, g_strcanon(os->name, valid_name_chars, rep_char));
     close(mkstemp(imagename->str));
     rename(ips->image_path, imagename->str);
     printf("imagename=%s\n", imagename->str);

@@ -27,6 +27,16 @@ struct pull_aparam_field {
     uint8_t latestcapturedimages;
 };
 
+struct image_handles_desc {
+    time_t ctime[2];
+    gboolean ctime_unbounded[2];
+    time_t mtime[2];
+    gboolean mtime_unbounded[2];
+    char *encoding;
+    unsigned int lower[2], upper[2];
+    gboolean fixed_ratio;
+};
+
 struct pull_aparam_header {
 	uint8_t tag;
 	uint8_t len;
@@ -36,6 +46,7 @@ struct pull_aparam_header {
 struct image_pull_session {
     struct obex_session *os;
     struct pull_aparam_field *aparam;
+    struct image_handles_desc *hdesc;
 };
 
 void *image_pull_connect(struct obex_session *os, int *err);
