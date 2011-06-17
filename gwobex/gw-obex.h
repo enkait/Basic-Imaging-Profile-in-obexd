@@ -553,7 +553,7 @@ GwObexXfer *gw_obex_get_async(GwObex *ctx, const char *name, const char *type, g
  */
 
 GwObexXfer *gw_obex_get_async_with_apparam(GwObex *ctx, const char *name, const char *type,
-        const guint8  *apparam, gint apparam_size, gint *error);
+    const guint8  *apparam, gint apparam_size, gint *error);
 
 /** Start a GET operation asynchronously with additional headers
  *

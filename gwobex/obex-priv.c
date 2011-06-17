@@ -322,7 +322,7 @@ static void obex_request_done(GwObex *ctx, obex_object_t *object,
         return;
     }
 
-    if(ctx->xfer)
+    if (ctx->xfer)
         get_non_body_headers(ctx->handle, object, ctx->xfer);
 
     debug("%s command (0x%02x) succeeded.\n", optostr((uint8_t)obex_cmd),
@@ -869,7 +869,8 @@ gboolean gw_obex_get(GwObex *ctx,
                      const guint8 *apparam, gint apparam_size,
                      gchar **buf, gint *buf_size, int stream_fd,
                      gboolean async) {
-    return gw_obex_get_with_aheaders(ctx, local, remote, type, apparam, apparam_size, NULL, buf, buf_size, stream_fd, async);
+    return gw_obex_get_with_aheaders(ctx, local, remote, type, apparam, apparam_size,
+            NULL, buf, buf_size, stream_fd, async);
 }
 
 gboolean gw_obex_get_with_aheaders(GwObex *ctx,
@@ -1005,7 +1006,8 @@ gboolean gw_obex_put(GwObex *ctx,
                      const guint8 *apparam, gint apparam_size,
                      const gchar *buf, gint object_size, time_t object_time,
                      int stream_fd, gboolean async) {
-    return gw_obex_put_with_aheaders(ctx, local, remote, type, apparam, apparam_size, NULL, buf, object_size, object_time, stream_fd, async);
+    return gw_obex_put_with_aheaders(ctx, local, remote, type, apparam, apparam_size,
+            NULL, buf, object_size, object_time, stream_fd, async);
 }
 
 gboolean gw_obex_put_with_aheaders(GwObex *ctx,
