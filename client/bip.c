@@ -11,21 +11,29 @@
 #include "transfer.h"
 #include "session.h"
 #include "bip.h"
+#include "bip_util.h"
 #include "gwobex/obex-xfer.h"
 #include "gwobex/obex-priv.h"
 #include "wand/MagickWand.h"
 
 #define EOL_CHARS "\n"
 
-#define IMG_DESCRIPTOR_BEGIN "<image-descriptor version=\"1.0\">" EOL_CHARS
+#define IMG_DESC_BEGIN "<image-descriptor version=\"1.0\">" EOL_CHARS
 
-#define IMG_DESCRIPTOR_FORMAT "<image encoding=\"%s\" pixel=\"%zu*%zu\" size=\"%lu\"/>" EOL_CHARS
+#define IMG_DESC_FORMAT "<image encoding=\"%s\" pixel=\"%zu*%zu\" size=\"%lu\"/>" EOL_CHARS
 
-#define IMG_DESCRIPTOR_WITH_TRANSFORM_FORMAT "<image encoding=\"%s\" pixel=\"%zu*%zu\" size=\"%lu\" transform=\"%s\"/>" EOL_CHARS
+#define IMG_DESC_WITH_TRANSFORM_FORMAT "<image encoding=\"%s\" pixel=\"%zu*%zu\" size=\"%lu\" transform=\"%s\"/>" EOL_CHARS
 
-#define IMG_DESCRIPTOR_END "</image-descriptor>" EOL_CHARS
+#define IMG_DESC_END "</image-descriptor>" EOL_CHARS
 
-#define IMG_DESCRIPTOR_HDR OBEX_HDR_TYPE_BYTES | 0x71
+#define IMG_HANDLES_DESC "<image-handles-descriptor version=\"1.0\">" EOL_CHARS \
+    "<filtering_parameters%s/>" EOL_CHARS \
+    "</image-handles-descriptor>" EOL_CHARS
+
+#define FILTERING_CREATED " created=\"%s\""
+#define FILTERING_MODIFIED " modified=\"%s\""
+#define FILTERING_ENCODING " encoding=\"%s\""
+#define FILTERING_PIXEL " pixel=\"%s\""
 
 #define BIP_TEMP_FOLDER /tmp/bip/
 
@@ -119,19 +127,19 @@ static void free_image_attributes(struct image_attributes *attr) {
 }
 
 static void create_image_descriptor(const struct image_attributes *attr, struct a_header *ah) {
-    GString *descriptor = g_string_new(IMG_DESCRIPTOR_BEGIN);
+    GString *descriptor = g_string_new(IMG_DESC_BEGIN);
     if (attr->transform) {
         g_string_append_printf(descriptor,
-            IMG_DESCRIPTOR_WITH_TRANSFORM_FORMAT,
+            IMG_DESC_WITH_TRANSFORM_FORMAT,
             attr->format, attr->width, attr->height, attr->length, attr->transform);
     }
     else {
         g_string_append_printf(descriptor,
-            IMG_DESCRIPTOR_FORMAT,
+            IMG_DESC_FORMAT,
             attr->format, attr->width, attr->height, attr->length);
     }
-    descriptor = g_string_append(descriptor, IMG_DESCRIPTOR_END);
-    ah->hi = IMG_DESCRIPTOR_HDR;
+    descriptor = g_string_append(descriptor, IMG_DESC_END);
+    ah->hi = IMG_DESC_HDR;
     ah->hv_size = descriptor->len;
     ah->hv.bs = (guint8 *) g_string_free(descriptor, FALSE);
 }
@@ -175,7 +183,7 @@ static DBusMessage *put_transformed_image(DBusMessage *message, struct session_d
 {
     int err;
     struct image_attributes attr;
-    struct a_header descriptor;
+    struct a_header *descriptor = g_try_new(struct a_header, 1);
     GSList * aheaders = NULL;
 
     attr.format = NULL;
@@ -186,9 +194,9 @@ static DBusMessage *put_transformed_image(DBusMessage *message, struct session_d
             "org.openobex.Error.InvalidArguments", NULL);
     }
 
-    create_image_descriptor(&attr, &descriptor);
-    printf("descriptor: %p %d\n", descriptor.hv.bs, descriptor.hv_size);
-    aheaders = g_slist_append(NULL, &descriptor);
+    create_image_descriptor(&attr, descriptor);
+    printf("descriptor: %p %d\n", descriptor->hv.bs, descriptor->hv_size);
+    aheaders = g_slist_append(NULL, descriptor);
 
     if ((err=session_put_with_aheaders(session, "x-bt/img-img",
             local_image, remote_image, aheaders, put_image_callback)) < 0) {
@@ -199,6 +207,8 @@ static DBusMessage *put_transformed_image(DBusMessage *message, struct session_d
     }
     session->msg = dbus_message_ref(message);
     free_image_attributes(&attr);
+    g_slist_free(aheaders);
+    a_header_free(descriptor);
 
     return dbus_message_new_method_return(message);
 }
@@ -428,6 +438,117 @@ static DBusMessage *get_images_listing_all(DBusConnection *connection,
     return NULL;
 }
 
+static int parse_filter_dict(DBusMessageIter *iter,
+		char **created, char **modified, char **encoding,
+		char **pixel) {
+	while (dbus_message_iter_get_arg_type(iter) == DBUS_TYPE_DICT_ENTRY) {
+		DBusMessageIter entry, value;
+		const char *key;
+		
+        dbus_message_iter_recurse(iter, &entry);
+		dbus_message_iter_get_basic(&entry, &key);
+
+		dbus_message_iter_next(&entry);
+		dbus_message_iter_recurse(&entry, &value);
+
+        if (dbus_message_iter_get_arg_type(&value) == DBUS_TYPE_STRING) {
+            if (g_str_equal(key, "created") == TRUE)
+				dbus_message_iter_get_basic(&value, created);
+            else if (g_str_equal(key, "modified") == TRUE)
+				dbus_message_iter_get_basic(&value, modified);
+            else if (g_str_equal(key, "encoding") == TRUE)
+				dbus_message_iter_get_basic(&value, encoding);
+            else if (g_str_equal(key, "pixel") == TRUE)
+				dbus_message_iter_get_basic(&value, pixel);
+        }
+		
+        dbus_message_iter_next(iter);
+    }
+
+    return 0;
+}
+
+static void create_filtering_descriptor(char *created, char *modified,
+        char *encoding, char *pixel, struct a_header *ah) {
+    GString *filter = g_string_new("");
+    GString *object = g_string_new("");
+    guint8 *encoded_data;
+    unsigned int length;
+
+    if (created)
+        g_string_append_printf(filter, FILTERING_CREATED, created);
+    if (modified)
+        g_string_append_printf(filter, FILTERING_MODIFIED, modified);
+    if (encoding)
+        g_string_append_printf(filter, FILTERING_ENCODING, encoding);
+    if (pixel)
+        g_string_append_printf(filter, FILTERING_PIXEL, pixel);
+
+    g_string_printf(object, IMG_HANDLES_DESC, filter->str);
+    g_string_free(filter, TRUE);
+
+    encoded_data = encode_img_descriptor(object->str, object->len, &length);
+    g_string_free(object, TRUE);
+
+    ah->hi = IMG_DESC_HDR;
+    ah->hv_size = length;
+    ah->hv.bs = encoded_data;
+}
+
+static DBusMessage *get_images_listing_range_filter(DBusConnection *connection,
+        DBusMessage *message, void *user_data)
+{
+    struct session_data *session = user_data;
+    DBusMessageIter iter, dict;
+    struct images_listing_aparam *aparam;
+    char *created = NULL, *modified = NULL,
+         *encoding = NULL, *pixel = NULL;
+    struct a_header *handles_desc = g_try_new(struct a_header, 1);
+    uint16_t count, begin;
+    GSList *aheaders;
+    int err;
+
+    printf("requested get images listing with range and filtering\n");
+    
+    if (dbus_message_get_args(message, NULL,
+                DBUS_TYPE_UINT16, &count,
+                DBUS_TYPE_UINT16, &begin,
+                DBUS_TYPE_INVALID) == FALSE)
+        return g_dbus_create_error(message,
+                "org.openobex.Error.InvalidArguments", NULL);
+
+    if (count==0)
+        return g_dbus_create_error(message,
+                "org.openobex.Error.InvalidArguments", NULL);
+	
+    dbus_message_iter_init(message, &iter);
+    dbus_message_iter_next(&iter);
+    dbus_message_iter_next(&iter);
+	dbus_message_iter_recurse(&iter, &dict);
+    
+    parse_filter_dict(&dict, &created, &modified, &encoding, &pixel);
+    create_filtering_descriptor(created, modified, encoding, pixel, handles_desc);
+    aheaders = g_slist_append(NULL, &handles_desc);
+
+    aparam = new_images_listing_aparam(count, begin, 0);
+
+    printf("rozmiar aparam: %u\n", sizeof(struct images_listing_aparam));
+
+    if ((err=session_get(session, "x-bt/img-listing", NULL, NULL, (const guint8 *)aparam,
+            sizeof(struct images_listing_aparam), get_images_listing_callback)) < 0) {
+        return g_dbus_create_error(message,
+                "org.openobex.Error.Failed",
+                "334Failed");
+    }
+
+    g_slist_free(aheaders);
+    a_header_free(handles_desc);
+
+    session->msg = dbus_message_ref(message);
+
+    return NULL;
+}
+
 static DBusMessage *get_images_listing_range(DBusConnection *connection,
         DBusMessage *message, void *user_data)
 {
@@ -469,6 +590,8 @@ static GDBusMethodTable image_pull_methods[] = {
     { "GetImagesListing",	"", "s", get_images_listing_all,
         G_DBUS_METHOD_FLAG_ASYNC },
     { "GetImagesListingRange",	"qq", "s", get_images_listing_range,
+        G_DBUS_METHOD_FLAG_ASYNC },
+    { "GetImagesListingRangeFilter",	"qqa{ss}", "s", get_images_listing_range_filter,
         G_DBUS_METHOD_FLAG_ASYNC },
     { }
 };
