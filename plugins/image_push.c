@@ -171,9 +171,9 @@ guint8 *encode_length_prefix(const gunichar2 *data, unsigned int length, unsigne
     len = GUINT16_TO_BE(len);
     if(!buf)
         return NULL;
-    g_memmove(buf,&len,2);
-    g_memmove(buf+2,data,2*length);
-    buf[2*length+2]='\0';
+    g_memmove(buf, &len, 2);
+    g_memmove(buf+2, data, 2*length);
+    buf[2*length+2] = '\0';
     *newsize = 2*length+3;
     return buf;
 }

@@ -1,0 +1,105 @@
+#!/usr/bin/python
+
+import gobject
+
+import sys
+import dbus
+import dbus.service
+import dbus.mainloop.glib
+import os.path
+from optparse import OptionParser
+
+class Agent(dbus.service.Object):
+    def __init__(self, conn=None, obj_path=None, verbose=False):
+        dbus.service.Object.__init__(self, conn, obj_path)
+        self.verbose = verbose
+
+    @dbus.service.method("org.openobex.Agent",
+                    in_signature="o", out_signature="s")
+    def Request(self, path):
+        return ""
+
+    @dbus.service.method("org.openobex.Agent",
+                    in_signature="ot", out_signature="")
+    def Progress(self, path, transferred):
+        if self.verbose:
+            print "Transfer progress (%d bytes)" % (transferred)
+        return
+
+    @dbus.service.method("org.openobex.Agent",
+                    in_signature="o", out_signature="")
+    def Complete(self, path):
+        if self.verbose:
+            print "Transfer finished"
+        mainloop.quit()
+
+    @dbus.service.method("org.openobex.Agent",
+                    in_signature="os", out_signature="")
+    def Error(self, path, error):
+        print "Transfer finished with an error: %s" % (error)
+        mainloop.quit()
+
+    @dbus.service.method("org.openobex.Agent",
+                    in_signature="", out_signature="")
+    def Release(self):
+        mainloop.quit()
+
+def parse_options():
+    parser.add_option("-d", "--device", dest="device",
+                      help="Device to connect", metavar="DEVICE")
+    parser.add_option("-c", "--capabilities", action="store_true",
+                      dest="capabilities",
+                      help="Get imaging capabilities")
+    parser.add_option("-l", "--listing", action="store_true",
+                      dest="listing",
+                      help="Get images listing")
+    parser.add_option("-v", "--verbose", action="store_true", dest="verbose")
+
+    return parser.parse_args()
+
+def images_listing(session):
+    print session.GetImagesListingRange(1,1)
+    print session.GetImagesListingRange(2,2)
+    print session.GetImagesListingRange(3,3)
+    print session.GetImagesListing()
+
+def imaging_capabilities(session):
+    print "omg"
+    print session.GetImagingCapabilities()
+
+if  __name__ == '__main__':
+
+    dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+
+    parser = OptionParser()
+
+    (options, args) = parse_options()
+
+    if not options.device:
+        parser.print_help()
+        sys.exit(0)
+
+    bus = dbus.SessionBus()
+    mainloop = gobject.MainLoop()
+
+    path = "/test/agent"
+    agent = Agent(bus, path, options.verbose)
+	
+    client = dbus.Interface(bus.get_object("org.openobex.client", "/"),
+                            "org.openobex.Client")
+
+    session_path = client.CreateSession({ "Destination": options.device,
+        "Target": "BIP:PULL"})
+
+    session = dbus.Interface(bus.get_object("org.openobex.client", session_path),
+                 "org.openobex.Session")
+
+    session.AssignAgent(path)
+
+    bip = dbus.Interface(bus.get_object("org.openobex.client", session_path),
+                 "org.openobex.ImagePull")
+    
+    if options.listing:
+       images_listing(bip)
+
+    mainloop.run()
