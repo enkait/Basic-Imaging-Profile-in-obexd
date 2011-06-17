@@ -39,7 +39,11 @@
 #include <string.h>
 #include <stdio.h>
 
+#define __USE_XOPEN
+#include <time.h>
+
 #include <glib.h>
+#include <regex.h>
 
 #include <openobex/obex.h>
 #include <openobex/obex_const.h>
@@ -91,7 +95,8 @@
   </attribute>								\
 </record>"
 
-#define IMG_HANDLE_HDR OBEX_HDR_TYPE_BYTES | 0x30
+#define IMG_HANDLE_HDR (OBEX_HDR_TYPE_BYTES | 0x30)
+#define IMG_DESC_HDR (OBEX_HDR_TYPE_BYTES | 0x71)
 
 #define NBRETURNEDHANDLES_TAG 0x01
 #define NBRETURNEDHANDLES_LEN 0x02
@@ -176,14 +181,134 @@ failed:
 	return NULL;
 }
 
+static gboolean parse_time_range(const gchar *range, time_t *res, gboolean *unbounded) {
+    gchar **arr = g_strsplit(range, "-", 2);
+    int i;
+    for(i=0;i<2;i++) {
+        struct tm tm;
+        if (range[i] == '*')
+            unbounded[i] = TRUE;
+        else
+            unbounded[i] = FALSE;
+        if (strptime(*arr, "%Y%m%dT%H%M%SZ", &tm)) {
+            printf("UTC\n");
+            res[i] = mktime(&tm);
+        }
+        else if(strptime(*arr, "%Y%m%dT%H%M%S", &tm)) {
+            printf("not UTC\n");
+            tm.tm_isdst = -1;
+            res[i] = mktime(&tm);
+        }
+        else {
+            g_strfreev(arr);
+            return FALSE;
+        }
+    }
+    printf("time_range: %lu %lu %d %d\n", res[0], res[1], unbounded[0], unbounded[1]);
+    g_strfreev(arr);
+    return TRUE;
+}
+
+static gboolean parse_pixel_range(const gchar *dim, unsigned int *lower, unsigned int *upper, gboolean *fixed_ratio) {
+    static regex_t no_range;
+    static regex_t range;
+    static regex_t range_fixed;
+    static int regex_initialized = 0;
+    if (!regex_initialized) {
+        regcomp(&no_range, "^([:digit:]+)\\*([:digit:]+)$", REG_EXTENDED);
+        regcomp(&range, "^([:digit:]+)\\*([:digit:]+)-([:digit:]+)\\*([:digit:]+)$", REG_EXTENDED);
+        regcomp(&range_fixed, "^([:digit:]+)\\*\\*-([:digit:]+)\\*([:digit:]+)$", REG_EXTENDED);
+        regex_initialized = 1;
+    }
+    if (regexec(&no_range, dim, 0, NULL, 0) == 0) {
+        sscanf(dim, "%u*%u", &lower[0], &lower[1]);
+        *fixed_ratio = FALSE;
+    }
+    else if (regexec(&range, dim, 0, NULL, 0) == 0) {
+        sscanf(dim, "%u*%u-%u*%u", &lower[0], &lower[1], &upper[0], &upper[1]);
+        *fixed_ratio = FALSE;
+    }
+    else if (regexec(&range_fixed, dim, 0, NULL, 0) == 0) {
+        sscanf(dim, "%d**-%d*%d", &lower[0], &upper[1], &upper[2]);
+        lower[1] = 0;
+        *fixed_ratio = TRUE;
+    }
+    if (lower[0] > 65535 || lower[1] > 65535 || upper[0] > 65535 || upper[1] > 65535)
+        return FALSE;
+    return TRUE;
+}
+
+static void handles_listing_element(GMarkupParseContext *ctxt,
+        const gchar *element,
+        const gchar **names,
+        const gchar **values,
+        gpointer user_data,
+        GError **gerr)
+{
+    struct image_handles_desc *desc = user_data;
+    gchar **key;
+    int i;
+
+    for(i = 0; i < 2; i++)
+        desc->ctime_unbounded[i] = desc->mtime_unbounded[i] = TRUE;
+    desc->lower[0] = desc->lower[1] = 0;
+    desc->upper[0] = desc->upper[1] = 65535;
+    desc->fixed_ratio = FALSE;
+
+    if (g_str_equal(element, "filtering-parameters") != TRUE)
+        return;
+
+    for (key = (gchar **) names; *key; key++, values++) {
+        if (g_str_equal(*key, "created")) {
+            parse_time_range(*values, desc->ctime, desc->ctime_unbounded);
+        }
+        else if (g_str_equal(*key, "modified")) {
+            parse_time_range(*values, desc->mtime, desc->mtime_unbounded);
+        }
+        else if (g_str_equal(*key, "encoding")) {
+            desc->encoding = g_strdup(*values);
+            printf("encoding: %s\n", desc->encoding);
+        }
+        else if (g_str_equal(*key, "pixel")) {
+            parse_pixel_range(*values, desc->lower, desc->upper, &desc->fixed_ratio);
+            printf("pixel: %u %u %u %u %d\n", desc->lower[0], desc->lower[1], desc->upper[0], desc->upper[1], desc->fixed_ratio);
+        }
+    }
+}
+
+static const GMarkupParser handles_desc_parser = {
+    handles_listing_element,
+    NULL,
+    NULL,
+    NULL,
+    NULL
+};
+
+static struct image_handles_desc *parse_handles_desc(const struct obex_session *os, obex_object_t *obj) {
+    obex_headerdata_t hd;
+    unsigned int hlen;
+    uint8_t hi;
+    struct image_handles_desc *desc = g_try_malloc(sizeof(struct image_handles_desc));
+    GMarkupParseContext *ctxt = g_markup_parse_context_new(&handles_desc_parser, 0, desc, NULL);
+    while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen)) {
+        if (hi == IMG_DESC_HDR) {
+	        g_markup_parse_context_parse(ctxt, (gchar *) hd.bs, hlen, NULL);
+        }
+    }
+	OBEX_ObjectReParseHeaders(os->obex, obj);
+	g_markup_parse_context_free(ctxt);
+    return desc;
+}
+
 int image_pull_get(struct obex_session *os, obex_object_t *obj,
         gboolean *stream, void *user_data) {
     struct image_pull_session *ips = user_data;
-	const uint8_t *buffer;
+    const uint8_t *buffer;
     int ret;
-	ssize_t rsize = obex_aparam_read(os, obj, &buffer);
+    ssize_t rsize = obex_aparam_read(os, obj, &buffer);
 
     ips->aparam = parse_aparam(buffer, rsize);
+    ips->hdesc = parse_handles_desc(os, obj);
 
     ret = obex_get_stream_start(os, "");
     printf("IMAGE PULL GET\n");
@@ -207,31 +332,31 @@ void image_pull_disconnect(struct obex_session *os, void *user_data)
     struct image_pull_session *ips = user_data;
     printf("IMAGE PULL DISCONNECT\n");
     free_image_pull_session(ips);
-	manager_unregister_session(os);
+    manager_unregister_session(os);
 }
 
 static struct obex_service_driver image_pull = {
-	.name = "OBEXD Image Pull Server",
-	.service = OBEX_BIP_PULL,
-	.channel = IMAGE_PULL_CHANNEL,
-	.record = IMAGE_PULL_RECORD,
-	.target = IMAGE_PULL_TARGET,
-	.target_size = TARGET_SIZE,
-	.connect = image_pull_connect,
-	.get = image_pull_get,
-	.put = image_pull_put,
-	.chkput = image_pull_chkput,
-	.disconnect = image_pull_disconnect
+    .name = "OBEXD Image Pull Server",
+    .service = OBEX_BIP_PULL,
+    .channel = IMAGE_PULL_CHANNEL,
+    .record = IMAGE_PULL_RECORD,
+    .target = IMAGE_PULL_TARGET,
+    .target_size = TARGET_SIZE,
+    .connect = image_pull_connect,
+    .get = image_pull_get,
+    .put = image_pull_put,
+    .chkput = image_pull_chkput,
+    .disconnect = image_pull_disconnect
 };
 
 static int image_pull_init(void)
 {
-	return obex_service_driver_register(&image_pull);
+    return obex_service_driver_register(&image_pull);
 }
 
 static void image_pull_exit(void)
 {
-	obex_service_driver_unregister(&image_pull);
+    obex_service_driver_unregister(&image_pull);
 }
 
 OBEX_PLUGIN_DEFINE(image_pull, image_pull_init, image_pull_exit)
