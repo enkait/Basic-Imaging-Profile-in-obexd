@@ -508,6 +508,16 @@ void a_header_free(struct a_header *ah) {
     g_free(ah);
 }
 
+struct a_header *a_header_find(GSList *aheaders, uint8_t hi) {
+    while (aheaders) {
+        struct a_header *ah = aheaders->data;
+        if (ah->hi == hi)
+            return aheaders->data;
+        aheaders = g_slist_next(aheaders);
+    }
+    return NULL;
+}
+
 void _gw_obex_xfer_free(struct gw_obex_xfer *xfer) {
     g_slist_free_full(xfer->aheaders, (GDestroyNotify) a_header_free);
     g_free(xfer->buf);
