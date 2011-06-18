@@ -484,6 +484,20 @@ struct a_header *make_a_header(uint8_t hi, obex_headerdata_t hv,
     return ah;
 }
 
+struct a_header *a_header_copy(struct a_header *ah) {
+    struct a_header *res;
+    if (ah == NULL)
+        return NULL;
+    res = g_memdup(ah, sizeof(struct a_header));
+    switch (res->hi & OBEX_HDR_TYPE_MASK) {
+        case OBEX_HDR_TYPE_BYTES:
+        case OBEX_HDR_TYPE_UNICODE:
+            res->hv.bs = g_memdup(ah->hv.bs, ah->hv_size);
+            break;
+    }
+    return res;
+}
+
 void a_header_free(struct a_header *ah) {
     switch (ah->hi & OBEX_HDR_TYPE_MASK) {
         case OBEX_HDR_TYPE_BYTES:
