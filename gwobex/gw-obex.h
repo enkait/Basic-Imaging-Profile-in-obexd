@@ -583,6 +583,13 @@ gint gw_obex_xfer_object_size(GwObexXfer *xfer);
  */
 unsigned char *gw_obex_xfer_object_apparam(GwObexXfer *xfer, size_t *apparam_size);
 
+/** Get the additional header list
+ *
+ * @param xfer Pointer returned by gw_obex_put_async or gw_obex_get_async
+ *
+ * @returns The pointer to the GSList that contains the headers
+ */
+GSList *gw_obex_xfer_object_aheaders(GwObexXfer *xfer);
 
 /** Returns if a transfer is already done
  *

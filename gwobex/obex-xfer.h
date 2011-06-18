@@ -62,6 +62,9 @@ struct gw_obex_xfer {
     unsigned char           *apparam_buf;
     size_t                   apparam_size;
 
+    /* Additional headers, in the order they were received */
+    GSList                  *aheaders;
+
     /* These two elements are only used for async transfers */
     size_t                   data_start;
     size_t                   data_length;
@@ -87,6 +90,8 @@ struct a_header {
     obex_headerdata_t hv;
     uint32_t hv_size;
 };
+
+void a_header_free(struct a_header *ah);
 
 struct gw_obex_xfer *gw_obex_xfer_new(struct gw_obex *ctx, gboolean async, int stream_fd);
 
