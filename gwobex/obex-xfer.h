@@ -82,6 +82,12 @@ struct gw_obex_xfer {
     GSource                 *idle_source;
 };
 
+struct a_header {
+    uint8_t hi;
+    obex_headerdata_t hv;
+    uint32_t hv_size;
+};
+
 struct gw_obex_xfer *gw_obex_xfer_new(struct gw_obex *ctx, gboolean async, int stream_fd);
 
 void _gw_obex_xfer_free(struct gw_obex_xfer *xfer);
