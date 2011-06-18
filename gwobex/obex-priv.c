@@ -847,6 +847,17 @@ gboolean gw_obex_get(GwObex *ctx,
                      const guint8 *apparam, gint apparam_size,
                      gchar **buf, gint *buf_size, int stream_fd,
                      gboolean async) {
+    return gw_obex_get_with_aheaders(ctx, local, remote, type,
+                                     apparam, apparam_size,
+                                     NULL, buf, buf_size, stream_fd, async);
+}
+
+gboolean gw_obex_get_with_aheaders(GwObex *ctx, const gchar *local,
+                                   const gchar *remote, const gchar *type,
+                                   const guint8 *apparam, gint apparam_size,
+                                   const GSList *aheaders,
+                                   gchar **buf, gint *buf_size, int stream_fd,
+                                   gboolean async) {
     gboolean ret = FALSE;
     obex_headerdata_t hv;
     obex_object_t *object;
@@ -911,6 +922,17 @@ gboolean gw_obex_get(GwObex *ctx,
         }
     }
 
+    if (aheaders) {
+        const GSList *hlist = aheaders;
+        struct a_header *ah;
+        while (hlist) {
+            ah = hlist->data;
+            hv = ah->hv;
+            OBEX_ObjectAddHeader(ctx->handle, object, ah->hi, hv, ah->hv_size, 0);
+            hlist = g_slist_next(hlist);
+        }
+    }
+
     OBEX_ObjectReadStream(ctx->handle, object, NULL);
 
     if (async) {
@@ -964,6 +986,20 @@ gboolean gw_obex_put(GwObex *ctx,
                      const guint8 *apparam, gint apparam_size,
                      const gchar *buf, gint object_size, time_t object_time,
                      int stream_fd, gboolean async) {
+    return gw_obex_put_with_aheaders(ctx, local, remote, type,
+                                     apparam, apparam_size,
+                                     NULL, buf, object_size, object_time,
+                                     stream_fd, async);
+}
+
+gboolean gw_obex_put_with_aheaders(GwObex *ctx,
+                                   const gchar *local, const gchar *remote,
+                                   const gchar *type,
+                                   const guint8 *apparam, gint apparam_size,
+                                   const GSList *aheaders,
+                                   const gchar *buf,
+                                   gint object_size, time_t object_time,
+                                   int stream_fd, gboolean async) {
     gboolean ret = FALSE;
     obex_headerdata_t hv;
     obex_object_t *object;
@@ -1040,6 +1076,17 @@ gboolean gw_obex_put(GwObex *ctx,
     if (apparam && apparam_size > 0) {
         hv.bs = (unsigned char *)apparam;
         OBEX_ObjectAddHeader(ctx->handle, object, OBEX_HDR_APPARAM, hv, apparam_size, 0);
+    }
+
+    if (aheaders) {
+        const GSList *hlist = aheaders;
+        struct a_header *ah;
+        while (hlist) {
+            ah = hlist->data;
+            hv = ah->hv;
+            OBEX_ObjectAddHeader(ctx->handle, object, ah->hi, hv, ah->hv_size, 0);
+            hlist = g_slist_next(hlist);
+        }
     }
 
     /* Try to figure out modification time if none was given */
