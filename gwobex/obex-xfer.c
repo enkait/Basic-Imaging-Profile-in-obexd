@@ -202,6 +202,10 @@ unsigned char *gw_obex_xfer_object_apparam(GwObexXfer *xfer, size_t *apparam_siz
     return xfer->apparam_buf;
 }
 
+GSList *gw_obex_xfer_object_aheaders(GwObexXfer *xfer) {
+    return xfer->aheaders;
+}
+
 gboolean gw_obex_xfer_object_done(GwObexXfer *xfer) {
     return xfer->ctx->done;
 }
@@ -418,7 +422,18 @@ out:
     return ret;
 }
 
+void a_header_free(struct a_header *ah) {
+    switch (ah->hi & OBEX_HDR_TYPE_MASK) {
+        case OBEX_HDR_TYPE_BYTES:
+        case OBEX_HDR_TYPE_UNICODE:
+            g_free((gpointer) ah->hv.bs);
+            break;
+    }
+    g_free(ah);
+}
+
 void _gw_obex_xfer_free(struct gw_obex_xfer *xfer) {
+    g_slist_free_full(xfer->aheaders, (GDestroyNotify) a_header_free);
     g_free(xfer->buf);
     g_free(xfer->apparam_buf);
     g_free(xfer);
