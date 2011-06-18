@@ -884,11 +884,6 @@ gboolean gw_obex_get_with_aheaders(GwObex *ctx, const gchar *local,
         OBEX_ObjectAddHeader(ctx->handle, object, OBEX_HDR_CONNECTION, hv, 4, 0);
     }
 
-    if (apparam && apparam_size > 0) {
-        hv.bs = (unsigned char *)apparam;
-        OBEX_ObjectAddHeader(ctx->handle, object, OBEX_HDR_APPARAM, hv, apparam_size, 0);
-    }
-
     if (type) {
         hv.bs = (unsigned char *)type;
         OBEX_ObjectAddHeader(ctx->handle, object, OBEX_HDR_TYPE, hv, strlen(type) + 1, 0);
@@ -923,6 +918,11 @@ gboolean gw_obex_get_with_aheaders(GwObex *ctx, const gchar *local,
             OBEX_ObjectDelete(ctx->handle, object);
             goto out;
         }
+    }
+
+    if (apparam && apparam_size > 0) {
+        hv.bs = (unsigned char *)apparam;
+        OBEX_ObjectAddHeader(ctx->handle, object, OBEX_HDR_APPARAM, hv, apparam_size, 0);
     }
 
     if (aheaders) {
@@ -1064,16 +1064,16 @@ gboolean gw_obex_put_with_aheaders(GwObex *ctx,
         OBEX_ObjectAddHeader(ctx->handle, object, OBEX_HDR_CONNECTION, hv, 4, 0);
     }
 
+    if (type) {
+        hv.bs = (unsigned char *)type;
+        OBEX_ObjectAddHeader(ctx->handle, object, OBEX_HDR_TYPE, hv, strlen(type) + 1, 0);
+    }
+
     if (uname) {
         hv.bs = (unsigned char *)uname;
         OBEX_ObjectAddHeader(ctx->handle, object, OBEX_HDR_NAME, hv, uname_len, 0);
         g_free(uname);
         uname = NULL;
-    }
-
-    if (type) {
-        hv.bs = (unsigned char *)type;
-        OBEX_ObjectAddHeader(ctx->handle, object, OBEX_HDR_TYPE, hv, strlen(type) + 1, 0);
     }
 
     if (apparam && apparam_size > 0) {
