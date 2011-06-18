@@ -39,6 +39,7 @@
 #include <sys/socket.h>
 
 #include <openobex/obex.h>
+#include <openobex/obex_const.h>
 
 #ifdef HAVE_CONFIG_H
 # include "config.h"
@@ -335,6 +336,7 @@ static void get_non_body_headers(obex_t *handle, obex_object_t *object,
     obex_headerdata_t hv;
     uint8_t hi;
     unsigned int hlen;
+    struct a_header *ah;
 
     xfer->target_size = GW_OBEX_UNKNOWN_LENGTH;
     xfer->modtime = -1;
@@ -358,6 +360,10 @@ static void get_non_body_headers(obex_t *handle, obex_object_t *object,
                     xfer->apparam_size = 0;
                 break;
             default:
+                ah = make_a_header(hi, hv, hlen);
+
+                if (ah != NULL)
+                    xfer->aheaders = g_slist_append(xfer->aheaders, ah);
                 break;
         }
     }
