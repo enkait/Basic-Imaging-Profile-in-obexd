@@ -100,12 +100,13 @@ src_obexd_SOURCES = $(gdbus_sources) $(builtin_sources) $(btio_sources) \
 			src/mimetype.h src/mimetype.c \
 			src/service.h src/service.c \
 			src/transport.h src/transport.c \
-			src/server.h src/server.c
+			src/server.h src/server.c \
+			plugins/bip_util.c plugins/bip_util.h
 
 src_obexd_LDADD = @DBUS_LIBS@ @GLIB_LIBS@ @GTHREAD_LIBS@ \
 					@EBOOK_LIBS@ @OPENOBEX_LIBS@ \
 					@BLUEZ_LIBS@ @LIBICAL_LIBS@ \
-					@TRACKER_LIBS@ -ldl
+					@TRACKER_LIBS@ @MAGICKWAND_LIBS@ -ldl
 
 src_obexd_LDFLAGS = -Wl,--export-dynamic
 
