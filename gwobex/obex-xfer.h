@@ -93,6 +93,9 @@ struct a_header {
 
 void a_header_free(struct a_header *ah);
 
+struct a_header *make_a_header(uint8_t hi, obex_headerdata_t hv,
+                               unsigned int hlen);
+
 struct gw_obex_xfer *gw_obex_xfer_new(struct gw_obex *ctx, gboolean async, int stream_fd);
 
 void _gw_obex_xfer_free(struct gw_obex_xfer *xfer);
