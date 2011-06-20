@@ -43,6 +43,7 @@
 
 #include <openobex/obex.h>
 #include <openobex/obex_const.h>
+#include "wand/MagickWand.h"
 
 #include "plugin.h"
 #include "log.h"
@@ -52,6 +53,7 @@
 #include "imglisting.h"
 #include "image_pull.h"
 #include "filesystem.h"
+#include "bip_util.h"
 
 #define EOL_CHARS "\n"
 
@@ -85,12 +87,51 @@ static gint ctime_compare(gconstpointer a, gconstpointer b) {
     return g_strcmp0(ail->image, bil->image);
 }
 
-static GString *create_images_listing(int count, int offset, int *res_count, int *err) {
+static gboolean verify_image(const gchar *image_file, const struct image_handles_desc *hdesc) {
+    struct stat file_stat;
+    struct image_attributes attr;
+    lstat(image_file, &file_stat);
+
+    if (!(file_stat.st_mode & S_IFREG)) {
+        return FALSE;
+    }
+
+    if (!hdesc)
+        return TRUE;
+
+    if (!hdesc->ctime_unbounded[0] && file_stat.st_ctime<hdesc->ctime[0])
+        return FALSE;
+    
+    if (!hdesc->ctime_unbounded[1] && file_stat.st_ctime>hdesc->ctime[1])
+        return FALSE;
+    
+    if (!hdesc->mtime_unbounded[0] && file_stat.st_mtime<hdesc->mtime[0])
+        return FALSE;
+    
+    if (!hdesc->mtime_unbounded[1] && file_stat.st_mtime>hdesc->mtime[1])
+        return FALSE;
+
+    if (get_image_attributes(image_file, &attr) < 0)
+        return FALSE;
+
+    if (hdesc->encoding != NULL && g_strcmp0(hdesc->encoding,attr.format) != 0)
+        return FALSE;
+
+    if (hdesc->lower[0] > attr.width || hdesc->lower[1] > attr.height)
+        return FALSE;
+    
+    if (hdesc->upper[0] < attr.width || hdesc->upper[1] < attr.height)
+        return FALSE;
+
+    return TRUE;
+}
+
+static GString *create_images_listing(int count, int offset, int *res_count, int *err, const struct image_handles_desc *hdesc) {
     GString *listing_obj = g_string_new(IMG_LISTING_BEGIN);
     struct dirent* file;
     struct stat file_stat;
     GSList *images = NULL;
-    struct img_listing *il;
+    struct img_listing *il = NULL;
     char *handle_str = g_try_malloc(8);
     char ctime[18], mtime[18];
     int handle = 0;
@@ -105,11 +146,14 @@ static GString *create_images_listing(int count, int offset, int *res_count, int
     while ((file = readdir(img_dir))) {
         GString *str = g_string_new(bip_dir);
         str = g_string_append(str, file->d_name);
+
         lstat(str->str, &file_stat);
         if (!(file_stat.st_mode & S_IFREG)) {
             g_string_free(str, TRUE);
             continue;
         }
+
+        if (!verify_image(str->str, hdesc))
         il = g_try_malloc(sizeof(struct img_listing));
         il->image = g_string_free(str, FALSE);
         il->mtime = file_stat.st_mtime;
@@ -157,7 +201,7 @@ static void *imglisting_open(const char *name, int oflag, mode_t mode,
 
     printf("imglisting_open\n");
 
-    return create_images_listing(count, offset, &res_count, err);
+    return create_images_listing(count, offset, &res_count, err, session->hdesc);
 }
 
 static ssize_t imglisting_read(void *object, void *buf, size_t count,

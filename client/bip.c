@@ -95,43 +95,12 @@ static void put_image_callback(struct session_data *session, GError *err,
     return;
 }
 
-struct image_attributes {
-    char * format;
-    size_t width, height;
-    unsigned long length;
-    char * transform;
-};
-
-static int get_image_attributes(const char * image_file, struct image_attributes * attr) {
-    int err;
-    MagickWand *wand;
-    MagickSizeType size;
-    MagickWandGenesis();
-    wand = NewMagickWand();
-    err = MagickPingImage(wand, image_file);
-    if (err == MagickFalse) {
-        return -1;
-    }
-    attr->format = g_strdup(MagickGetImageFormat(wand));
-    attr->width = MagickGetImageWidth(wand);
-    attr->height = MagickGetImageHeight(wand);
-    MagickGetImageLength(wand, &size);
-    attr->length = (unsigned long) size;
-    MagickWandTerminus();
-    return 0;
-}
-
-static void free_image_attributes(struct image_attributes *attr) {
-    g_free(attr->format);
-    g_free(attr->transform);
-}
-
-static void create_image_descriptor(const struct image_attributes *attr, struct a_header *ah) {
+static void create_image_descriptor(const struct image_attributes *attr, const char *transform, struct a_header *ah) {
     GString *descriptor = g_string_new(IMG_DESC_BEGIN);
-    if (attr->transform) {
+    if (transform) {
         g_string_append_printf(descriptor,
             IMG_DESC_WITH_TRANSFORM_FORMAT,
-            attr->format, attr->width, attr->height, attr->length, attr->transform);
+            attr->format, attr->width, attr->height, attr->length, transform);
     }
     else {
         g_string_append_printf(descriptor,
@@ -144,23 +113,23 @@ static void create_image_descriptor(const struct image_attributes *attr, struct 
     ah->hv.bs = (guint8 *) g_string_free(descriptor, FALSE);
 }
 
-static int make_modified_image(const char *image_path, const char *modified_path, struct image_attributes *attr) {
+static int make_modified_image(const char *image_path, const char *modified_path, struct image_attributes *attr, const char *transform) {
     MagickWand *wand;
     MagickWandGenesis();
     wand = NewMagickWand();
     if (MagickReadImage(wand, image_path) == MagickFalse)
         return -1;
-    if (g_strcmp0(attr->transform, "crop") == 0) {
+    if (g_strcmp0(transform, "crop") == 0) {
         printf("crop\n");
         if(MagickCropImage(wand, attr->width, attr->height, 0, 0) == MagickFalse)
             return -1;
     }
-    else if (g_strcmp0(attr->transform, "fill") == 0) {
+    else if (g_strcmp0(transform, "fill") == 0) {
         printf("fill\n");
         if(MagickExtentImage(wand, attr->width, attr->height, 0, 0) == MagickFalse)
             return -1;
     }
-    else if (g_strcmp0(attr->transform, "stretch") == 0){
+    else if (g_strcmp0(transform, "stretch") == 0){
         printf("stretch\n");
         if(MagickResizeImage(wand, attr->width, attr->height, LanczosFilter, 1.0) == MagickFalse)
             return -1;
@@ -187,14 +156,13 @@ static DBusMessage *put_transformed_image(DBusMessage *message, struct session_d
     GSList * aheaders = NULL;
 
     attr.format = NULL;
-    attr.transform = g_strdup(transform);
     if (get_image_attributes(local_image, &attr) < 0) {
         free_image_attributes(&attr);
         return g_dbus_create_error(message,
             "org.openobex.Error.InvalidArguments", NULL);
     }
 
-    create_image_descriptor(&attr, descriptor);
+    create_image_descriptor(&attr, transform, descriptor);
     printf("descriptor: %p %d\n", descriptor->hv.bs, descriptor->hv_size);
     aheaders = g_slist_append(NULL, descriptor);
 
@@ -233,7 +201,6 @@ static DBusMessage *put_modified_image(DBusConnection *connection,
         return g_dbus_create_error(message,
                 "org.openobex.Error.InvalidArguments", NULL);
     attr.format = g_strdup(format);
-    attr.transform = g_strdup(transform);
 
     if (!image_path || strlen(image_path)==0) {
         return g_dbus_create_error(message,"org.openobex.Error.InvalidArguments", NULL);
@@ -250,12 +217,12 @@ static DBusMessage *put_modified_image(DBusConnection *connection,
 
     printf("new path: %s\n", new_image_path->str);
 
-    if (make_modified_image(image_path, new_image_path->str, &attr) < 0) {
+    if (make_modified_image(image_path, new_image_path->str, &attr, transform) < 0) {
         return g_dbus_create_error(message,
             "org.openobex.Error.CanNotCreateModifiedImage", NULL);
     }
 
-    result = put_transformed_image(message, session, new_image_path->str, image_path, attr.transform);
+    result = put_transformed_image(message, session, new_image_path->str, image_path, transform);
 
     free_image_attributes(&attr);
     return result;
