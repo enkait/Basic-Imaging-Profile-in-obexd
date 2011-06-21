@@ -1189,12 +1189,12 @@ static void session_prepare_get(struct session_data *session,
 int session_get_with_aheaders(struct session_data *session, const char *type,
 		const char *filename, const char *targetname,
 		const guint8 *apparam, gint apparam_size,
-        const GSList * aheaders,
+		const GSList * aheaders,
 		session_callback_t func)
 {
 	struct transfer_data *transfer;
 	struct transfer_params *params = NULL;
-    GSList *aheaders_copy = NULL;
+	GSList *aheaders_copy = NULL;
 	int err;
 
 	if (session->obex == NULL)
@@ -1206,25 +1206,24 @@ int session_get_with_aheaders(struct session_data *session, const char *type,
 		memcpy(params->data, apparam, apparam_size);
 		params->size = apparam_size;
 	}
-    
-    if (aheaders) {
-        const GSList *aheaders_src = aheaders;
-        while (aheaders_src) {
-            aheaders_copy = g_slist_append(aheaders_copy,
-                    a_header_copy(aheaders_src->data));
-            aheaders_src = g_slist_next(aheaders_src);
-        }
-    }
+
+	if (aheaders) {
+		const GSList *aheaders_src = aheaders;
+		while (aheaders_src) {
+			aheaders_copy = g_slist_append(aheaders_copy,
+			a_header_copy(aheaders_src->data));
+			aheaders_src = g_slist_next(aheaders_src);
+		}
+	}
 
 	transfer = transfer_register(session, filename, targetname, type,
 					params, aheaders_copy);
 	if (transfer == NULL) {
-        if (aheaders_copy != NULL) {
-            while (aheaders_copy) {
-                a_header_free(aheaders_copy->data);
-            }
-            g_slist_free(aheaders_copy);
-        }
+		if (aheaders_copy != NULL) {
+			while (aheaders_copy)
+				a_header_free(aheaders_copy->data);
+			g_slist_free(aheaders_copy);
+		}
 		if (params != NULL) {
 			g_free(params->data);
 			g_free(params);
@@ -1607,67 +1606,66 @@ int session_put(struct session_data *session, char *buf, const char *targetname)
 }
 
 int session_put_with_aheaders(struct session_data *session, const char *type,
-        char *buf, const char *filename, const char *targetname,
+		char *buf, const char *filename, const char *targetname,
 		const guint8 *apparam, gint apparam_size,
 		const GSList *aheaders,
 		session_callback_t func)
 {
 	struct transfer_data *transfer;
 	struct transfer_params *params = NULL;
-    GSList *aheaders_copy = NULL;
-    int err;
+	GSList *aheaders_copy = NULL;
+	int err;
 
-    g_assert(buf == NULL || filename == NULL);
+	g_assert(buf == NULL || filename == NULL);
 
 	if (session->obex == NULL)
 		return -ENOTCONN;
 
 	if (session->pending != NULL)
 		return -EISCONN;
-	
-    if (apparam != NULL) {
+
+	if (apparam != NULL) {
 		params = g_new0(struct transfer_params, 1);
 		params->data = g_new(guint8, apparam_size);
 		memcpy(params->data, apparam, apparam_size);
 		params->size = apparam_size;
 	}
 
-    if (aheaders) {
-        const GSList *aheaders_src = aheaders;
-        while(aheaders_src) {
-            aheaders_copy = g_slist_append(aheaders_copy,
-                    a_header_copy(aheaders_src->data));
-            aheaders_src = g_slist_next(aheaders_src);
-        }
-    }
+	if (aheaders) {
+		const GSList *aheaders_src = aheaders;
+		while(aheaders_src) {
+			aheaders_copy = g_slist_append(aheaders_copy,
+				a_header_copy(aheaders_src->data));
+			aheaders_src = g_slist_next(aheaders_src);
+		}
+	}
 
 	transfer = transfer_register(session, filename, targetname, type, params,
                                                               aheaders_copy);
 	if (transfer == NULL) {
-        if (aheaders_copy != NULL) {
-            while (aheaders_copy) {
-                a_header_free(aheaders_copy->data);
-            }
-            g_slist_free(aheaders_copy);
-        }
+		if (aheaders_copy != NULL) {
+			while (aheaders_copy)
+				a_header_free(aheaders_copy->data);
+			g_slist_free(aheaders_copy);
+		}
 		if (params != NULL) {
 			g_free(params->data);
 			g_free(params);
 		}
 		return -EIO;
-    }
-	
-    if (func != NULL) {
+	}
+
+	if (func != NULL) {
 		struct session_callback *callback;
 		callback = g_new0(struct session_callback, 1);
 		callback->func = func;
 		session->callback = callback;
 	}
 
-    if (buf == NULL) {
-	    transfer->size = strlen(buf);
-	    transfer->buffer = buf;
-    }
+	if (buf == NULL) {
+		transfer->size = strlen(buf);
+		transfer->buffer = buf;
+	}
 
 	err = session_request(session, session_prepare_put, transfer);
 	if (err < 0)
