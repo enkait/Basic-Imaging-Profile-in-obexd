@@ -112,6 +112,13 @@ static const uint8_t IMAGE_PULL_TARGET[TARGET_SIZE] = {
 			0x84, 0x1A, 0x00, 0x02, 0xA5, 0x32, 0x5B, 0x4E };
 
 //static const char * bip_root="/tmp/bip/";
+
+struct image_handles_desc *new_hdesc() {
+    struct image_handles_desc *hdesc = g_new0(struct image_handles_desc, 1);
+    hdesc->upper[0] = hdesc->upper[1] = -1;
+    return hdesc;
+}
+
 static void free_image_pull_session(struct image_pull_session *session) {
 }
 
@@ -181,15 +188,15 @@ failed:
 	return NULL;
 }
 
-static gboolean parse_time_range(const gchar *range, time_t *res, gboolean *unbounded) {
+static gboolean parse_time_range(const gchar *range, time_t *res, gboolean *bounded) {
     gchar **arr = g_strsplit(range, "-", 2);
     int i;
     for(i=0;i<2;i++) {
         struct tm tm;
         if (range[i] == '*')
-            unbounded[i] = TRUE;
+            bounded[i] = TRUE;
         else
-            unbounded[i] = FALSE;
+            bounded[i] = FALSE;
         if (strptime(*arr, "%Y%m%dT%H%M%SZ", &tm)) {
             printf("UTC\n");
             res[i] = mktime(&tm);
@@ -204,7 +211,7 @@ static gboolean parse_time_range(const gchar *range, time_t *res, gboolean *unbo
             return FALSE;
         }
     }
-    printf("time_range: %lu %lu %d %d\n", res[0], res[1], unbounded[0], unbounded[1]);
+    printf("time_range: %lu %lu %d %d\n", res[0], res[1], bounded[0], bounded[1]);
     g_strfreev(arr);
     return TRUE;
 }
@@ -250,7 +257,7 @@ static void handles_listing_element(GMarkupParseContext *ctxt,
     int i;
 
     for(i = 0; i < 2; i++)
-        desc->ctime_unbounded[i] = desc->mtime_unbounded[i] = TRUE;
+        desc->ctime_bounded[i] = desc->mtime_bounded[i] = TRUE;
     desc->lower[0] = desc->lower[1] = 0;
     desc->upper[0] = desc->upper[1] = 65535;
     desc->fixed_ratio = FALSE;
@@ -260,10 +267,10 @@ static void handles_listing_element(GMarkupParseContext *ctxt,
 
     for (key = (gchar **) names; *key; key++, values++) {
         if (g_str_equal(*key, "created")) {
-            parse_time_range(*values, desc->ctime, desc->ctime_unbounded);
+            parse_time_range(*values, desc->ctime, desc->ctime_bounded);
         }
         else if (g_str_equal(*key, "modified")) {
-            parse_time_range(*values, desc->mtime, desc->mtime_unbounded);
+            parse_time_range(*values, desc->mtime, desc->mtime_bounded);
         }
         else if (g_str_equal(*key, "encoding")) {
             desc->encoding = g_strdup(*values);
@@ -288,7 +295,7 @@ static struct image_handles_desc *parse_handles_desc(const struct obex_session *
     obex_headerdata_t hd;
     unsigned int hlen;
     uint8_t hi;
-    struct image_handles_desc *desc = g_new0(struct image_handles_desc, 1);
+    struct image_handles_desc *desc = new_hdesc();
     GMarkupParseContext *ctxt = g_markup_parse_context_new(&handles_desc_parser, 0, desc, NULL);
     while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen));
 	OBEX_ObjectReParseHeaders(os->obex, obj);

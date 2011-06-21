@@ -29,9 +29,9 @@ struct pull_aparam_field {
 
 struct image_handles_desc {
     time_t ctime[2];
-    gboolean ctime_unbounded[2];
+    gboolean ctime_bounded[2];
     time_t mtime[2];
-    gboolean mtime_unbounded[2];
+    gboolean mtime_bounded[2];
     char *encoding;
     unsigned int lower[2], upper[2];
     gboolean fixed_ratio;
@@ -56,3 +56,4 @@ int image_pull_chkput(struct obex_session *os, void *user_data);
 int image_pull_put(struct obex_session *os, obex_object_t *obj, void *user_data);
 void image_pull_disconnect(struct obex_session *os, void *user_data);
 
+struct image_handles_desc *new_hdesc();
