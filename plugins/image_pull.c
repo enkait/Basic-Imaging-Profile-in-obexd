@@ -288,8 +288,10 @@ static struct image_handles_desc *parse_handles_desc(const struct obex_session *
     obex_headerdata_t hd;
     unsigned int hlen;
     uint8_t hi;
-    struct image_handles_desc *desc = g_try_malloc(sizeof(struct image_handles_desc));
+    struct image_handles_desc *desc = g_new0(struct image_handles_desc, 1);
     GMarkupParseContext *ctxt = g_markup_parse_context_new(&handles_desc_parser, 0, desc, NULL);
+    while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen));
+	OBEX_ObjectReParseHeaders(os->obex, obj);
     while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen)) {
         if (hi == IMG_DESC_HDR) {
 	        g_markup_parse_context_parse(ctxt, (gchar *) hd.bs, hlen, NULL);

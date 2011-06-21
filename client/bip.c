@@ -409,28 +409,33 @@ static int parse_filter_dict(DBusMessageIter *iter,
 		char **created, char **modified, char **encoding,
 		char **pixel) {
 	while (dbus_message_iter_get_arg_type(iter) == DBUS_TYPE_DICT_ENTRY) {
-		DBusMessageIter entry, value;
-		const char *key;
+		DBusMessageIter entry;
+		const char *key, *value;
 		
         dbus_message_iter_recurse(iter, &entry);
 		dbus_message_iter_get_basic(&entry, &key);
 
 		dbus_message_iter_next(&entry);
-		dbus_message_iter_recurse(&entry, &value);
+		dbus_message_iter_get_basic(&entry, &value);
 
-        if (dbus_message_iter_get_arg_type(&value) == DBUS_TYPE_STRING) {
-            if (g_str_equal(key, "created") == TRUE)
-				dbus_message_iter_get_basic(&value, created);
-            else if (g_str_equal(key, "modified") == TRUE)
-				dbus_message_iter_get_basic(&value, modified);
-            else if (g_str_equal(key, "encoding") == TRUE)
-				dbus_message_iter_get_basic(&value, encoding);
-            else if (g_str_equal(key, "pixel") == TRUE)
-				dbus_message_iter_get_basic(&value, pixel);
-        }
-		
+        if (g_str_equal(key, "created") == TRUE)
+            *created = g_strdup(value);
+        else if (g_str_equal(key, "modified") == TRUE)
+            *modified = g_strdup(value);
+        else if (g_str_equal(key, "encoding") == TRUE)
+            *encoding = g_strdup(value);
+        else if (g_str_equal(key, "pixel") == TRUE)
+            *pixel = g_strdup(value);
+
         dbus_message_iter_next(iter);
     }
+
+    printf("c: %s\nm: %s\ne: %s\np: %s\n",
+            (*created)?(*created):(""),
+            (*modified)?(*modified):(""),
+            (*encoding)?(*encoding):(""),
+            (*pixel)?(*pixel):("")
+          );
 
     return 0;
 }
@@ -476,7 +481,7 @@ static DBusMessage *get_images_listing_range_filter(DBusConnection *connection,
     int err;
 
     printf("requested get images listing with range and filtering\n");
-    
+
     if (dbus_message_get_args(message, NULL,
                 DBUS_TYPE_UINT16, &count,
                 DBUS_TYPE_UINT16, &begin,
@@ -487,12 +492,12 @@ static DBusMessage *get_images_listing_range_filter(DBusConnection *connection,
     if (count==0)
         return g_dbus_create_error(message,
                 "org.openobex.Error.InvalidArguments", NULL);
-	
+
     dbus_message_iter_init(message, &iter);
     dbus_message_iter_next(&iter);
     dbus_message_iter_next(&iter);
-	dbus_message_iter_recurse(&iter, &dict);
-    
+    dbus_message_iter_recurse(&iter, &dict);
+
     parse_filter_dict(&dict, &created, &modified, &encoding, &pixel);
     create_filtering_descriptor(created, modified, encoding, pixel, handles_desc);
     aheaders = g_slist_append(NULL, &handles_desc);
@@ -502,7 +507,7 @@ static DBusMessage *get_images_listing_range_filter(DBusConnection *connection,
     printf("rozmiar aparam: %u\n", sizeof(struct images_listing_aparam));
 
     if ((err=session_get(session, "x-bt/img-listing", NULL, NULL, (const guint8 *)aparam,
-            sizeof(struct images_listing_aparam), get_images_listing_callback)) < 0) {
+                    sizeof(struct images_listing_aparam), get_images_listing_callback)) < 0) {
         return g_dbus_create_error(message,
                 "org.openobex.Error.Failed",
                 "334Failed");
@@ -525,7 +530,7 @@ static DBusMessage *get_images_listing_range(DBusConnection *connection,
     int err;
 
     printf("requested get images listing with range\n");
-    
+
     if (dbus_message_get_args(message, NULL,
                 DBUS_TYPE_UINT16, &count,
                 DBUS_TYPE_UINT16, &begin,
@@ -542,7 +547,7 @@ static DBusMessage *get_images_listing_range(DBusConnection *connection,
     printf("rozmiar aparam: %u\n", sizeof(struct images_listing_aparam));
 
     if ((err=session_get(session, "x-bt/img-listing", NULL, NULL, (const guint8 *)aparam,
-            sizeof(struct images_listing_aparam), get_images_listing_callback)) < 0) {
+                    sizeof(struct images_listing_aparam), get_images_listing_callback)) < 0) {
         return g_dbus_create_error(message,
                 "org.openobex.Error.Failed",
                 "334Failed");
@@ -572,9 +577,9 @@ static GDBusMethodTable image_push_methods[] = {
 };
 
 static GDBusSignalTable image_push_signals[] = {
-	{ "PutImageCompleted",	"sb" },
-	{ "PutImageFailed",	"s" },
-	{ }
+    { "PutImageCompleted",	"sb" },
+    { "PutImageFailed",	"s" },
+    { }
 };
 
 gboolean bip_register_interface(DBusConnection *connection, const char *path,

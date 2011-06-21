@@ -61,6 +61,9 @@ def images_listing(session):
     print session.GetImagesListingRange(1,1)
     print session.GetImagesListingRange(2,2)
     print session.GetImagesListingRange(3,3)
+    print session.GetImagesListingRangeFilter(65535,0,{
+        "pixel" : "100*200-400*400"
+        })
     print session.GetImagesListing()
 
 def imaging_capabilities(session):

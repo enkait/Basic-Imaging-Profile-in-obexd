@@ -153,7 +153,10 @@ static GString *create_images_listing(int count, int offset, int *res_count, int
             continue;
         }
 
-        if (!verify_image(str->str, hdesc))
+        if (!verify_image(str->str, hdesc)) {
+            g_string_free(str, TRUE);
+            continue;
+        }
         il = g_try_malloc(sizeof(struct img_listing));
         il->image = g_string_free(str, FALSE);
         il->mtime = file_stat.st_mtime;
