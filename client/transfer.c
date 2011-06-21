@@ -433,14 +433,12 @@ int transfer_get(struct transfer_data *transfer, transfer_callback_t func,
 	struct session_data *session = transfer->session;
 	gw_obex_xfer_cb_t cb;
 	guint8 *apparam = NULL;
-    gint apparam_size = 0;
+	gint apparam_size = 0;
 
 	if (transfer->xfer != NULL)
 		return -EALREADY;
 
-	if (transfer->type != NULL &&
-			(strncmp(transfer->type, "x-obex/", 7) == 0 ||
-			strncmp(transfer->type, "x-bt/", 5) == 0))
+	if (transfer->name == NULL)
 		cb = get_buf_xfer_progress;
 	else {
 		int fd = open(transfer->name ? : transfer->filename,
@@ -453,11 +451,11 @@ int transfer_get(struct transfer_data *transfer, transfer_callback_t func,
 		transfer->fd = fd;
 		cb = get_xfer_progress;
 	}
-    
-    if (transfer->params != NULL) {
-        apparam = transfer->params->data;
-        apparam_size = transfer->params->size;
-    }
+
+	if (transfer->params != NULL) {
+		apparam = transfer->params->data;
+		apparam_size = transfer->params->size;
+	}
 
 	if (transfer->params != NULL)
 		transfer->xfer = gw_obex_get_async_with_apparam(session->obex,

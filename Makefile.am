@@ -56,7 +56,7 @@ builtin_modules += opp
 builtin_sources += plugins/opp.c
 
 builtin_modules += ftp
-builtin_sources += plugins/ftp.c
+builtin_sources += plugins/ftp.c plugins/ftp.h
 
 builtin_modules += pbap
 builtin_sources += plugins/pbap.c plugins/phonebook.h \
@@ -121,9 +121,10 @@ service_in_files += client/obex-client.service.in
 
 libexec_PROGRAMS += client/obex-client
 
-client_obex_client_SOURCES = $(gdbus_sources) $(gwobex_sources) $(btio_sources) \
-				client/main.c client/session.h client/session.c \
-				src/log.h src/log.c \
+client_obex_client_SOURCES = $(gdbus_sources) \
+				$(gwobex_sources) $(btio_sources) \
+				client/main.c src/log.h src/log.c \
+				client/session.h client/session.c \
 				client/pbap.h client/pbap.c \
 				client/sync.h client/sync.c \
 				client/transfer.h client/transfer.c \
