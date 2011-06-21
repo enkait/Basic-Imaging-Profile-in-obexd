@@ -137,11 +137,8 @@ static void *img_capabilities_open(const char *name, int oflag, mode_t mode,
 }
 
 static ssize_t img_capabilities_read(void *object, void *buf, size_t count,
-					uint8_t *hi, unsigned int *flags)
+					uint8_t *hi)
 {
-	if (flags)
-		*flags = 0;
-
 	*hi = OBEX_HDR_BODY;
 	return string_read(object, buf, count);
 }
