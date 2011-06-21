@@ -9,7 +9,12 @@
 #include <string.h>
 
 #include "log.h"
+#include "transfer.h"
+#include "session.h"
+#include "bip.h"
 #include "bip_util.h"
+#include "gwobex/obex-xfer.h"
+#include "gwobex/obex-priv.h"
 #include "wand/MagickWand.h"
 
 guint8 *encode_img_descriptor(const gchar *data, unsigned int length, unsigned int *newsize) {
@@ -80,4 +85,3 @@ int get_image_attributes(const char *image_file, struct image_attributes *attr) 
 void free_image_attributes(struct image_attributes *attr) {
     g_free(attr->format);
 }
-

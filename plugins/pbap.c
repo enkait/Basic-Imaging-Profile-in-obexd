@@ -967,7 +967,7 @@ static ssize_t array_read(GByteArray *array, void *buf, size_t count)
 }
 
 static ssize_t vobject_pull_read(void *object, void *buf, size_t count,
-					uint8_t *hi, unsigned int *flags)
+								uint8_t *hi)
 {
 	struct pbap_object *obj = object;
 	struct pbap_session *pbap = obj->session;
@@ -982,22 +982,15 @@ static ssize_t vobject_pull_read(void *object, void *buf, size_t count,
 	if (pbap->params->maxlistcount == 0) {
 		/* PhoneBookSize */
 		*hi = OBEX_HDR_APPARAM;
-		if (flags)
-			*flags = 0;
 		return array_read(obj->aparams, buf, count);
 	} else if (obj->firstpacket) {
 		/* NewMissedCalls */
 		*hi = OBEX_HDR_APPARAM;
 		obj->firstpacket = FALSE;
-		if (flags)
-			*flags = OBEX_FL_FIT_ONE_PACKET;
 		return array_read(obj->aparams, buf, count);
 	} else {
 		/* Stream data */
 		*hi = OBEX_HDR_BODY;
-		if (flags)
-			*flags = 0;
-
 		len = string_read(obj->buffer, buf, count);
 		if (len == 0 && !obj->lastpart) {
 			/* in case when buffer is empty and we know that more
@@ -1016,7 +1009,7 @@ static ssize_t vobject_pull_read(void *object, void *buf, size_t count,
 }
 
 static ssize_t vobject_list_read(void *object, void *buf, size_t count,
-					uint8_t *hi, unsigned int *flags)
+								uint8_t *hi)
 {
 	struct pbap_object *obj = object;
 	struct pbap_session *pbap = obj->session;
@@ -1028,9 +1021,6 @@ static ssize_t vobject_list_read(void *object, void *buf, size_t count,
 	if (!pbap->cache.valid)
 		return -EAGAIN;
 
-	if (flags)
-		*flags = 0;
-
 	if (pbap->params->maxlistcount == 0) {
 		*hi = OBEX_HDR_APPARAM;
 		return array_read(obj->aparams, buf, count);
@@ -1041,7 +1031,7 @@ static ssize_t vobject_list_read(void *object, void *buf, size_t count,
 }
 
 static ssize_t vobject_vcard_read(void *object, void *buf, size_t count,
-					uint8_t *hi, unsigned int *flags)
+								uint8_t *hi)
 {
 	struct pbap_object *obj = object;
 
@@ -1049,9 +1039,6 @@ static ssize_t vobject_vcard_read(void *object, void *buf, size_t count,
 
 	if (!obj->buffer)
 		return -EAGAIN;
-
-	if (flags)
-		*flags = 0;
 
 	*hi = OBEX_HDR_BODY;
 	return string_read(obj->buffer, buf, count);
@@ -1090,7 +1077,7 @@ static int pbap_init(void)
 
 	err = phonebook_init();
 	if (err < 0)
-		goto fail_pb_init;
+		return err;
 
 	err = obex_mime_type_driver_register(&mime_pull);
 	if (err < 0)
@@ -1118,7 +1105,7 @@ fail_mime_list:
 	obex_mime_type_driver_unregister(&mime_pull);
 fail_mime_pull:
 	phonebook_exit();
-fail_pb_init:
+
 	return err;
 }
 
