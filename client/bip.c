@@ -190,8 +190,8 @@ static DBusMessage *put_transformed_image(DBusMessage *message, struct session_d
     printf("descriptor: %p %d\n", descriptor.hv.bs, descriptor.hv_size);
     aheaders = g_slist_append(NULL, &descriptor);
 
-    if ((err=session_put_with_aheaders(session, "x-bt/img-img",
-            local_image, remote_image, aheaders, put_image_callback)) < 0) {
+    if ((err=session_put_with_aheaders(session, "x-bt/img-img", NULL,
+            local_image, remote_image, NULL, 0, aheaders, put_image_callback)) < 0) {
         free_image_attributes(&attr);
         return g_dbus_create_error(message,
                 "org.openobex.Error.Failed",
