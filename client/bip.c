@@ -506,8 +506,9 @@ static DBusMessage *get_images_listing_range_filter(DBusConnection *connection,
 
     printf("rozmiar aparam: %u\n", sizeof(struct images_listing_aparam));
 
-    if ((err=session_get(session, "x-bt/img-listing", NULL, NULL, (const guint8 *)aparam,
-                    sizeof(struct images_listing_aparam), get_images_listing_callback)) < 0) {
+    if ((err=session_get_with_aheaders(session, "x-bt/img-listing", NULL, NULL,
+		(const guint8 *)aparam, sizeof(struct images_listing_aparam),
+		aheaders, get_images_listing_callback)) < 0) {
         return g_dbus_create_error(message,
                 "org.openobex.Error.Failed",
                 "334Failed");
