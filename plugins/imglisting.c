@@ -99,16 +99,16 @@ static gboolean verify_image(const gchar *image_file, const struct image_handles
     if (!hdesc)
         return TRUE;
 
-    if (!hdesc->ctime_bounded[0] && file_stat.st_ctime<hdesc->ctime[0])
+    if (hdesc->ctime_bounded[0] && file_stat.st_ctime<hdesc->ctime[0])
         return FALSE;
     
-    if (!hdesc->ctime_bounded[1] && file_stat.st_ctime>hdesc->ctime[1])
+    if (hdesc->ctime_bounded[1] && file_stat.st_ctime>hdesc->ctime[1])
         return FALSE;
     
-    if (!hdesc->mtime_bounded[0] && file_stat.st_mtime<hdesc->mtime[0])
+    if (hdesc->mtime_bounded[0] && file_stat.st_mtime<hdesc->mtime[0])
         return FALSE;
     
-    if (!hdesc->mtime_bounded[1] && file_stat.st_mtime>hdesc->mtime[1])
+    if (hdesc->mtime_bounded[1] && file_stat.st_mtime>hdesc->mtime[1])
         return FALSE;
 
     if (get_image_attributes(image_file, &attr) < 0)

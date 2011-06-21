@@ -254,13 +254,6 @@ static void handles_listing_element(GMarkupParseContext *ctxt,
 {
     struct image_handles_desc *desc = user_data;
     gchar **key;
-    int i;
-
-    for(i = 0; i < 2; i++)
-        desc->ctime_bounded[i] = desc->mtime_bounded[i] = TRUE;
-    desc->lower[0] = desc->lower[1] = 0;
-    desc->upper[0] = desc->upper[1] = 65535;
-    desc->fixed_ratio = FALSE;
 
     if (g_str_equal(element, "filtering-parameters") != TRUE)
         return;
