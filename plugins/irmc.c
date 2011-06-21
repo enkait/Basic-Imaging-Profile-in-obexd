@@ -463,8 +463,7 @@ static int irmc_close(void *object)
 	return 0;
 }
 
-static ssize_t irmc_read(void *object, void *buf, size_t count, uint8_t *hi,
-							unsigned int *flags)
+static ssize_t irmc_read(void *object, void *buf, size_t count, uint8_t *hi)
 {
 	struct irmc_session *irmc = object;
 	int len;
@@ -472,9 +471,6 @@ static ssize_t irmc_read(void *object, void *buf, size_t count, uint8_t *hi,
 	DBG("buffer %p count %zu", irmc->buffer, count);
 	if (!irmc->buffer)
                 return -EAGAIN;
-
-	if (flags)
-		*flags = 0;
 
 	*hi = OBEX_HDR_BODY;
 	len = string_read(irmc->buffer, buf, count);
@@ -510,7 +506,7 @@ static int irmc_init(void)
 	DBG("");
 	err = phonebook_init();
 	if (err < 0)
-		goto fail_pb_init;
+		return err;
 
 	err = obex_mime_type_driver_register(&irmc_driver);
 	if (err < 0)
@@ -526,7 +522,7 @@ fail_irmc_reg:
 	obex_mime_type_driver_unregister(&irmc_driver);
 fail_mime_irmc:
 	phonebook_exit();
-fail_pb_init:
+
 	return err;
 }
 

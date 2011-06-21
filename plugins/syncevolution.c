@@ -331,8 +331,7 @@ done:
 	return 0;
 }
 
-static ssize_t synce_read(void *object, void *buf, size_t count,
-					uint8_t *hi, unsigned int *flags)
+static ssize_t synce_read(void *object, void *buf, size_t count, uint8_t *hi)
 {
 	struct synce_context *context = object;
 	DBusConnection *conn;
@@ -343,9 +342,6 @@ static ssize_t synce_read(void *object, void *buf, size_t count,
 	gboolean authenticate;
 	DBusPendingCall *call;
 
-	if (flags)
-		*flags = 0;
-
 	if (context->buffer) {
 		*hi = OBEX_HDR_BODY;
 		return string_read(context->buffer, buf, count);
@@ -353,12 +349,12 @@ static ssize_t synce_read(void *object, void *buf, size_t count,
 
 	conn = obex_dbus_get_connection();
 	if (conn == NULL)
-		goto failed;
+		return -EPERM;
 
 	msg = dbus_message_new_method_call(SYNCE_BUS_NAME, SYNCE_PATH,
 				SYNCE_SERVER_INTERFACE, "Connect");
 	if (!msg)
-		goto failed;
+		return -EPERM;
 
 	dbus_message_iter_init_append(msg, &iter);
 	dbus_message_iter_open_container(&iter, DBUS_TYPE_ARRAY,
@@ -387,7 +383,7 @@ static ssize_t synce_read(void *object, void *buf, size_t count,
 	if (!dbus_connection_send_with_reply(conn, msg, &call, -1)) {
 		error("D-Bus call to %s failed.", SYNCE_SERVER_INTERFACE);
 		dbus_message_unref(msg);
-		goto failed;
+		return -EPERM;
 	}
 
 	dbus_pending_call_set_notify(call, connect_cb, context, NULL);
@@ -396,9 +392,6 @@ static ssize_t synce_read(void *object, void *buf, size_t count,
 	dbus_message_unref(msg);
 
 	return -EAGAIN;
-
-failed:
-	return -EPERM;
 }
 
 static ssize_t synce_write(void *object, const void *buf, size_t count)
