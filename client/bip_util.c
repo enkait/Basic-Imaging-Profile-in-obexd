@@ -9,6 +9,10 @@
 #include <string.h>
 
 #include "log.h"
+#include "transfer.h"
+#include "session.h"
+#include "bip_pull.h"
+#include "bip_push.h"
 #include "bip_util.h"
 #include "wand/MagickWand.h"
 
