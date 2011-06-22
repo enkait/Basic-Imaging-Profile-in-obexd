@@ -24,6 +24,21 @@ guint8 *encode_img_descriptor(const gchar *data, unsigned int length, unsigned i
     return buf;
 }
 
+guint8 *decode_img_descriptor(const gchar *data, unsigned int length, unsigned int *newsize) {
+    guint16 len = length;
+	guint8 *buf;
+    printf("%u\n", len);
+	len = GUINT16_FROM_BE(len);
+	buf = g_try_malloc(len-2);
+
+	if (buf == NULL)
+		return NULL;
+
+    g_memmove(buf, data+2, len);
+    *newsize = len;
+    return buf;
+}
+
 struct encconv_pair {
     gchar *bip, *im;
 } encconv_table[] = {
@@ -79,5 +94,62 @@ int get_image_attributes(const char *image_file, struct image_attributes *attr) 
 
 void free_image_attributes(struct image_attributes *attr) {
     g_free(attr->format);
+}
+
+time_t parse_iso8601(const gchar *str, int len) {
+    gchar    *tstr;
+    struct tm tm;
+    gint      nr;
+    gchar     tz;
+    time_t    time;
+    time_t    tz_offset = 0;
+
+    memset (&tm, 0, sizeof (struct tm));
+
+    /* According to spec the time doesn't have to be null terminated */
+    if (str[len - 1] != '\0') {
+        tstr = g_malloc(len + 1);
+        strncpy(tstr, str, len);
+        tstr[len] = '\0';
+    }
+    else
+        tstr = g_strdup(str);
+
+    nr = sscanf (tstr, "%04u%02u%02uT%02u%02u%02u%c",
+            &tm.tm_year, &tm.tm_mon, &tm.tm_mday,
+            &tm.tm_hour, &tm.tm_min, &tm.tm_sec,
+            &tz);
+
+    g_free(tstr);
+
+    /* Fixup the tm values */
+    tm.tm_year -= 1900;       /* Year since 1900 */
+    tm.tm_mon--;              /* Months since January, values 0-11 */
+    tm.tm_isdst = -1;         /* Daylight savings information not avail */
+
+    if (nr < 6) {
+        /* Invalid time format */
+        return -1;
+    }
+
+    time = mktime (&tm);
+
+#if defined(HAVE_TM_GMTOFF)
+    tz_offset = tm.tm_gmtoff;
+#elif defined(HAVE_TIMEZONE)
+    tz_offset = -timezone;
+    if (tm.tm_isdst > 0) {
+        tz_offset += 3600;
+    }
+#endif
+
+    if (nr == 7) { /* Date/Time was in localtime (to remote device)
+                    * already. Since we don't know anything about the
+                    * timezone on that one we won't try to apply UTC offset
+                    */
+        time += tz_offset;
+    }
+
+    return time;
 }
 
