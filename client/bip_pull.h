@@ -36,7 +36,4 @@ struct images_listing_aparam {
     uint8_t lc;
 } __attribute__ ((packed));
 
-gboolean bip_register_interface(DBusConnection *connection, const char *path,
-				void *user_data, GDBusDestroyFunction destroy);
-void bip_unregister_interface(DBusConnection *connection, const char *path,
-				void *user_data);
+extern GDBusMethodTable image_pull_methods[];
