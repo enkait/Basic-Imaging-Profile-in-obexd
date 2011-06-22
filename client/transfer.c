@@ -457,18 +457,14 @@ int transfer_get(struct transfer_data *transfer, transfer_callback_t func,
 		apparam_size = transfer->params->size;
 	}
 
-	if (transfer->params != NULL)
-		transfer->xfer = gw_obex_get_async_with_apparam(session->obex,
+	transfer->xfer = gw_obex_get_async_with_aheaders(session->obex,
 							transfer->filename,
 							transfer->type,
-							transfer->params->data,
-							transfer->params->size,
+							apparam,
+							apparam_size,
+							transfer->aheaders,
 							NULL);
-	else
-		transfer->xfer = gw_obex_get_async(session->obex,
-							transfer->filename,
-							transfer->type,
-							NULL);
+	
 	if (transfer->xfer == NULL)
 		return -ENOTCONN;
 
