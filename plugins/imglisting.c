@@ -70,6 +70,7 @@ static const uint8_t IMAGE_PULL_TARGET[TARGET_SIZE] = {
 static const char * bip_dir = "/tmp/bip/";
 
 struct img_listing {
+	int handle;
     char * image;
     time_t ctime;
     time_t mtime;
@@ -87,7 +88,22 @@ static gint ctime_compare(gconstpointer a, gconstpointer b) {
     return g_strcmp0(ail->image, bil->image);
 }
 
-static gboolean verify_image(const gchar *image_file, const struct image_handles_desc *hdesc) {
+static gboolean verify_image(const gchar *image_file) {
+    struct stat file_stat;
+    struct image_attributes attr;
+    lstat(image_file, &file_stat);
+
+    if (!(file_stat.st_mode & S_IFREG)) {
+        return FALSE;
+    }
+    
+	if (get_image_attributes(image_file, &attr) < 0)
+		return FALSE;
+
+	return TRUE;
+}
+
+static gboolean filter_image(const gchar *image_file, const struct image_handles_desc *hdesc) {
     struct stat file_stat;
     struct image_attributes attr;
     lstat(image_file, &file_stat);
@@ -98,6 +114,8 @@ static gboolean verify_image(const gchar *image_file, const struct image_handles
 
     if (!hdesc)
         return TRUE;
+	
+	printf("image: %s\n", image_file);
 
     if (hdesc->ctime_bounded[0] && file_stat.st_ctime<hdesc->ctime[0])
         return FALSE;
@@ -122,6 +140,9 @@ static gboolean verify_image(const gchar *image_file, const struct image_handles
     
     if (hdesc->upper[0] < attr.width || hdesc->upper[1] < attr.height)
         return FALSE;
+
+	if (hdesc->fixed_ratio && hdesc->upper[1]*attr.width != hdesc->upper[0]*attr.height)
+		return FALSE;
 
     return TRUE;
 }
@@ -148,18 +169,17 @@ static GString *create_images_listing(int count, int offset, int *res_count, int
         str = g_string_append(str, file->d_name);
 
         lstat(str->str, &file_stat);
-        if (!(file_stat.st_mode & S_IFREG)) {
-            g_string_free(str, TRUE);
-            continue;
-        }
 
-        if (!verify_image(str->str, hdesc)) {
-            g_string_free(str, TRUE);
-            continue;
-        }
+		if (!verify_image(str->str)) {
+			g_string_free(str, TRUE);
+			continue;
+		}
+
+		printf("passed verification: %s\n", str->str);
+
         il = g_try_malloc(sizeof(struct img_listing));
-        il->image = g_string_free(str, FALSE);
-        il->mtime = file_stat.st_mtime;
+		il->image = g_string_free(str, FALSE);
+		il->mtime = file_stat.st_mtime;
         il->ctime = file_stat.st_ctime;
         images = g_slist_append(images, il);
     }
@@ -173,15 +193,24 @@ static GString *create_images_listing(int count, int offset, int *res_count, int
     *res_count = 0;
     while (images && count) {
         struct img_listing *listing = images->data;
+        listing->handle = handle++;
+		printf("filtering: %s\n", listing->image);
+        printf("%p\n", filter_image);
+		if (!filter_image(listing->image, hdesc)) {
+            img_listing_free(listing);
+        	images = g_slist_next(images);
+            continue;
+        }
         strftime(mtime, 17, "%Y%m%dT%H%M%SZ", gmtime(&listing->mtime));
 	    strftime(ctime, 17, "%Y%m%dT%H%M%SZ", gmtime(&listing->ctime));
-        snprintf(handle_str, 8, "%07d", handle++);
+        snprintf(handle_str, 8, "%07d", listing->handle);
         g_string_append_printf(listing_obj, IMG_LISTING_ELEMENT, handle_str, ctime, mtime);
         img_listing_free(listing);
         images = g_slist_next(images);
         (*res_count)++;
         count--;
     }
+	g_slist_free(images);
     listing_obj = g_string_append(listing_obj, IMG_LISTING_END);
     g_free(handle_str);
     return listing_obj;

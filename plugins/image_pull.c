@@ -56,6 +56,7 @@
 #include "service.h"
 #include "obex-priv.h"
 #include "image_pull.h"
+#include "bip_util.h"
 
 #define IMAGE_PULL_CHANNEL 21
 #define IMAGE_PULL_RECORD "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>		\
@@ -190,26 +191,20 @@ failed:
 
 static gboolean parse_time_range(const gchar *range, time_t *res, gboolean *bounded) {
     gchar **arr = g_strsplit(range, "-", 2);
+    gchar **pos = arr;
     int i;
     for(i=0;i<2;i++) {
-        struct tm tm;
+		int len = strlen(*pos);
+
         if (range[i] == '*')
-            bounded[i] = TRUE;
-        else
             bounded[i] = FALSE;
-        if (strptime(*arr, "%Y%m%dT%H%M%SZ", &tm)) {
-            printf("UTC\n");
-            res[i] = mktime(&tm);
-        }
-        else if(strptime(*arr, "%Y%m%dT%H%M%S", &tm)) {
-            printf("not UTC\n");
-            tm.tm_isdst = -1;
-            res[i] = mktime(&tm);
-        }
-        else {
-            g_strfreev(arr);
-            return FALSE;
-        }
+        else
+            bounded[i] = TRUE;
+
+        res[i] = parse_iso8601(*pos, len);
+		if (res[i] == -1)
+			return FALSE;
+		pos++;
     }
     printf("time_range: %lu %lu %d %d\n", res[0], res[1], bounded[0], bounded[1]);
     g_strfreev(arr);
@@ -222,22 +217,26 @@ static gboolean parse_pixel_range(const gchar *dim, unsigned int *lower, unsigne
     static regex_t range_fixed;
     static int regex_initialized = 0;
     if (!regex_initialized) {
-        regcomp(&no_range, "^([:digit:]+)\\*([:digit:]+)$", REG_EXTENDED);
-        regcomp(&range, "^([:digit:]+)\\*([:digit:]+)-([:digit:]+)\\*([:digit:]+)$", REG_EXTENDED);
-        regcomp(&range_fixed, "^([:digit:]+)\\*\\*-([:digit:]+)\\*([:digit:]+)$", REG_EXTENDED);
+        regcomp(&no_range, "^([[:digit:]]+)\\*([[:digit:]]+)$", REG_EXTENDED);
+        regcomp(&range, "^([[:digit:]]+)\\*([[:digit:]]+)-([[:digit:]]+)\\*([[:digit:]]+)$", REG_EXTENDED);
+        regcomp(&range_fixed, "^([[:digit:]]+)\\*\\*-([[:digit:]]+)\\*([[:digit:]]+)$", REG_EXTENDED);
         regex_initialized = 1;
     }
+	printf("dim=%s\n", dim);
     if (regexec(&no_range, dim, 0, NULL, 0) == 0) {
         sscanf(dim, "%u*%u", &lower[0], &lower[1]);
-        *fixed_ratio = FALSE;
+        upper[0] = lower[0];
+		upper[1] = lower[1];
+		*fixed_ratio = FALSE;
     }
     else if (regexec(&range, dim, 0, NULL, 0) == 0) {
+		printf("range\n");
         sscanf(dim, "%u*%u-%u*%u", &lower[0], &lower[1], &upper[0], &upper[1]);
         *fixed_ratio = FALSE;
     }
     else if (regexec(&range_fixed, dim, 0, NULL, 0) == 0) {
-        sscanf(dim, "%d**-%d*%d", &lower[0], &upper[1], &upper[2]);
-        lower[1] = 0;
+    	sscanf(dim, "%u**-%u*%u", &lower[0], &upper[0], &upper[1]);
+		lower[1] = 0;
         *fixed_ratio = TRUE;
     }
     if (lower[0] > 65535 || lower[1] > 65535 || upper[0] > 65535 || upper[1] > 65535)
@@ -255,11 +254,16 @@ static void handles_listing_element(GMarkupParseContext *ctxt,
     struct image_handles_desc *desc = user_data;
     gchar **key;
 
+	printf("element: %s\n", element);
+    printf("names\n");
+
     if (g_str_equal(element, "filtering-parameters") != TRUE)
         return;
 
-    for (key = (gchar **) names; *key; key++, values++) {
-        if (g_str_equal(*key, "created")) {
+    printf("names: %p\n", names);
+	for (key = (gchar **) names; *key; key++, values++) {
+        printf("key: %s\n", *key);
+		if (g_str_equal(*key, "created")) {
             parse_time_range(*values, desc->ctime, desc->ctime_bounded);
         }
         else if (g_str_equal(*key, "modified")) {
@@ -293,8 +297,15 @@ static struct image_handles_desc *parse_handles_desc(const struct obex_session *
     while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen));
 	OBEX_ObjectReParseHeaders(os->obex, obj);
     while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen)) {
+		printf("%d %d\n", hi, IMG_DESC_HDR);
         if (hi == IMG_DESC_HDR) {
-	        g_markup_parse_context_parse(ctxt, (gchar *) hd.bs, hlen, NULL);
+			unsigned int len;
+			gchar *desc = (gchar *) decode_img_descriptor((gchar *) hd.bs, hlen, &len);
+			if (desc == NULL) {
+				g_free(desc);
+				return NULL;
+			}
+			g_markup_parse_context_parse(ctxt, desc, len, NULL);
         }
     }
 	OBEX_ObjectReParseHeaders(os->obex, obj);
