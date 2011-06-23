@@ -20,7 +20,7 @@
 
 #define IMG_DESC_BEGIN "<image-descriptor version=\"1.0\">" EOL_CHARS
 
-#define IMG_DESC_PULL "<image encoding=\"%s\" pixel=\"%s\" transform=\"%s\"/>" EOL_CHARS
+#define IMG_DESC_PULL "<image encoding=\"%s\" pixel=\"%s\" transformation=\"%s\"/>" EOL_CHARS
 
 #define IMG_DESC_END "</image-descriptor>" EOL_CHARS
 
@@ -307,10 +307,32 @@ static struct a_header *create_img_desc(const char *encoding, const char *pixel,
 
 static struct a_header *create_handle(const char *handle) {
 	struct a_header *ah = g_try_new(struct a_header, 1);
-	ah->hi = IMG_DESC_HDR;
+	ah->hi = IMG_HANDLE_HDR;
 	ah->hv.bs = encode_img_handle(handle, strlen(handle), &ah->hv_size);
 	return ah;
 }
+
+static void get_image_callback(struct session_data *session, GError *err,
+		void *user_data)
+{
+	struct transfer_data *transfer = session->pending->data;
+	printf("get_image_callback\n");
+	if (err) {
+		g_dbus_emit_signal(session->conn, session->path,
+				IMAGE_PULL_INTERFACE, "GetImageFailed",
+				DBUS_TYPE_STRING, &err->message,
+				DBUS_TYPE_INVALID);
+		transfer_unregister(transfer);
+		return;
+	}
+
+	g_dbus_emit_signal(session->conn, session->path,
+			IMAGE_PULL_INTERFACE, "GetImageCompleted",
+			DBUS_TYPE_INVALID);
+	transfer_unregister(transfer);
+	return;
+}
+
 
 static DBusMessage *get_image(DBusConnection *connection,
 				DBusMessage *message, void *user_data)
@@ -348,7 +370,7 @@ static DBusMessage *get_image(DBusConnection *connection,
 
 	if ((err=session_get_with_aheaders(session, "x-bt/img-img", NULL, image_path,
 						NULL, 0, aheaders,
-						get_images_listing_callback)) < 0) {
+						get_image_callback)) < 0) {
 		return g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
 				"334Failed");
@@ -356,11 +378,11 @@ static DBusMessage *get_image(DBusConnection *connection,
 
 	session->msg = dbus_message_ref(message);
 
-	return NULL;
+	return dbus_message_new_method_return(message);
 }
 
 GDBusMethodTable image_pull_methods[] = {
-	{ "GetImage",	"sssuus", "", get_image,
+	{ "GetImage",	"sssss", "", get_image,
 		G_DBUS_METHOD_FLAG_ASYNC },
 	{ "GetImagesListing",	"", "s", get_images_listing_all,
 		G_DBUS_METHOD_FLAG_ASYNC },
@@ -368,5 +390,11 @@ GDBusMethodTable image_pull_methods[] = {
 		G_DBUS_METHOD_FLAG_ASYNC },
 	{ "GetImagesListingRangeFilter",	"qqa{ss}", "s", get_images_listing_range_filter,
 		G_DBUS_METHOD_FLAG_ASYNC },
+	{ }
+};
+
+GDBusSignalTable image_pull_signals[] = {
+	{ "GetImageCompleted", "" },
+	{ "GetImageFailed", "" },
 	{ }
 };

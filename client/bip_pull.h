@@ -37,3 +37,4 @@ struct images_listing_aparam {
 } __attribute__ ((packed));
 
 extern GDBusMethodTable image_pull_methods[];
+extern GDBusSignalTable image_pull_signals[];

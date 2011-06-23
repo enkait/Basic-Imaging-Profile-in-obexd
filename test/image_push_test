@@ -99,12 +99,12 @@ if  __name__ == '__main__':
     agent = Agent(bus, path, options.verbose)
 	
     bus.add_signal_receiver(image_push_completed,
-								dbus_interface="org.openobex.ImagePush",
-								signal_name="PutImageCompleted")
+	dbus_interface="org.openobex.ImagePush",
+	signal_name="PutImageCompleted")
     
     bus.add_signal_receiver(image_push_failed,
-								dbus_interface="org.openobex.ImagePush",
-								signal_name="PutImageFailed")
+	dbus_interface="org.openobex.ImagePush",
+	signal_name="PutImageFailed")
 
     client = dbus.Interface(bus.get_object("org.openobex.client", "/"),
                             "org.openobex.Client")
