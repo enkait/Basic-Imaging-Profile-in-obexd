@@ -257,8 +257,9 @@ static void parse_user_headers(struct image_pull_session *ips,
 	uint8_t hi;
 	while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen));
 	OBEX_ObjectReParseHeaders(os->obex, obj);
+	printf("header search: %d %d\n", IMG_DESC_HDR, IMG_HANDLE_HDR);
 	while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen)) {
-		printf("%d %d\n", hi, IMG_DESC_HDR);
+		printf("header: %d %d %d\n", hi, IMG_DESC_HDR, IMG_HANDLE_HDR);
 		switch (hi) {
 			case IMG_DESC_HDR:
 				ips->desc_hdr = decode_img_descriptor(hd.bs,
@@ -266,6 +267,7 @@ static void parse_user_headers(struct image_pull_session *ips,
 						&ips->desc_hdr_len);
 				break;
 			case IMG_HANDLE_HDR:
+				printf("handle header\n");
 				ips->handle_hdr = decode_img_handle(hd.bs,
 						hlen,
 						&ips->handle_hdr_len);
