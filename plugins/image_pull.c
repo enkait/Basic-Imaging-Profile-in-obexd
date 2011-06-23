@@ -112,21 +112,86 @@ static const uint8_t IMAGE_PULL_TARGET[TARGET_SIZE] = {
 			0x8E, 0xE9, 0xB3, 0xD0, 0x46, 0x08, 0x11, 0xD5,
 			0x84, 0x1A, 0x00, 0x02, 0xA5, 0x32, 0x5B, 0x4E };
 
-//static const char * bip_root="/tmp/bip/";
+static const char * bip_dir="/tmp/bip/";
 
 static void free_image_pull_session(struct image_pull_session *session) {
 }
 
+void img_listing_free(struct img_listing *listing)
+{
+	g_free(listing->image);
+	g_free(listing);
+}
+
+/*
+static gint ctime_compare(gconstpointer a, gconstpointer b)
+{
+	const struct img_listing *ail = a, *bil = b;
+	if(ail->ctime < bil->ctime) return -1;
+	else if(ail->ctime > bil->ctime) return 1;
+	return g_strcmp0(ail->image, bil->image);
+}
+*/
+
+static GSList *get_image_list(int *err) {
+	struct dirent* file;
+	GSList *images = NULL;
+	struct img_listing *il = NULL;
+	struct stat file_stat;
+	int handle = 0;
+	DIR *img_dir = opendir(bip_dir);
+
+	if (!img_dir) {
+		if (err)
+			*err = -errno;
+		return NULL;
+	}
+
+	while ((file = readdir(img_dir))) {
+		GString *str = g_string_new(bip_dir);
+		struct image_attributes *attr;
+		str = g_string_append(str, file->d_name);
+		lstat(str->str, &file_stat);
+
+		if (!(file_stat.st_mode & S_IFREG)) {
+			g_string_free(str, TRUE);
+			continue;
+		}
+
+		attr = g_try_new0(struct image_attributes, 1);
+		if (get_image_attributes(str->str, attr) < 0) {
+			g_free(attr);
+			g_string_free(str, TRUE);
+			continue;
+		}
+
+		printf("passed verification: %s\n", str->str);
+
+		il = g_try_new0(struct img_listing, 1);
+		il->image = g_string_free(str, FALSE);
+		il->mtime = file_stat.st_mtime;
+		il->ctime = file_stat.st_ctime;
+		il->handle = handle++;
+		il->attr = attr;
+		images = g_slist_append(images, il);
+	}
+	//images = g_slist_sort(images, ctime_compare);
+	return images;
+}
+
 void *image_pull_connect(struct obex_session *os, int *err) {
-    struct image_pull_session *ips;
-    printf("IMAGE PULL CONNECT\n");
+	struct image_pull_session *ips;
+	printf("IMAGE PULL CONNECT\n");
 	manager_register_session(os);
 
-    ips = g_new0(struct image_pull_session, 1);
-    ips->os = os;
+	ips = g_new0(struct image_pull_session, 1);
+	ips->os = os;
+	ips->image_list = get_image_list(err);
+	if (ips->image_list == NULL)
+		return NULL;
 
-    if (err)
-        *err = 0;
+	if (err)
+		*err = 0;
 
 	return ips;
 }
@@ -144,29 +209,29 @@ static struct pull_aparam_field *parse_aparam(const uint8_t *buffer, uint32_t hl
 		hdr = (void *) buffer + len;
 
 		switch (hdr->tag) {
-		case NBRETURNEDHANDLES_TAG:
-			if (hdr->len != NBRETURNEDHANDLES_LEN)
+			case NBRETURNEDHANDLES_TAG:
+				if (hdr->len != NBRETURNEDHANDLES_LEN)
+					goto failed;
+
+				memcpy(&val16, hdr->val, sizeof(val16));
+				param->nbreturnedhandles = GUINT16_FROM_BE(val16);
+				break;
+
+			case LISTSTARTOFFSET_TAG:
+				if (hdr->len != LISTSTARTOFFSET_LEN)
+					goto failed;
+
+				memcpy(&val16, hdr->val, sizeof(val16));
+				param->liststartoffset = GUINT16_FROM_BE(val16);
+				break;
+			case LATESTCAPTUREDIMAGES_TAG:
+				if (hdr->len != LATESTCAPTUREDIMAGES_LEN)
+					goto failed;
+
+				param->latestcapturedimages = hdr->val[0];
+				break;
+			default:
 				goto failed;
-
-			memcpy(&val16, hdr->val, sizeof(val16));
-			param->nbreturnedhandles = GUINT16_FROM_BE(val16);
-			break;
-
-		case LISTSTARTOFFSET_TAG:
-			if (hdr->len != LISTSTARTOFFSET_LEN)
-				goto failed;
-
-			memcpy(&val16, hdr->val, sizeof(val16));
-			param->liststartoffset = GUINT16_FROM_BE(val16);
-			break;
-		case LATESTCAPTUREDIMAGES_TAG:
-			if (hdr->len != LATESTCAPTUREDIMAGES_LEN)
-				goto failed;
-
-			param->latestcapturedimages = hdr->val[0];
-			break;
-		default:
-			goto failed;
 		}
 
 		len += hdr->len + sizeof(struct pull_aparam_header);
@@ -184,8 +249,8 @@ failed:
 }
 
 static void parse_user_headers(struct image_pull_session *ips,
-				const struct obex_session *os,
-				obex_object_t *obj)
+		const struct obex_session *os,
+		obex_object_t *obj)
 {
 	obex_headerdata_t hd;
 	unsigned int hlen;
@@ -197,13 +262,13 @@ static void parse_user_headers(struct image_pull_session *ips,
 		switch (hi) {
 			case IMG_DESC_HDR:
 				ips->desc_hdr = decode_img_descriptor(hd.bs,
-							hlen,
-							&ips->desc_hdr_len);
+						hlen,
+						&ips->desc_hdr_len);
 				break;
 			case IMG_HANDLE_HDR:
 				ips->handle_hdr = decode_img_handle(hd.bs,
-							hlen,
-							&ips->handle_hdr_len);
+						hlen,
+						&ips->handle_hdr_len);
 				break;
 		}
 	}
