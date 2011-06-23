@@ -102,24 +102,6 @@ static const char * bip_root="/tmp/bip/";
 
 static const gchar * valid_name_chars="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.";
 static const gchar rep_char='_';
-void free_image_descriptor(struct image_descriptor *id) {
-	if(!id)
-		return;
-	g_free(id->version);
-	g_free(id->encoding);
-	g_free(id->pixel);
-	g_free(id->size);
-	g_free(id->maxsize);
-	g_free(id->transformation);
-	g_free(id);
-}
-
-void free_request_data(struct request_data *rd) {
-	if (!rd)
-		return;
-	free_image_descriptor(rd->imgdesc);
-	g_free(rd);
-}
 
 void free_image_push_session(struct image_push_session *session) {
 	g_free(session->image_path);
@@ -153,7 +135,7 @@ int image_push_get(struct obex_session *os, obex_object_t *obj, gboolean *stream
 
 int image_push_chkput(struct obex_session *os, void *user_data)
 {
-	struct image_push_session *ips = user_data;
+	//struct image_push_session *ips = user_data;
 	int ret;
 	printf("IMAGE PUSH CHKPUT\n");
 
