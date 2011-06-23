@@ -34,11 +34,9 @@ uint8_t *encode_img_handle(const char *data, unsigned int length, unsigned int *
 }
 
 char *decode_img_handle(const uint8_t *data, unsigned int length, unsigned int *newsize) {
-	gunichar2 *buf = g_try_malloc(length - 2);
 	glong size;
 	char *handle;
-	g_memmove(buf, data + 2, length - 2);
-	handle = g_utf16_to_utf8(buf, length - 2, NULL, &size, NULL);
+	handle = g_utf16_to_utf8((gunichar2 *) (data + 2), length - 3, NULL, &size, NULL);
 	*newsize = size;
 	return handle;
 }
