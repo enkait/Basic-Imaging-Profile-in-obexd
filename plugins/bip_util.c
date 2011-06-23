@@ -185,3 +185,72 @@ time_t parse_iso8601(const gchar *str, int len) {
 	return time;
 }
 
+gboolean parse_pixel_range(const gchar *dim, unsigned int *lower, unsigned int *upper, gboolean *fixed_ratio)
+{
+	static regex_t no_range;
+	static regex_t range;
+	static regex_t range_fixed;
+	static int regex_initialized = 0;
+	if (!regex_initialized) {
+		regcomp(&no_range, "^([[:digit:]]+)\\*([[:digit:]]+)$", REG_EXTENDED);
+		regcomp(&range, "^([[:digit:]]+)\\*([[:digit:]]+)-([[:digit:]]+)\\*([[:digit:]]+)$", REG_EXTENDED);
+		regcomp(&range_fixed, "^([[:digit:]]+)\\*\\*-([[:digit:]]+)\\*([[:digit:]]+)$", REG_EXTENDED);
+		regex_initialized = 1;
+	}
+	printf("dim=%s\n", dim);
+	if (regexec(&no_range, dim, 0, NULL, 0) == 0) {
+		sscanf(dim, "%u*%u", &lower[0], &lower[1]);
+		upper[0] = lower[0];
+		upper[1] = lower[1];
+		*fixed_ratio = FALSE;
+	}
+	else if (regexec(&range, dim, 0, NULL, 0) == 0) {
+		printf("range\n");
+		sscanf(dim, "%u*%u-%u*%u", &lower[0], &lower[1], &upper[0], &upper[1]);
+		*fixed_ratio = FALSE;
+	}
+	else if (regexec(&range_fixed, dim, 0, NULL, 0) == 0) {
+		sscanf(dim, "%u**-%u*%u", &lower[0], &upper[0], &upper[1]);
+		lower[1] = 0;
+		*fixed_ratio = TRUE;
+	}
+	if (lower[0] > 65535 || lower[1] > 65535 || upper[0] > 65535 || upper[1] > 65535)
+		return FALSE;
+	return TRUE;
+}
+
+int make_modified_image(const char *image_path, const char *modified_path,
+			struct image_attributes *attr, const char *transform) {
+	MagickWand *wand;
+	MagickWandGenesis();
+	wand = NewMagickWand();
+	if (MagickReadImage(wand, image_path) == MagickFalse)
+		return -1;
+	if (g_strcmp0(transform, "crop") == 0) {
+		printf("crop\n");
+		if(MagickCropImage(wand, attr->width, attr->height, 0, 0) == MagickFalse)
+			return -1;
+	}
+	else if (g_strcmp0(transform, "fill") == 0) {
+		printf("fill\n");
+		if(MagickExtentImage(wand, attr->width, attr->height, 0, 0) == MagickFalse)
+			return -1;
+	}
+	else if (g_strcmp0(transform, "stretch") == 0){
+		printf("stretch\n");
+		if(MagickResizeImage(wand, attr->width, attr->height, LanczosFilter, 1.0) == MagickFalse)
+			return -1;
+	}
+	else {
+		return -1;
+	}
+	if (MagickSetImageFormat(wand, attr->format) == MagickFalse) {
+		return -1;
+	}
+	if (MagickWriteImage(wand, modified_path) == MagickFalse) {
+		return -1;
+	}
+	MagickWandTerminus();
+	return 0;
+}
+

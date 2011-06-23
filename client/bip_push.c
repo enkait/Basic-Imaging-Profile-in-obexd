@@ -113,41 +113,6 @@ static void create_image_descriptor(const struct image_attributes *attr, const c
 	ah->hv.bs = (guint8 *) g_string_free(descriptor, FALSE);
 }
 
-static int make_modified_image(const char *image_path, const char *modified_path,
-			struct image_attributes *attr, const char *transform) {
-	MagickWand *wand;
-	MagickWandGenesis();
-	wand = NewMagickWand();
-	if (MagickReadImage(wand, image_path) == MagickFalse)
-		return -1;
-	if (g_strcmp0(transform, "crop") == 0) {
-		printf("crop\n");
-		if(MagickCropImage(wand, attr->width, attr->height, 0, 0) == MagickFalse)
-			return -1;
-	}
-	else if (g_strcmp0(transform, "fill") == 0) {
-		printf("fill\n");
-		if(MagickExtentImage(wand, attr->width, attr->height, 0, 0) == MagickFalse)
-			return -1;
-	}
-	else if (g_strcmp0(transform, "stretch") == 0){
-		printf("stretch\n");
-		if(MagickResizeImage(wand, attr->width, attr->height, LanczosFilter, 1.0) == MagickFalse)
-			return -1;
-	}
-	else {
-		return -1;
-	}
-	if (MagickSetImageFormat(wand, attr->format) == MagickFalse) {
-		return -1;
-	}
-	if (MagickWriteImage(wand, modified_path) == MagickFalse) {
-		return -1;
-	}
-	MagickWandTerminus();
-	return 0;
-}
-
 static DBusMessage *put_transformed_image(DBusMessage *message, struct session_data *session,
 		const char *local_image, const char *remote_image, const char *transform)
 {
