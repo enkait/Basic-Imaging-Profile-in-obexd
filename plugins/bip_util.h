@@ -46,3 +46,6 @@ void free_image_attributes(struct image_attributes *attr);
  * @returns time as time_t format
  */
 time_t parse_iso8601(const gchar *str, int len);
+gboolean parse_pixel_range(const gchar *dim, unsigned int *lower, unsigned int *upper, gboolean *fixed_ratio);
+int make_modified_image(const char *image_path, const char *modified_path,
+			struct image_attributes *attr, const char *transform);
