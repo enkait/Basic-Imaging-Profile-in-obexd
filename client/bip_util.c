@@ -27,7 +27,7 @@ uint8_t *encode_img_handle(const char *data, unsigned int length, unsigned int *
 	if (buf == NULL)
 		return NULL;
 	g_memmove(buf, &len, 2);
-	g_memmove(buf + 2, data, sizeof(gunichar2) * length);
+	g_memmove(buf + 2, utf16buf, sizeof(gunichar2) * length);
 	buf[sizeof(gunichar2) * length + 2] = '\0';
 	*newsize = sizeof(gunichar2) * length + 3;
 	return buf;
