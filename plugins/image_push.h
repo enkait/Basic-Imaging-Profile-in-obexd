@@ -28,24 +28,14 @@ int image_push_chkput(struct obex_session *os, void *user_data);
 int image_push_put(struct obex_session *os, obex_object_t *obj, void *user_data);
 void image_push_disconnect(struct obex_session *os, void *user_data);
 
-struct image_descriptor {
-    char *version;
-    char *encoding;
-    char *pixel;
-    char *size;
-    char *maxsize;
-    char *transformation;
-};
-
-struct request_data {
-    struct image_descriptor *imgdesc;
-};
-
 struct image_push_session {
     struct obex_session *os;
-    struct request_data *reqdata;
     int fd;
     int next_handle;
+    char *handle_hdr;
+    unsigned int handle_hdr_len;
+    char *desc_hdr;
+    unsigned int desc_hdr_len;
     char *image_path;
 };
 
