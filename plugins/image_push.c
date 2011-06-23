@@ -52,6 +52,7 @@
 #include "service.h"
 #include "obex-priv.h"
 #include "image_push.h"
+#include "bip_util.h"
 
 #define IMAGE_PUSH_CHANNEL 20
 #define IMAGE_PUSH_RECORD "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>		\
@@ -94,173 +95,123 @@
 #define IMG_HANDLE_HDR OBEX_HDR_TYPE_BYTES | 0x30
 
 static const uint8_t IMAGE_PUSH_TARGET[TARGET_SIZE] = {
-			0xE3, 0x3D, 0x95, 0x45, 0x83, 0x74, 0x4A, 0xD7,
-			0x9E, 0xC5, 0xC1, 0x6B, 0xE3, 0x1E, 0xDE, 0x8E };
+	0xE3, 0x3D, 0x95, 0x45, 0x83, 0x74, 0x4A, 0xD7,
+	0x9E, 0xC5, 0xC1, 0x6B, 0xE3, 0x1E, 0xDE, 0x8E };
 
 static const char * bip_root="/tmp/bip/";
 
 static const gchar * valid_name_chars="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.";
 static const gchar rep_char='_';
-
 void free_image_descriptor(struct image_descriptor *id) {
-    if(!id)
-        return;
-    g_free(id->version);
-    g_free(id->encoding);
-    g_free(id->pixel);
-    g_free(id->size);
-    g_free(id->maxsize);
-    g_free(id->transformation);
-    g_free(id);
+	if(!id)
+		return;
+	g_free(id->version);
+	g_free(id->encoding);
+	g_free(id->pixel);
+	g_free(id->size);
+	g_free(id->maxsize);
+	g_free(id->transformation);
+	g_free(id);
 }
 
 void free_request_data(struct request_data *rd) {
-    if (!rd)
-        return;
-    free_image_descriptor(rd->imgdesc);
-    g_free(rd);
+	if (!rd)
+		return;
+	free_image_descriptor(rd->imgdesc);
+	g_free(rd);
 }
 
 void free_image_push_session(struct image_push_session *session) {
-    free_request_data(session->reqdata);
-    g_free(session->image_path);
-    g_free(session);
+	g_free(session->image_path);
+	g_free(session);
 }
 
 void *image_push_connect(struct obex_session *os, int *err)
 {
-    struct image_push_session *ips;
-    printf("IMAGE PUSH CONNECT\n");
+	struct image_push_session *ips;
+	printf("IMAGE PUSH CONNECT\n");
 	manager_register_session(os);
 
-    ips = g_new0(struct image_push_session, 1);
-    ips->os = os;
+	ips = g_new0(struct image_push_session, 1);
+	ips->os = os;
 
-    if (err)
-        *err = 0;
+	if (err)
+		*err = 0;
 
 	return ips;
 }
 
 int image_push_get(struct obex_session *os, obex_object_t *obj, gboolean *stream,
-							void *user_data)
+		void *user_data)
 {
-    int ret = obex_get_stream_start(os, "");
-    printf("IMAGE PUSH GET\n");
-    if (ret < 0)
-        return ret;
+	int ret = obex_get_stream_start(os, "");
+	printf("IMAGE PUSH GET\n");
+	if (ret < 0)
+		return ret;
 	return 0;
 }
 
 int image_push_chkput(struct obex_session *os, void *user_data)
 {
-    struct image_push_session *ips = user_data;
-    int ret;
-    printf("IMAGE PUSH CHKPUT\n");
-    
-    g_free(ips->reqdata);
-    ips->reqdata = g_new0(struct request_data, 1);
-    ips->reqdata->imgdesc = g_new0(struct image_descriptor, 1);
+	struct image_push_session *ips = user_data;
+	int ret;
+	printf("IMAGE PUSH CHKPUT\n");
+
 	ret = obex_put_stream_start(os, "");
 	return ret;
 }
 
-guint8 *encode_length_prefix(const gunichar2 *data, unsigned int length, unsigned int *newsize) {
-    guint16 len = length;
-    guint8 *buf = g_try_malloc(3+2*length);
-    len = GUINT16_TO_BE(len);
-    if(!buf)
-        return NULL;
-    g_memmove(buf, &len, 2);
-    g_memmove(buf+2, data, 2*length);
-    buf[2*length+2] = '\0';
-    *newsize = 2*length+3;
-    return buf;
-}
-
 int obex_handle_write(struct obex_session *os, obex_object_t *obj, const char *data, unsigned int size) {
-    obex_headerdata_t hd;
-    glong newlen;
-    unsigned int headersize;
+	obex_headerdata_t hd;
+	unsigned int headersize;
 
-    gunichar2 *buf = g_utf8_to_utf16(data,size,NULL,&newlen,NULL);
-    hd.bs = encode_length_prefix(buf, newlen, &headersize);
+	hd.bs = encode_img_handle(data, size, &headersize);
 
-    return OBEX_ObjectAddHeader(os->obex, obj,
-            IMG_HANDLE_HDR, hd, headersize, 0);
+	if (hd.bs == NULL)
+		return -1;
+
+	return OBEX_ObjectAddHeader(os->obex, obj,
+			IMG_HANDLE_HDR, hd, headersize, 0);
 }
 
 char *get_handle(struct image_push_session *ips) {
-    char *handle = g_try_malloc(8);
-    printf("%d\n", ips->next_handle);
-    snprintf(handle, 8, "%07d", ips->next_handle);
-    ips->next_handle++;
-    return handle;
+	char *handle = g_try_malloc(8);
+	printf("%d\n", ips->next_handle);
+	snprintf(handle, 8, "%07d", ips->next_handle);
+	ips->next_handle++;
+	return handle;
 }
-
-/*
-char * get_handle(char * image_name, char * image_folder) {
-    DIR *image_dir = opendir(image_folder);
-    struct dirent *dent;
-    struct stat filestat;
-    int len = strlen(image_folder) + strlen(image_name) + 1;
-    time_t image_creation;
-    int count_earlier = 0;
-    char *image_path = g_try_malloc(len);
-    char * handle;
-    image_path[0]='\0';
-    strcat(image_path, image_folder);
-    strcat(image_path, image_name);
-    stat(image_path, &filestat);
-    image_creation = filestat.st_mtime;
-    printf("%s\n", image_path);
-    g_free(image_path);
-    if (!image_dir)
-        return NULL;
-    while ((dent = readdir(image_dir))) {
-        time_t filemodtime;
-        stat(image_path, filestat);
-        if (filestat->st_ctime<image_creation) {
-            count_earlier++;
-        }
-    }
-    handle = g_try_malloc(7);
-    printf("%d\n", count_earlier);
-    snprintf(handle, 7, "%d", count_earlier);
-    return handle;
-}
-*/
 
 int image_push_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 {
-    struct image_push_session *ips = user_data;
+	struct image_push_session *ips = user_data;
 	obex_headerdata_t hd;
 	unsigned int hlen, len;
 	uint8_t hi;
-    char *handle;
-    GString *imagename;
-    printf("IMAGE PUSH PUT %s\n", os->name);
+	char *handle;
+	GString *imagename;
+	printf("IMAGE PUSH PUT %s\n", os->name);
 	while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen)) {
-        printf("header numer=%d\n", hi);
-    }
-    len = strlen(bip_root) + strlen(os->name) + 7;
-    imagename = g_string_new(bip_root);
-    imagename = g_string_append(imagename, g_strcanon(os->name, valid_name_chars, rep_char));
-    close(mkstemp(imagename->str));
-    rename(ips->image_path, imagename->str);
-    printf("imagename=%s\n", imagename->str);
-    g_string_free(imagename, TRUE);
-    handle = get_handle(ips);
-    obex_handle_write(os, obj, handle, 7);
-    g_free(handle);
+		printf("header numer=%d\n", hi);
+	}
+	len = strlen(bip_root) + strlen(os->name) + 7;
+	imagename = g_string_new(bip_root);
+	imagename = g_string_append(imagename, g_strcanon(os->name, valid_name_chars, rep_char));
+	close(mkstemp(imagename->str));
+	rename(ips->image_path, imagename->str);
+	printf("imagename=%s\n", imagename->str);
+	g_string_free(imagename, TRUE);
+	handle = get_handle(ips);
+	obex_handle_write(os, obj, handle, 7);
+	g_free(handle);
 	return 0;
 }
 
 void image_push_disconnect(struct obex_session *os, void *user_data)
 {
-    struct image_push_session *ips = user_data;
-    printf("IMAGE PUSH DISCONNECT\n");
-    free_image_push_session(ips);
+	struct image_push_session *ips = user_data;
+	printf("IMAGE PUSH DISCONNECT\n");
+	free_image_push_session(ips);
 	manager_unregister_session(os);
 }
 
