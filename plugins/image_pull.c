@@ -114,12 +114,6 @@ static const uint8_t IMAGE_PULL_TARGET[TARGET_SIZE] = {
 
 //static const char * bip_root="/tmp/bip/";
 
-struct image_handles_desc *new_hdesc() {
-    struct image_handles_desc *hdesc = g_new0(struct image_handles_desc, 1);
-    hdesc->upper[0] = hdesc->upper[1] = -1;
-    return hdesc;
-}
-
 static void free_image_pull_session(struct image_pull_session *session) {
 }
 
@@ -189,187 +183,90 @@ failed:
 	return NULL;
 }
 
-static gboolean parse_time_range(const gchar *range, time_t *res, gboolean *bounded) {
-    gchar **arr = g_strsplit(range, "-", 2);
-    gchar **pos = arr;
-    int i;
-    for(i=0;i<2;i++) {
-		int len = strlen(*pos);
-
-        if (range[i] == '*')
-            bounded[i] = FALSE;
-        else
-            bounded[i] = TRUE;
-
-        res[i] = parse_iso8601(*pos, len);
-		if (res[i] == -1)
-			return FALSE;
-		pos++;
-    }
-    printf("time_range: %lu %lu %d %d\n", res[0], res[1], bounded[0], bounded[1]);
-    g_strfreev(arr);
-    return TRUE;
-}
-
-static gboolean parse_pixel_range(const gchar *dim, unsigned int *lower, unsigned int *upper, gboolean *fixed_ratio) {
-    static regex_t no_range;
-    static regex_t range;
-    static regex_t range_fixed;
-    static int regex_initialized = 0;
-    if (!regex_initialized) {
-        regcomp(&no_range, "^([[:digit:]]+)\\*([[:digit:]]+)$", REG_EXTENDED);
-        regcomp(&range, "^([[:digit:]]+)\\*([[:digit:]]+)-([[:digit:]]+)\\*([[:digit:]]+)$", REG_EXTENDED);
-        regcomp(&range_fixed, "^([[:digit:]]+)\\*\\*-([[:digit:]]+)\\*([[:digit:]]+)$", REG_EXTENDED);
-        regex_initialized = 1;
-    }
-	printf("dim=%s\n", dim);
-    if (regexec(&no_range, dim, 0, NULL, 0) == 0) {
-        sscanf(dim, "%u*%u", &lower[0], &lower[1]);
-        upper[0] = lower[0];
-		upper[1] = lower[1];
-		*fixed_ratio = FALSE;
-    }
-    else if (regexec(&range, dim, 0, NULL, 0) == 0) {
-		printf("range\n");
-        sscanf(dim, "%u*%u-%u*%u", &lower[0], &lower[1], &upper[0], &upper[1]);
-        *fixed_ratio = FALSE;
-    }
-    else if (regexec(&range_fixed, dim, 0, NULL, 0) == 0) {
-    	sscanf(dim, "%u**-%u*%u", &lower[0], &upper[0], &upper[1]);
-		lower[1] = 0;
-        *fixed_ratio = TRUE;
-    }
-    if (lower[0] > 65535 || lower[1] > 65535 || upper[0] > 65535 || upper[1] > 65535)
-        return FALSE;
-    return TRUE;
-}
-
-static void handles_listing_element(GMarkupParseContext *ctxt,
-        const gchar *element,
-        const gchar **names,
-        const gchar **values,
-        gpointer user_data,
-        GError **gerr)
+static void parse_user_headers(struct image_pull_session *ips,
+				const struct obex_session *os,
+				obex_object_t *obj)
 {
-    struct image_handles_desc *desc = user_data;
-    gchar **key;
-
-	printf("element: %s\n", element);
-    printf("names\n");
-
-    if (g_str_equal(element, "filtering-parameters") != TRUE)
-        return;
-
-    printf("names: %p\n", names);
-	for (key = (gchar **) names; *key; key++, values++) {
-        printf("key: %s\n", *key);
-		if (g_str_equal(*key, "created")) {
-            parse_time_range(*values, desc->ctime, desc->ctime_bounded);
-        }
-        else if (g_str_equal(*key, "modified")) {
-            parse_time_range(*values, desc->mtime, desc->mtime_bounded);
-        }
-        else if (g_str_equal(*key, "encoding")) {
-            desc->encoding = g_strdup(*values);
-            printf("encoding: %s\n", desc->encoding);
-        }
-        else if (g_str_equal(*key, "pixel")) {
-            parse_pixel_range(*values, desc->lower, desc->upper, &desc->fixed_ratio);
-            printf("pixel: %u %u %u %u %d\n", desc->lower[0], desc->lower[1], desc->upper[0], desc->upper[1], desc->fixed_ratio);
-        }
-    }
-}
-
-static const GMarkupParser handles_desc_parser = {
-    handles_listing_element,
-    NULL,
-    NULL,
-    NULL,
-    NULL
-};
-
-static struct image_handles_desc *parse_handles_desc(const struct obex_session *os, obex_object_t *obj) {
-    obex_headerdata_t hd;
-    unsigned int hlen;
-    uint8_t hi;
-    struct image_handles_desc *desc = new_hdesc();
-    GMarkupParseContext *ctxt = g_markup_parse_context_new(&handles_desc_parser, 0, desc, NULL);
-    while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen));
+	obex_headerdata_t hd;
+	unsigned int hlen;
+	uint8_t hi;
+	while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen));
 	OBEX_ObjectReParseHeaders(os->obex, obj);
-    while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen)) {
+	while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen)) {
 		printf("%d %d\n", hi, IMG_DESC_HDR);
-        if (hi == IMG_DESC_HDR) {
-			unsigned int len;
-			gchar *desc = (gchar *) decode_img_descriptor((gchar *) hd.bs, hlen, &len);
-			if (desc == NULL) {
-				g_free(desc);
-				return NULL;
-			}
-			g_markup_parse_context_parse(ctxt, desc, len, NULL);
-        }
-    }
+		switch (hi) {
+			case IMG_DESC_HDR:
+				ips->desc_hdr = decode_img_descriptor(hd.bs,
+							hlen,
+							&ips->desc_hdr_len);
+				break;
+			case IMG_HANDLE_HDR:
+				ips->handle_hdr = decode_img_handle(hd.bs,
+							hlen,
+							&ips->handle_hdr_len);
+				break;
+		}
+	}
 	OBEX_ObjectReParseHeaders(os->obex, obj);
-	g_markup_parse_context_free(ctxt);
-    return desc;
 }
 
 int image_pull_get(struct obex_session *os, obex_object_t *obj,
-        gboolean *stream, void *user_data) {
-    struct image_pull_session *ips = user_data;
-    const uint8_t *buffer;
-    int ret;
-    ssize_t rsize = obex_aparam_read(os, obj, &buffer);
+		gboolean *stream, void *user_data) {
+	struct image_pull_session *ips = user_data;
+	const uint8_t *buffer;
+	int ret;
+	ssize_t rsize = obex_aparam_read(os, obj, &buffer);
 
-    ips->aparam = parse_aparam(buffer, rsize);
-    ips->hdesc = parse_handles_desc(os, obj);
+	ips->aparam = parse_aparam(buffer, rsize);
+	parse_user_headers(ips, os, obj);
 
-    ret = obex_get_stream_start(os, "");
-    printf("IMAGE PULL GET\n");
-    if (ret < 0)
-        return ret;
-    return 0;
+	ret = obex_get_stream_start(os, "");
+	printf("IMAGE PULL GET\n");
+	if (ret < 0)
+		return ret;
+	return 0;
 }
 
 int image_pull_chkput(struct obex_session *os, void *user_data) {
-    printf("IMAGE PULL CHKPUT\n");
-    return 0;
+	printf("IMAGE PULL CHKPUT\n");
+	return 0;
 }
 
 int image_pull_put(struct obex_session *os, obex_object_t *obj, void *user_data) {
-    printf("IMAGE PULL PUT\n");
-    return 0;
+	printf("IMAGE PULL PUT\n");
+	return 0;
 }
 
 void image_pull_disconnect(struct obex_session *os, void *user_data)
 {
-    struct image_pull_session *ips = user_data;
-    printf("IMAGE PULL DISCONNECT\n");
-    free_image_pull_session(ips);
-    manager_unregister_session(os);
+	struct image_pull_session *ips = user_data;
+	printf("IMAGE PULL DISCONNECT\n");
+	free_image_pull_session(ips);
+	manager_unregister_session(os);
 }
 
 static struct obex_service_driver image_pull = {
-    .name = "OBEXD Image Pull Server",
-    .service = OBEX_BIP_PULL,
-    .channel = IMAGE_PULL_CHANNEL,
-    .record = IMAGE_PULL_RECORD,
-    .target = IMAGE_PULL_TARGET,
-    .target_size = TARGET_SIZE,
-    .connect = image_pull_connect,
-    .get = image_pull_get,
-    .put = image_pull_put,
-    .chkput = image_pull_chkput,
-    .disconnect = image_pull_disconnect
+	.name = "OBEXD Image Pull Server",
+	.service = OBEX_BIP_PULL,
+	.channel = IMAGE_PULL_CHANNEL,
+	.record = IMAGE_PULL_RECORD,
+	.target = IMAGE_PULL_TARGET,
+	.target_size = TARGET_SIZE,
+	.connect = image_pull_connect,
+	.get = image_pull_get,
+	.put = image_pull_put,
+	.chkput = image_pull_chkput,
+	.disconnect = image_pull_disconnect
 };
 
 static int image_pull_init(void)
 {
-    return obex_service_driver_register(&image_pull);
+	return obex_service_driver_register(&image_pull);
 }
 
 static void image_pull_exit(void)
 {
-    obex_service_driver_unregister(&image_pull);
+	obex_service_driver_unregister(&image_pull);
 }
 
 OBEX_PLUGIN_DEFINE(image_pull, image_pull_init, image_pull_exit)

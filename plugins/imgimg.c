@@ -67,86 +67,86 @@
 #define CAPABILITIES_END "</imaging-capabilities>" EOL_CHARS
 
 static const uint8_t IMAGE_PUSH_TARGET[TARGET_SIZE] = {
-			0xE3, 0x3D, 0x95, 0x45, 0x83, 0x74, 0x4A, 0xD7,
-			0x9E, 0xC5, 0xC1, 0x6B, 0xE3, 0x1E, 0xDE, 0x8E };
+	0xE3, 0x3D, 0x95, 0x45, 0x83, 0x74, 0x4A, 0xD7,
+	0x9E, 0xC5, 0xC1, 0x6B, 0xE3, 0x1E, 0xDE, 0x8E };
 
 static const char * bip_temp_template = "/tmp/bip/.tmpXXXXXX";
 
 static void *imgimg_open(const char *name, int oflag, mode_t mode,
-					void *context, size_t *size, int *err)
+		void *context, size_t *size, int *err)
 {
-    struct image_push_session *session = context;
-    char * tmpname = strdup(bip_temp_template);
-    if (!name) {
-        if (err)
-            *err = -errno;
-        return NULL;
-    }
+	struct image_push_session *session = context;
+	char * tmpname = strdup(bip_temp_template);
+	if (!name) {
+		if (err)
+			*err = -errno;
+		return NULL;
+	}
 	session->fd = mkstemp(tmpname);
-    session->image_path = tmpname;
-	
-    if (session->fd < 0) {
+	session->image_path = tmpname;
+
+	if (session->fd < 0) {
 		if (err)
 			*err = -errno;
 		return NULL;
 	}
 
-    printf("imging_open\n");
-    return session;
+	printf("imging_open\n");
+	return session;
 }
 
 static int imgimg_close(void *object)
 {
-    struct image_push_session *session = object;
-    if (close(session->fd) < 0)
-        return -errno;
-    printf("imging_close\n");
+	struct image_push_session *session = object;
+	if (close(session->fd) < 0)
+		return -errno;
+	printf("imging_close\n");
 	return 0;
 }
 
 static ssize_t imgimg_write(void *object, const void *buf, size_t count)
 {
-    struct image_push_session *session = object;
+	struct image_push_session *session = object;
 	ssize_t ret = write(session->fd, buf, count);
-    printf("imging_write\n");
-    if (ret < 0)
-        return -errno;
-    return ret;
+	printf("imging_write\n");
+	if (ret < 0)
+		return -errno;
+	return ret;
 }
 
 static struct obex_mime_type_driver imgimg = {
-    .target = IMAGE_PUSH_TARGET,
-    .target_size = TARGET_SIZE,
-    .mimetype = "x-bt/img-img",
+	.target = IMAGE_PUSH_TARGET,
+	.target_size = TARGET_SIZE,
+	.mimetype = "x-bt/img-img",
 	.open = imgimg_open,
 	.close = imgimg_close,
 	.write = imgimg_write,
 };
 
 static void *img_capabilities_open(const char *name, int oflag, mode_t mode,
-					void *context, size_t *size, int *err)
+		void *context, size_t *size, int *err)
 {
-    GString *capabilities = g_string_new(CAPABILITIES_BEGIN);
-    capabilities = g_string_append(capabilities, IMAGE_FORMATS);
-    capabilities = g_string_append(capabilities, CAPABILITIES_END);
-    
-    if (err)
-        *err = 0;
+	GString *capabilities = g_string_new(CAPABILITIES_BEGIN);
+	capabilities = g_string_append(capabilities, IMAGE_FORMATS);
+	capabilities = g_string_append(capabilities, CAPABILITIES_END);
 
-    return capabilities;
+	if (err)
+		*err = 0;
+
+	return capabilities;
 }
 
 static ssize_t img_capabilities_read(void *object, void *buf, size_t count,
-					uint8_t *hi)
+		uint8_t *hi)
 {
 	*hi = OBEX_HDR_BODY;
 	return string_read(object, buf, count);
 }
 
 static struct obex_mime_type_driver img_capabilities = {
-    .target = IMAGE_PUSH_TARGET,
-    .target_size = TARGET_SIZE,
-    .mimetype = "x-bt/img-capabilities",
+	.target = IMAGE_PUSH_TARGET,
+	.target_size = TARGET_SIZE,
+	.mimetype = "x-bt/img-capabilities",
 	.open = img_capabilities_open,
 	.close = string_free,
 	.read = img_capabilities_read,
@@ -154,10 +154,10 @@ static struct obex_mime_type_driver img_capabilities = {
 
 static int imgimg_init(void)
 {
-    int res;
-    if ((res = obex_mime_type_driver_register(&img_capabilities)) < 0) {
-        return res;
-    }
+	int res;
+	if ((res = obex_mime_type_driver_register(&img_capabilities)) < 0) {
+		return res;
+	}
 	return obex_mime_type_driver_register(&imgimg);
 }
 
