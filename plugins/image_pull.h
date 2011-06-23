@@ -21,6 +21,14 @@
  *
  */
 
+struct img_listing {
+	int handle;
+	char *image;
+	time_t ctime;
+	time_t mtime;
+	struct image_attributes *attr;
+};
+
 struct pull_aparam_field {
     uint16_t nbreturnedhandles;
     uint16_t liststartoffset;
@@ -50,6 +58,7 @@ struct image_pull_session {
     unsigned int handle_hdr_len;
     char *desc_hdr;
     unsigned int desc_hdr_len;
+    GSList * image_list;
 };
 
 void *image_pull_connect(struct obex_session *os, int *err);
@@ -60,3 +69,4 @@ int image_pull_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 void image_pull_disconnect(struct obex_session *os, void *user_data);
 
 struct image_handles_desc *new_hdesc();
+void img_listing_free(struct img_listing *listing);

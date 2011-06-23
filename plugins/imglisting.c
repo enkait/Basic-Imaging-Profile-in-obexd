@@ -68,15 +68,6 @@ static const uint8_t IMAGE_PULL_TARGET[TARGET_SIZE] = {
 	0x8E, 0xE9, 0xB3, 0xD0, 0x46, 0x08, 0x11, 0xD5,
 	0x84, 0x1A, 0x00, 0x02, 0xA5, 0x32, 0x5B, 0x4E };
 
-static const char * bip_dir = "/tmp/bip/";
-
-struct img_listing {
-	int handle;
-	char * image;
-	time_t ctime;
-	time_t mtime;
-};
-
 struct image_handles_desc *new_hdesc()
 {
 	struct image_handles_desc *hdesc = g_new0(struct image_handles_desc, 1);
@@ -88,35 +79,6 @@ static void free_image_handles_desc(struct image_handles_desc *hdesc)
 {
 	g_free(hdesc->encoding);
 	g_free(hdesc);
-}
-
-static void img_listing_free(struct img_listing *listing)
-{
-	g_free(listing->image);
-	g_free(listing);
-}
-
-static gint ctime_compare(gconstpointer a, gconstpointer b)
-{
-	const struct img_listing *ail = a, *bil = b;
-	if(ail->ctime < bil->ctime) return -1;
-	else if(ail->ctime > bil->ctime) return 1;
-	return g_strcmp0(ail->image, bil->image);
-}
-
-static gboolean verify_image(const gchar *image_file) {
-	struct stat file_stat;
-	struct image_attributes attr;
-	lstat(image_file, &file_stat);
-
-	if (!(file_stat.st_mode & S_IFREG)) {
-		return FALSE;
-	}
-
-	if (get_image_attributes(image_file, &attr) < 0)
-		return FALSE;
-
-	return TRUE;
 }
 
 static gboolean filter_image(const gchar *image_file, const struct image_handles_desc *hdesc) {
@@ -163,53 +125,17 @@ static gboolean filter_image(const gchar *image_file, const struct image_handles
 	return TRUE;
 }
 
-static GString *create_images_listing(int count, int offset, int *res_count, int *err, const struct image_handles_desc *hdesc) {
-	GString *listing_obj = g_string_new(IMG_LISTING_BEGIN);
-	struct dirent* file;
-	struct stat file_stat;
+static GString *create_images_listing(struct image_pull_session *session, int count, int offset, int *res_count, int *err, const struct image_handles_desc *hdesc) {
 	GSList *images = NULL;
-	struct img_listing *il = NULL;
-	char *handle_str = g_try_malloc(8);
-	char ctime[18], mtime[18];
-	int handle = 0;
-	DIR *img_dir = opendir(bip_dir);
+	GString *listing_obj = g_string_new(IMG_LISTING_BEGIN);
+	char mtime[18], ctime[18];
+	char handle_str[8];
 
-	if (!img_dir) {
-		if (err)
-			*err = -errno;
-		return NULL;
-	}
-
-	while ((file = readdir(img_dir))) {
-		GString *str = g_string_new(bip_dir);
-		str = g_string_append(str, file->d_name);
-
-		lstat(str->str, &file_stat);
-
-		if (!verify_image(str->str)) {
-			g_string_free(str, TRUE);
-			continue;
-		}
-
-		printf("passed verification: %s\n", str->str);
-
-		il = g_try_malloc(sizeof(struct img_listing));
-		il->image = g_string_free(str, FALSE);
-		il->mtime = file_stat.st_mtime;
-		il->ctime = file_stat.st_ctime;
-		images = g_slist_append(images, il);
-	}
-	images = g_slist_sort(images, ctime_compare);
-
-	while (offset) {
-		images = g_slist_next(images);
-		offset--;
-	}
+	images = session->image_list;
 
 	*res_count = 0;
-	while (images && count) {
+	while (images != NULL && count > 0) {
 		struct img_listing *listing = images->data;
-		listing->handle = handle++;
 		printf("filtering: %s\n", listing->image);
 		printf("%p\n", filter_image);
 		if (!filter_image(listing->image, hdesc)) {
@@ -217,18 +143,20 @@ static GString *create_images_listing(int count, int offset, int *res_count, int
 			images = g_slist_next(images);
 			continue;
 		}
-		strftime(mtime, 17, "%Y%m%dT%H%M%SZ", gmtime(&listing->mtime));
-		strftime(ctime, 17, "%Y%m%dT%H%M%SZ", gmtime(&listing->ctime));
-		snprintf(handle_str, 8, "%07d", listing->handle);
-		g_string_append_printf(listing_obj, IMG_LISTING_ELEMENT, handle_str, ctime, mtime);
-		img_listing_free(listing);
+		if (offset == 0) {
+			strftime(mtime, 17, "%Y%m%dT%H%M%SZ", gmtime(&listing->mtime));
+			strftime(ctime, 17, "%Y%m%dT%H%M%SZ", gmtime(&listing->ctime));
+			snprintf(handle_str, 8, "%07d", listing->handle);
+			g_string_append_printf(listing_obj, IMG_LISTING_ELEMENT, handle_str, ctime, mtime);
+			(*res_count)++;
+			count--;
+		}
+		else
+			offset--;
 		images = g_slist_next(images);
-		(*res_count)++;
-		count--;
 	}
 	g_slist_free(images);
 	listing_obj = g_string_append(listing_obj, IMG_LISTING_END);
-	g_free(handle_str);
 	return listing_obj;
 }
 
@@ -364,7 +292,7 @@ static void *imglisting_open(const char *name, int oflag, mode_t mode,
 
 	printf("imglisting_open\n");
 
-	body = create_images_listing(count, offset, &res_count, err, desc);
+	body = create_images_listing(session, count, offset, &res_count, err, desc);
 	free_image_handles_desc(desc);
 	return body;
 }
