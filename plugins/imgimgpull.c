@@ -149,6 +149,15 @@ static struct image_desc *parse_image_desc(char *data, unsigned int length)
 static int get_handle(char *data, unsigned int length)
 {
 	int handle;
+	int i;
+	printf("header:\n");
+	for(i = 0; i < 10; i++)
+		printf("%c", data[i]);
+	if (data == NULL)
+		return -1;
+	for(i = 0; i < 10; i++)
+		printf("%c", data[i]);
+	printf("\n");
 	sscanf(data, "%d", &handle);
 	return handle;
 }
@@ -162,6 +171,8 @@ static int get_image_fd(char *image_path, struct image_desc *desc) {
 	if ((fd = mkstemp(new_image_path->str)) < 0)
 		return -1;
 
+	printf("fd = %d\n", fd);
+	
 	attr.format = desc->encoding;
 	attr.width = desc->upper[0];
 	attr.height = desc->upper[1];
@@ -170,6 +181,7 @@ static int get_image_fd(char *image_path, struct image_desc *desc) {
 		close(fd);
 		return -1;
 	}
+	unlink(new_image_path->str);
 	return fd;
 }
 
@@ -188,18 +200,33 @@ static void *imgimgpull_open(const char *name, int oflag, mode_t mode,
 	desc = parse_image_desc(session->desc_hdr, session->desc_hdr_len);
 	handle = get_handle(session->handle_hdr, session->handle_hdr_len);
 
+	if (handle == -1) {
+		if (err)
+			*err = -ENOENT;
+		return NULL;
+	}
+
+	printf("handle = %d\n", handle);
+
 	while (images != NULL) {
 		struct img_listing *il = images->data;
 		if (il->handle == handle) {
+			printf("plik: %s\n", il->image);
 			fd = get_image_fd(il->image, desc);
 			break;
 		}
 		images = g_slist_next(images);
 	}
 
-	if (fd == -1)
+	printf("fd = %d\n", fd);
 
-	printf("imglisting_open\n");
+	if (fd == -1) {
+		if (err)
+			*err = -ENOENT;
+		return NULL;
+	}
+
+	printf("imgimgpull_open\n");
 
 	free_image_desc(desc);
 	return GINT_TO_POINTER(fd);
@@ -209,8 +236,11 @@ static ssize_t imgimgpull_read(void *object, void *buf, size_t count,
 		uint8_t *hi)
 {
 	ssize_t ret;
+	
+	printf("imgimgpull_read %p %p %u\n", object, buf, count);
 
 	ret = read(GPOINTER_TO_INT(object), buf, count);
+	printf("read %u\n", ret);
 	if (ret < 0)
 		return -errno;
 
@@ -221,6 +251,8 @@ static ssize_t imgimgpull_read(void *object, void *buf, size_t count,
 
 static int imgimgpull_close(void *object)
 {
+	
+
 	if (close(GPOINTER_TO_INT(object)) < 0)
 		return -errno;
 
