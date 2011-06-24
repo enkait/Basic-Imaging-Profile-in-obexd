@@ -44,7 +44,12 @@ class Agent(dbus.service.Object):
     def Release(self):
         mainloop.quit()
 
-def foo_callback(option, opt, value, parser):
+def get_image_thumbnail_callback(option, opt, value, parser):
+        parser.values.get_thumbnail = True
+        parser.values.get_settings = value.split(',')
+        print parser.values.get_settings
+
+def get_image_callback(option, opt, value, parser):
         parser.values.get = True
         parser.values.get_settings = value.split(',')
         print parser.values.get_settings
@@ -57,10 +62,13 @@ def parse_options():
                       help="Get imaging capabilities")
     parser.add_option("-l", "--listing", action="store_true",
                       dest="listing",
-                      help="Get images listing")
+                      help="Get image")
     parser.add_option("-g", "--getimage", type="string", action="callback",
-                      callback=foo_callback,
+                      callback=get_image_callback,
                       help="Get images listing")
+    parser.add_option("-t", "--getimagethumbnail", type="string", action="callback",
+                      callback=get_image_thumbnail_callback,
+                      help="Get image thumbnail")
     parser.add_option("-v", "--verbose", action="store_true", dest="verbose")
 
     return parser.parse_args()
@@ -107,8 +115,15 @@ def get_image(session, path, handle, encoding, width, height, transform):
         session.GetImage(path, handle, encoding, width+"*"+height, transform)
         print "GetImage returned"
 
+def get_image_thumbnail(session, path, handle):
+        session.GetImageThumbnail(path, handle)
+        print "GetImageThumbnail returned"
+
 def image_pull_completed():
         print "Pull completed"
+
+def image_pull_thumbnail_completed():
+        print "Pull thumbnail completed"
 
 def image_pull_failed(reason):
         print "Pull failed: "+reason
@@ -135,6 +150,10 @@ if  __name__ == '__main__':
 	dbus_interface="org.openobex.ImagePull",
 	signal_name="GetImageCompleted")
     
+    bus.add_signal_receiver(image_pull_thumbnail_completed,
+	dbus_interface="org.openobex.ImagePull",
+	signal_name="GetImageThumbnailCompleted")
+    
     bus.add_signal_receiver(image_pull_failed,
 	dbus_interface="org.openobex.ImagePull",
 	signal_name="GetImageFailed")
@@ -155,7 +174,7 @@ if  __name__ == '__main__':
    
     if options.listing:
        images_listing(bip)
-    if options.get:
+    if hasattr(options, 'get'):
        path = options.get_settings[0]
        handle = options.get_settings[1]
        encoding = options.get_settings[2]
@@ -163,5 +182,9 @@ if  __name__ == '__main__':
        height = options.get_settings[4]
        transform = options.get_settings[5]
        get_image(bip, path, handle, encoding, width, height, transform)
+    if hasattr(options, 'get_thumbnail'):
+       path = options.get_settings[0]
+       handle = options.get_settings[1]
+       get_image_thumbnail(bip, path, handle)
 
     mainloop.run()
