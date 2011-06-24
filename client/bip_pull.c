@@ -354,6 +354,27 @@ static void get_image_thumbnail_callback(struct session_data *session, GError *e
 	return;
 }
 
+static void get_image_attachment_callback(struct session_data *session, GError *err,
+		void *user_data)
+{
+	struct transfer_data *transfer = session->pending->data;
+	printf("get_image_attachment_callback\n");
+	if (err) {
+		g_dbus_emit_signal(session->conn, session->path,
+				IMAGE_PULL_INTERFACE, "GetImageAttachmentFailed",
+				DBUS_TYPE_STRING, &err->message,
+				DBUS_TYPE_INVALID);
+		transfer_unregister(transfer);
+		return;
+	}
+
+	g_dbus_emit_signal(session->conn, session->path,
+			IMAGE_PULL_INTERFACE, "GetImageAttachmentCompleted",
+			DBUS_TYPE_INVALID);
+	transfer_unregister(transfer);
+	return;
+}
+
 
 static DBusMessage *get_image_thumbnail(DBusConnection *connection,
 				DBusMessage *message, void *user_data)
@@ -393,6 +414,47 @@ static DBusMessage *get_image_thumbnail(DBusConnection *connection,
 
 	return dbus_message_new_method_return(message);
 }
+
+static DBusMessage *get_image_attachment(DBusConnection *connection,
+				DBusMessage *message, void *user_data)
+{
+	struct session_data *session = user_data;
+	const char *handle, *file_path, *att_name;
+	GSList *aheaders = NULL;
+	struct a_header *hdesc = NULL;
+	int err;
+
+	if (dbus_message_get_args(message, NULL,
+				DBUS_TYPE_STRING, &file_path,
+				DBUS_TYPE_STRING, &att_name,
+				DBUS_TYPE_STRING, &handle,
+				DBUS_TYPE_INVALID) == FALSE)
+		return g_dbus_create_error(message,
+				"org.openobex.Error.InvalidArguments", NULL);
+	
+	printf("requested get image thumbnail %s %s\n", file_path, handle);
+
+	hdesc = create_handle(handle);
+	
+	if (hdesc == NULL)
+		return g_dbus_create_error(message,
+			"org.openobex.Error.InvalidArguments", NULL);
+	
+	aheaders = g_slist_append(NULL, hdesc);
+
+	if ((err=session_get_with_aheaders(session, "x-bt/img-attachment", att_name, file_path,
+						NULL, 0, aheaders,
+						get_image_attachment_callback)) < 0) {
+		return g_dbus_create_error(message,
+				"org.openobex.Error.Failed",
+				"334Failed");
+	}
+
+	session->msg = dbus_message_ref(message);
+
+	return dbus_message_new_method_return(message);
+}
+
 
 static DBusMessage *get_image(DBusConnection *connection,
 				DBusMessage *message, void *user_data)
@@ -446,6 +508,8 @@ GDBusMethodTable image_pull_methods[] = {
 		G_DBUS_METHOD_FLAG_ASYNC },
 	{ "GetImageThumbnail",	"ss", "", get_image_thumbnail,
 		G_DBUS_METHOD_FLAG_ASYNC },
+	{ "GetImageAttachment",	"ss", "", get_image_attachment,
+		G_DBUS_METHOD_FLAG_ASYNC },
 	{ "GetImagesListing",	"", "s", get_images_listing_all,
 		G_DBUS_METHOD_FLAG_ASYNC },
 	{ "GetImagesListingRange",	"qq", "s", get_images_listing_range,
@@ -457,7 +521,10 @@ GDBusMethodTable image_pull_methods[] = {
 
 GDBusSignalTable image_pull_signals[] = {
 	{ "GetImageCompleted", "" },
-	{ "GetImageThumbnailCompleted", "" },
 	{ "GetImageFailed", "" },
+	{ "GetImageThumbnailCompleted", "" },
+	{ "GetImageThumbnailFailed", "" },
+	{ "GetImageAttachmentCompleted", "" },
+	{ "GetImageAttachmentFailed", "" },
 	{ }
 };
