@@ -360,6 +360,7 @@ static void get_image_attachment_callback(struct session_data *session, GError *
 	struct transfer_data *transfer = session->pending->data;
 	printf("get_image_attachment_callback\n");
 	if (err) {
+		printf("emitting message\n");
 		g_dbus_emit_signal(session->conn, session->path,
 				IMAGE_PULL_INTERFACE, "GetImageAttachmentFailed",
 				DBUS_TYPE_STRING, &err->message,
@@ -426,13 +427,13 @@ static DBusMessage *get_image_attachment(DBusConnection *connection,
 
 	if (dbus_message_get_args(message, NULL,
 				DBUS_TYPE_STRING, &file_path,
-				DBUS_TYPE_STRING, &att_name,
 				DBUS_TYPE_STRING, &handle,
+				DBUS_TYPE_STRING, &att_name,
 				DBUS_TYPE_INVALID) == FALSE)
 		return g_dbus_create_error(message,
 				"org.openobex.Error.InvalidArguments", NULL);
 	
-	printf("requested get image thumbnail %s %s\n", file_path, handle);
+	printf("requested get image attachment %s %s %s\n", file_path, handle, att_name);
 
 	hdesc = create_handle(handle);
 	
@@ -508,7 +509,7 @@ GDBusMethodTable image_pull_methods[] = {
 		G_DBUS_METHOD_FLAG_ASYNC },
 	{ "GetImageThumbnail",	"ss", "", get_image_thumbnail,
 		G_DBUS_METHOD_FLAG_ASYNC },
-	{ "GetImageAttachment",	"ss", "", get_image_attachment,
+	{ "GetImageAttachment",	"sss", "", get_image_attachment,
 		G_DBUS_METHOD_FLAG_ASYNC },
 	{ "GetImagesListing",	"", "s", get_images_listing_all,
 		G_DBUS_METHOD_FLAG_ASYNC },
@@ -521,10 +522,10 @@ GDBusMethodTable image_pull_methods[] = {
 
 GDBusSignalTable image_pull_signals[] = {
 	{ "GetImageCompleted", "" },
-	{ "GetImageFailed", "" },
+	{ "GetImageFailed", "s" },
 	{ "GetImageThumbnailCompleted", "" },
-	{ "GetImageThumbnailFailed", "" },
+	{ "GetImageThumbnailFailed", "s" },
 	{ "GetImageAttachmentCompleted", "" },
-	{ "GetImageAttachmentFailed", "" },
+	{ "GetImageAttachmentFailed", "s" },
 	{ }
 };
