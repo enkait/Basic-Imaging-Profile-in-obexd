@@ -75,18 +75,25 @@ static char *verify_attachment(const char *image_path, const char *name) {
 	DIR *att_dir = opendir(att_dir_path);
 	char *ret = NULL;
 
+	printf("%s\n", att_dir_path);
+
 	if (att_dir == NULL)
 		goto done;
 	
 	while ((file = readdir(att_dir)) != NULL) {
-		//fix filename creation with g_build_path
-		char *path = g_build_path(att_dir_path, file->d_name, NULL);
+		char *path = g_build_filename(att_dir_path, file->d_name, NULL);
+		printf("path: %s\n", path);
 		lstat(path, &file_stat);
 		
-		if (!(file_stat.st_mode & S_IFREG)) {
+		printf("%d\n", file_stat.st_mode);
+
+		if (!S_ISREG(file_stat.st_mode)) {
+			printf("nie baldzo: %s\n", path);
 			g_free(path);
 			continue;
 		}
+
+		printf("porownojemy: %s %s\n", file->d_name, name);
 
 		if (g_strcmp0(file->d_name, name) == 0) {
 			printf("attachment path: %s\n", path);
@@ -115,6 +122,7 @@ static void *imgattpull_open(const char *name, int oflag, mode_t mode,
 		*err = 0;
 	
 	printf("imgattpull_open\n");
+	printf("name: %s\n", name);
 
 	handle = get_handle(session->handle_hdr, session->handle_hdr_len);
 
@@ -123,12 +131,13 @@ static void *imgattpull_open(const char *name, int oflag, mode_t mode,
 
 	printf("handle = %d\n", handle);
 
-
 	if ((il = get_listing(session, handle)) == NULL)
 		goto enoent;
 
 	if ((att_path = verify_attachment(il->image, name)) == NULL)
 		goto enoent;
+
+	printf("path: %s\n", att_path);
 
 	fd = open(att_path, oflag, mode);
 	g_free(att_path);
@@ -172,7 +181,7 @@ static int imgattpull_close(void *object)
 static struct obex_mime_type_driver imgattpull = {
 	.target = IMAGE_PULL_TARGET,
 	.target_size = TARGET_SIZE,
-	.mimetype = "x-bt/img-thm",
+	.mimetype = "x-bt/img-attachment",
 	.open = imgattpull_open,
 	.close = imgattpull_close,
 	.read = imgattpull_read,
