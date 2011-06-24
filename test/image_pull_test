@@ -128,8 +128,8 @@ def get_image_thumbnail(session, path, handle):
         print "GetImageThumbnail returned"
 
 def get_image_attachment(session, path, handle, name):
-        session.GetImageThumbnail(path, handle, name)
-        print "GetImageThumbnail returned"
+        session.GetImageAttachment(path, handle, name)
+        print "GetImageAttachment returned"
 
 def image_pull_completed():
         print "Pull completed"
