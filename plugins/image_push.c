@@ -136,12 +136,12 @@ int image_push_get(struct obex_session *os, obex_object_t *obj, gboolean *stream
 int image_push_chkput(struct obex_session *os, void *user_data)
 {
 	//struct image_push_session *ips = user_data;
-	//int ret;
+	int ret;
 	printf("IMAGE PUSH CHKPUT\n");
 
-	//ret = obex_put_stream_start(os, "");
-	//return ret;
-	return 0;
+	ret = obex_put_stream_start(os, "");
+	return ret;
+	//return 0;
 }
 
 int obex_handle_write(struct obex_session *os, obex_object_t *obj, const char *data, unsigned int size) {
@@ -187,7 +187,8 @@ int image_push_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 	handle = get_new_handle(ips);
 	obex_handle_write(os, obj, handle, 7);
 	g_free(handle);
-	return obex_put_stream_start(os, "");
+	return 0;
+	//obex_put_stream_start(os, "");
 }
 
 void image_push_disconnect(struct obex_session *os, void *user_data)
