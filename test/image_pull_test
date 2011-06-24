@@ -54,6 +54,11 @@ def get_image_callback(option, opt, value, parser):
         parser.values.get_settings = value.split(',')
         print parser.values.get_settings
 
+def get_image_attachment_callback(option, opt, value, parser):
+        parser.values.get_attachment = True
+        parser.values.get_settings = value.split(',')
+        print parser.values.get_settings
+
 def parse_options():
     parser.add_option("-d", "--device", dest="device",
                       help="Device to connect", metavar="DEVICE")
@@ -69,6 +74,9 @@ def parse_options():
     parser.add_option("-t", "--getimagethumbnail", type="string", action="callback",
                       callback=get_image_thumbnail_callback,
                       help="Get image thumbnail")
+    parser.add_option("-a", "--getimageattachment", type="string", action="callback",
+                      callback=get_image_attachment_callback,
+                      help="Get image attachment")
     parser.add_option("-v", "--verbose", action="store_true", dest="verbose")
 
     return parser.parse_args()
@@ -119,14 +127,27 @@ def get_image_thumbnail(session, path, handle):
         session.GetImageThumbnail(path, handle)
         print "GetImageThumbnail returned"
 
+def get_image_attachment(session, path, handle, name):
+        session.GetImageThumbnail(path, handle, name)
+        print "GetImageThumbnail returned"
+
 def image_pull_completed():
         print "Pull completed"
 
 def image_pull_thumbnail_completed():
         print "Pull thumbnail completed"
 
+def image_pull_attachment_completed():
+        print "Pull attachment completed"
+
 def image_pull_failed(reason):
         print "Pull failed: "+reason
+
+def image_pull_thumbnail_failed(reason):
+        print "Pull thumbnail failed: "+reason
+
+def image_pull_attachment_failed(reason):
+        print "Pull attachment failed: "+reason
 
 if  __name__ == '__main__':
 
@@ -157,6 +178,18 @@ if  __name__ == '__main__':
     bus.add_signal_receiver(image_pull_failed,
 	dbus_interface="org.openobex.ImagePull",
 	signal_name="GetImageFailed")
+    
+    bus.add_signal_receiver(image_pull_thumbnail_failed,
+	dbus_interface="org.openobex.ImagePull",
+	signal_name="GetImageThumbnailFailed")
+    
+    bus.add_signal_receiver(image_pull_attachment_failed,
+	dbus_interface="org.openobex.ImagePull",
+	signal_name="GetImageAttachmentFailed")
+    
+    bus.add_signal_receiver(image_pull_attachment_completed,
+	dbus_interface="org.openobex.ImagePull",
+	signal_name="GetImageAttachmentCompleted")
 	
     client = dbus.Interface(bus.get_object("org.openobex.client", "/"),
                             "org.openobex.Client")
@@ -186,5 +219,11 @@ if  __name__ == '__main__':
        path = options.get_settings[0]
        handle = options.get_settings[1]
        get_image_thumbnail(bip, path, handle)
+    if hasattr(options, 'get_attachment'):
+       path = options.get_settings[0]
+       handle = options.get_settings[1]
+       name = options.get_settings[2]
+       get_image_attachment(bip, path, handle, name)
+
 
     mainloop.run()
