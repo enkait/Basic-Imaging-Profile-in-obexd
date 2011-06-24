@@ -133,8 +133,19 @@ static gint ctime_compare(gconstpointer a, gconstpointer b)
 }
 */
 
+struct img_listing *get_listing(struct image_pull_session *session, int handle) {
+	GSList *images = session->image_list;
+	while (images != NULL) {
+		struct img_listing *il = images->data;
+		if (il->handle == handle)
+			return il;
+		images = g_slist_next(images);
+	}
+	return NULL;
+}
+
 static GSList *get_image_list(int *err) {
-	struct dirent* file;
+	struct dirent *file;
 	GSList *images = NULL;
 	struct img_listing *il = NULL;
 	struct stat file_stat;
@@ -147,9 +158,10 @@ static GSList *get_image_list(int *err) {
 		return NULL;
 	}
 
-	while ((file = readdir(img_dir))) {
+	while ((file = readdir(img_dir)) != NULL) {
 		GString *str = g_string_new(bip_dir);
 		struct image_attributes *attr;
+		//fix filename creation with g_build_path
 		str = g_string_append(str, file->d_name);
 		lstat(str->str, &file_stat);
 
