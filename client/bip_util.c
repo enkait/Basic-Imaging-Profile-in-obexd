@@ -126,6 +126,63 @@ void free_image_attributes(struct image_attributes *attr) {
 	g_free(attr->format);
 }
 
+time_t parse_iso8601_bip(const gchar *str, int len) {
+	gchar    *tstr;
+	struct tm tm;
+	gint      nr;
+	gchar     tz;
+	time_t    time;
+	time_t    tz_offset = 0;
+
+	memset (&tm, 0, sizeof (struct tm));
+
+	/* According to spec the time doesn't have to be null terminated */
+	if (str[len - 1] != '\0') {
+		tstr = g_malloc(len + 1);
+		strncpy(tstr, str, len);
+		tstr[len] = '\0';
+	}
+	else
+		tstr = g_strdup(str);
+
+	nr = sscanf (tstr, "%04u%02u%02uT%02u%02u%02u%c",
+			&tm.tm_year, &tm.tm_mon, &tm.tm_mday,
+			&tm.tm_hour, &tm.tm_min, &tm.tm_sec,
+			&tz);
+
+	g_free(tstr);
+
+	/* Fixup the tm values */
+	tm.tm_year -= 1900;       /* Year since 1900 */
+	tm.tm_mon--;              /* Months since January, values 0-11 */
+	tm.tm_isdst = -1;         /* Daylight savings information not avail */
+
+	if (nr < 6) {
+		/* Invalid time format */
+		return -1;
+	}
+
+	time = mktime (&tm);
+
+#if defined(HAVE_TM_GMTOFF)
+	tz_offset = tm.tm_gmtoff;
+#elif defined(HAVE_TIMEZONE)
+	tz_offset = -timezone;
+	if (tm.tm_isdst > 0) {
+		tz_offset += 3600;
+	}
+#endif
+
+	if (nr == 7) { /* Date/Time was in localtime (to remote device)
+			* already. Since we don't know anything about the
+			* timezone on that one we won't try to apply UTC offset
+			*/
+		time += tz_offset;
+	}
+
+	return time;
+}
+
 gboolean parse_pixel_range(const gchar *dim, unsigned int *lower, unsigned int *upper, gboolean *fixed_ratio)
 {
 	static regex_t no_range;
@@ -179,7 +236,8 @@ int make_modified_image(const char *image_path, const char *modified_path,
 	}
 	else if (g_strcmp0(transform, "stretch") == 0){
 		printf("stretch\n");
-		if(MagickResizeImage(wand, attr->width, attr->height, LanczosFilter, 1.0) == MagickFalse)
+		if(MagickResizeImage(wand, attr->width, attr->height,
+					LanczosFilter, 1.0) == MagickFalse)
 			return -1;
 	}
 	else {
@@ -193,5 +251,48 @@ int make_modified_image(const char *image_path, const char *modified_path,
 	}
 	MagickWandTerminus();
 	return 0;
+}
+
+gboolean make_thumbnail(const char *image_path, const char *modified_path) {
+	gboolean status = TRUE;
+	MagickWand *wand;
+	MagickWandGenesis();
+	wand = NewMagickWand();
+	if (MagickSetImageColorspace(wand, sRGBColorspace) == MagickFalse) {
+		status = FALSE;
+		goto cleanup;
+	}
+	if (MagickResizeImage(wand, THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT,
+				LanczosFilter, 1.0) == MagickFalse) {
+		status = FALSE;
+		goto cleanup;
+	}
+	if (MagickSetImageFormat(wand, "JPEG") == MagickFalse) {
+		status = FALSE;
+		goto cleanup;
+	}
+	if (MagickWriteImage(wand, modified_path) == MagickFalse) {
+		status = FALSE;
+		goto cleanup;
+	}
+cleanup:
+	MagickWandTerminus();
+	return status;
+}
+
+int get_handle(char *data, unsigned int length)
+{
+	int handle;
+	int i;
+	printf("header:\n");
+	for(i = 0; i < 10; i++)
+		printf("%c", data[i]);
+	if (data == NULL)
+		return -1;
+	for(i = 0; i < 10; i++)
+		printf("%c", data[i]);
+	printf("\n");
+	sscanf(data, "%d", &handle);
+	return handle;
 }
 

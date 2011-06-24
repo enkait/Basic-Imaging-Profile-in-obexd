@@ -146,22 +146,6 @@ static struct image_desc *parse_image_desc(char *data, unsigned int length)
 	return desc;
 }
 
-static int get_handle(char *data, unsigned int length)
-{
-	int handle;
-	int i;
-	printf("header:\n");
-	for(i = 0; i < 10; i++)
-		printf("%c", data[i]);
-	if (data == NULL)
-		return -1;
-	for(i = 0; i < 10; i++)
-		printf("%c", data[i]);
-	printf("\n");
-	sscanf(data, "%d", &handle);
-	return handle;
-}
-
 static int get_image_fd(char *image_path, struct image_desc *desc) {
 	int fd;
 	GString *new_image_path = g_string_new(image_path);

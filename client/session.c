@@ -1941,7 +1941,7 @@ int session_put_with_aheaders(struct session_data *session, const char *type,
 		session->callback = callback;
 	}
 
-	if (buf == NULL) {
+	if (buf != NULL) {
 		transfer->size = strlen(buf);
 		transfer->buffer = buf;
 	}

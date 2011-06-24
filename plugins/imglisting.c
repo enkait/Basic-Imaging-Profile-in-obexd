@@ -172,7 +172,7 @@ static gboolean parse_time_range(const gchar *range, time_t *res, gboolean *boun
 		else
 			bounded[i] = TRUE;
 
-		res[i] = parse_iso8601(*pos, len);
+		res[i] = parse_iso8601_bip(*pos, len);
 		if (res[i] == -1)
 			return FALSE;
 		pos++;

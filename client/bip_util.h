@@ -24,6 +24,9 @@
 #include <openobex/obex.h>
 #include <openobex/obex_const.h>
 
+#define THUMBNAIL_WIDTH 160
+#define THUMBNAIL_HEIGHT 120
+
 struct image_attributes {
     char * format;
     size_t width, height;
@@ -45,7 +48,9 @@ void free_image_attributes(struct image_attributes *attr);
  * @param len Length of string
  * @returns time as time_t format
  */
-time_t parse_iso8601(const gchar *str, int len);
+time_t parse_iso8601_bip(const gchar *str, int len);
 gboolean parse_pixel_range(const gchar *dim, unsigned int *lower, unsigned int *upper, gboolean *fixed_ratio);
 int make_modified_image(const char *image_path, const char *modified_path,
 			struct image_attributes *attr, const char *transform);
+gboolean make_thumbnail(const char *image_path, const char *modified_path);
+int get_handle(char *data, unsigned int length);
