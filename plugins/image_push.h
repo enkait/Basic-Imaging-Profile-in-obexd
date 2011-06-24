@@ -39,8 +39,5 @@ struct image_push_session {
     char *image_path;
 };
 
-char *get_handle(struct image_push_session *ips);
-
 void free_image_push_session(struct image_push_session *session);
 int obex_handle_write(struct obex_session *os, obex_object_t *obj, const char *data, unsigned int size);
-guint8 *encode_length_prefix(const gunichar2 *data, unsigned int length, unsigned int *newsize);

@@ -126,7 +126,7 @@ void free_image_attributes(struct image_attributes *attr) {
 	g_free(attr->format);
 }
 
-time_t parse_iso8601(const gchar *str, int len) {
+time_t parse_iso8601_bip(const gchar *str, int len) {
 	gchar    *tstr;
 	struct tm tm;
 	gint      nr;
@@ -236,7 +236,8 @@ int make_modified_image(const char *image_path, const char *modified_path,
 	}
 	else if (g_strcmp0(transform, "stretch") == 0){
 		printf("stretch\n");
-		if(MagickResizeImage(wand, attr->width, attr->height, LanczosFilter, 1.0) == MagickFalse)
+		if(MagickResizeImage(wand, attr->width, attr->height,
+					LanczosFilter, 1.0) == MagickFalse)
 			return -1;
 	}
 	else {
@@ -250,5 +251,48 @@ int make_modified_image(const char *image_path, const char *modified_path,
 	}
 	MagickWandTerminus();
 	return 0;
+}
+
+gboolean make_thumbnail(const char *image_path, const char *modified_path) {
+	gboolean status = TRUE;
+	MagickWand *wand;
+	MagickWandGenesis();
+	wand = NewMagickWand();
+	if (MagickSetImageColorspace(wand, sRGBColorspace) == MagickFalse) {
+		status = FALSE;
+		goto cleanup;
+	}
+	if (MagickResizeImage(wand, THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT,
+				LanczosFilter, 1.0) == MagickFalse) {
+		status = FALSE;
+		goto cleanup;
+	}
+	if (MagickSetImageFormat(wand, "JPEG") == MagickFalse) {
+		status = FALSE;
+		goto cleanup;
+	}
+	if (MagickWriteImage(wand, modified_path) == MagickFalse) {
+		status = FALSE;
+		goto cleanup;
+	}
+cleanup:
+	MagickWandTerminus();
+	return status;
+}
+
+int get_handle(char *data, unsigned int length)
+{
+	int handle;
+	int i;
+	printf("header:\n");
+	for(i = 0; i < 10; i++)
+		printf("%c", data[i]);
+	if (data == NULL)
+		return -1;
+	for(i = 0; i < 10; i++)
+		printf("%c", data[i]);
+	printf("\n");
+	sscanf(data, "%d", &handle);
+	return handle;
 }
 

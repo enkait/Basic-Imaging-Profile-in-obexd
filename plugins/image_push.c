@@ -157,7 +157,7 @@ int obex_handle_write(struct obex_session *os, obex_object_t *obj, const char *d
 			IMG_HANDLE_HDR, hd, headersize, 0);
 }
 
-char *get_handle(struct image_push_session *ips) {
+static char *get_new_handle(struct image_push_session *ips) {
 	char *handle = g_try_malloc(8);
 	printf("%d\n", ips->next_handle);
 	snprintf(handle, 8, "%07d", ips->next_handle);
@@ -184,7 +184,7 @@ int image_push_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 	rename(ips->image_path, imagename->str);
 	printf("imagename=%s\n", imagename->str);
 	g_string_free(imagename, TRUE);
-	handle = get_handle(ips);
+	handle = get_new_handle(ips);
 	obex_handle_write(os, obj, handle, 7);
 	g_free(handle);
 	return obex_put_stream_start(os, "");
