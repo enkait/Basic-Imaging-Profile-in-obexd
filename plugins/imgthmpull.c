@@ -70,10 +70,11 @@ static int get_thumbnail_fd(char *image_path) {
 
 	printf("fd = %d\n", fd);
 	
-	if (make_thumbnail(image_path, new_image_path->str)) {
+	if (!make_thumbnail(image_path, new_image_path->str)) {
 		close(fd);
 		return -1;
 	}
+	printf("thumbnail path: %s\n", new_image_path->str);
 	unlink(new_image_path->str);
 	return fd;
 }

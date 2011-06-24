@@ -258,23 +258,40 @@ gboolean make_thumbnail(const char *image_path, const char *modified_path) {
 	MagickWand *wand;
 	MagickWandGenesis();
 	wand = NewMagickWand();
-	if (MagickSetImageColorspace(wand, sRGBColorspace) == MagickFalse) {
+	printf("lol\n");
+
+	if (MagickReadImage(wand, image_path) == MagickFalse) {
+		printf("read failed\n");
 		status = FALSE;
 		goto cleanup;
 	}
+	
+	if (MagickSetImageColorspace(wand, sRGBColorspace) == MagickFalse) {
+		printf("set colorspace failed\n");
+		status = FALSE;
+		goto cleanup;
+	}
+	
 	if (MagickResizeImage(wand, THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT,
 				LanczosFilter, 1.0) == MagickFalse) {
+		printf("resize failed\n");
 		status = FALSE;
 		goto cleanup;
 	}
+	
 	if (MagickSetImageFormat(wand, "JPEG") == MagickFalse) {
+		printf("set format failed\n");
 		status = FALSE;
 		goto cleanup;
 	}
+	
 	if (MagickWriteImage(wand, modified_path) == MagickFalse) {
+		printf("write failed\n");
 		status = FALSE;
 		goto cleanup;
 	}
+	status = TRUE;
+	printf("lol\n");
 cleanup:
 	MagickWandTerminus();
 	return status;
