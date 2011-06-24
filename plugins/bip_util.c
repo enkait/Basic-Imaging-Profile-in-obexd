@@ -312,4 +312,3 @@ int get_handle(char *data, unsigned int length)
 	sscanf(data, "%d", &handle);
 	return handle;
 }
-
