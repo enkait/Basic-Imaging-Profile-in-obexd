@@ -297,16 +297,11 @@ cleanup:
 
 int get_handle(char *data, unsigned int length)
 {
-	int handle;
-	int i;
-	printf("header:\n");
-	for(i = 0; i < 10; i++)
-		printf("%c", data[i]);
+	int handle, ret;
 	if (data == NULL)
 		return -1;
-	for(i = 0; i < 10; i++)
-		printf("%c", data[i]);
-	printf("\n");
-	sscanf(data, "%d", &handle);
+	ret = sscanf(data, "%d", &handle);
+	if (ret < 1)
+		return -1;
 	return handle;
 }
