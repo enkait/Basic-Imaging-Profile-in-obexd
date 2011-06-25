@@ -303,11 +303,11 @@ int image_pull_get(struct obex_session *os, obex_object_t *obj,
 	int ret;
 	ssize_t rsize = obex_aparam_read(os, obj, &buffer);
 
+	printf("IMAGE PULL GET\n");
 	ips->aparam = parse_aparam(buffer, rsize);
 	parse_user_headers(ips, os, obj);
 
 	ret = obex_get_stream_start(os, os->name);
-	printf("IMAGE PULL GET\n");
 	if (ret < 0)
 		return ret;
 	return 0;

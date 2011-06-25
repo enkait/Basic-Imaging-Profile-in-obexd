@@ -110,13 +110,12 @@ done:
 	return object;
 }
 
-static GString *create_image_properties(struct image_pull_session *session, int handle) {
+static GString *create_image_properties(struct image_pull_session *session, struct img_listing *il) {
 	struct encconv_pair * ep = encconv_table;
-	struct img_listing *il = get_listing(session, handle);
-
 	char *image_name = g_path_get_basename(il->image);
+	
 	GString *object = g_string_new("");
-	g_string_append_printf(object, IMG_PROPERTIES_BEGIN, handle, image_name);
+	g_string_append_printf(object, IMG_PROPERTIES_BEGIN, il->handle, image_name);
 	g_free(image_name);
 
 	g_string_append_printf(object, NATIVE_ELEMENT, il->attr->format,
@@ -125,7 +124,7 @@ static GString *create_image_properties(struct image_pull_session *session, int 
 
 	while (ep->bip != NULL) {
 		g_string_append_printf(object, VARIANT_ELEMENT,
-					il->attr->format);
+					ep->bip);
 		ep++;
 	}
 
@@ -141,20 +140,32 @@ static void *imgpropull_open(const char *name, int oflag, mode_t mode,
 	struct image_pull_session *session = context;
 	int handle;
 	GString *object = NULL;
+	struct img_listing *il;
+	
+	printf("imgpropull_open\n");
 
 	if (err)
 		*err = 0;
 
 	handle = get_handle(session->handle_hdr, session->handle_hdr_len);
 
+	printf("handle: %d\n", handle);
+
 	if (handle < 0) {
 		if (err)
 			*err = -EINVAL;
 		return NULL;
 	}
+	
+	il = get_listing(session, handle);
 
-	printf("imgpropull_open\n");
-	object = create_image_properties(session, handle);
+	if (il == NULL) {
+		if (err)
+			*err = -ENOENT;
+		return NULL;
+	}
+
+	object = create_image_properties(session, il);
 	return object;
 }
 
