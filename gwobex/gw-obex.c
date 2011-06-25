@@ -147,6 +147,28 @@ gboolean gw_obex_get_buf_with_apparam(GwObex        *ctx,
     return ret;
 }
 
+gboolean gw_obex_get_buf_with_aheaders(GwObex        *ctx,
+                                      const gchar   *remote,
+                                      const gchar   *type,
+                                      const guint8  *apparam,
+                                      gint           apparam_size,
+                                      const GSList *aheaders,
+                                      gchar        **buf,
+                                      gint          *buf_size,
+                                      gint          *error) {
+    gboolean ret;
+    GW_OBEX_LOCK(ctx);
+    CHECK_DISCONNECT(FALSE, error, ctx);
+    ret = gw_obex_get_with_aheaders(ctx, NULL, remote, type,
+					apparam, apparam_size,
+					aheaders,
+					buf, buf_size, -1, FALSE);
+    if (ret == FALSE)
+        gw_obex_get_error(ctx, error);
+    GW_OBEX_UNLOCK(ctx);
+    return ret;
+}
+
 gboolean gw_obex_put_buf_with_apparam(GwObex       *ctx,
                                       const gchar  *remote,
                                       const gchar  *type,
@@ -160,6 +182,29 @@ gboolean gw_obex_put_buf_with_apparam(GwObex       *ctx,
     GW_OBEX_LOCK(ctx);
     CHECK_DISCONNECT(FALSE, error, ctx);
     ret = gw_obex_put(ctx, NULL, remote, type, apparam, apparam_size, buf, buf_size, time, -1, FALSE);
+    if (ret == FALSE)
+        gw_obex_get_error(ctx, error);
+    GW_OBEX_UNLOCK(ctx);
+    return ret;
+}
+
+gboolean gw_obex_put_buf_with_aheaders(GwObex       *ctx,
+                                      const gchar  *remote,
+                                      const gchar  *type,
+                                      const guint8 *apparam,
+                                      gint          apparam_size,
+                                      const GSList *aheaders,
+                                      const gchar  *buf,
+                                      gint          buf_size,
+                                      gint          time,
+                                      gint         *error) {
+    gboolean ret;
+    GW_OBEX_LOCK(ctx);
+    CHECK_DISCONNECT(FALSE, error, ctx);
+    ret = gw_obex_put_with_aheaders(ctx, NULL, remote, type,
+					apparam, apparam_size,
+					aheaders,
+					buf, buf_size, time, -1, FALSE);
     if (ret == FALSE)
         gw_obex_get_error(ctx, error);
     GW_OBEX_UNLOCK(ctx);

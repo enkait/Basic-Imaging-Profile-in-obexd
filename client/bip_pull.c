@@ -137,61 +137,18 @@ static struct a_header *create_handle(const char *handle) {
 	return ah;
 }
 
-static void get_image_properties_callback(
-		struct session_data *session, GError *err,
-		void *user_data)
-{
-	DBusMessage *reply;
-	DBusMessageIter iter;
-	char *listing;
-	int i;
-	struct transfer_data *transfer = session->pending->data;
-	printf("get_images_properties_callback called\n");
-	if(err) {
-		reply = g_dbus_create_error(session->msg,
-				"org.openobex.Error", "%s", err->message);
-		goto done;
-	}
-
-	reply = dbus_message_new_method_return(session->msg);
-
-	if (transfer->filled == 0)
-		goto done;
-
-	for (i = transfer->filled - 1; i > 0; i--) {
-		if (transfer->buffer[i] != '\0')
-			break;
-
-		transfer->filled--;
-	}
-
-	listing = get_null_terminated(transfer->buffer, transfer->filled);
-
-	dbus_message_iter_init_append(reply, &iter);
-	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING,
-			&listing);
-	g_free(listing);
-
-done:
-	g_dbus_send_message(session->conn, reply);
-	dbus_message_unref(reply);
-	dbus_message_unref(session->msg);
-
-	transfer_unregister(transfer);
-	return;
-}
-
-
 static DBusMessage *get_image_properties(DBusConnection *connection,
 		DBusMessage *message, void *user_data)
 {
 	struct session_data *session = user_data;
-	char *handle;
+	DBusMessage *reply;
+	DBusMessageIter iter;
+	char *handle, *buffer, *object;
 	struct a_header *hdesc;
 	GSList *aheaders;
-	int err;
+	int err, length;
 
-	printf("requested get images listing for all\n");
+	printf("requested get image properties\n");
 	
 	if (dbus_message_get_args(message, NULL,
 					DBUS_TYPE_STRING, &handle,
@@ -207,17 +164,61 @@ static DBusMessage *get_image_properties(DBusConnection *connection,
 	
 	aheaders = g_slist_append(NULL, hdesc);
 
-	if ((err=session_get_with_aheaders(session, "x-bt/img-properties", NULL, NULL,
+	if (!gw_obex_get_buf_with_aheaders(session->obex, NULL, "x-bt/img-properties",
 					NULL, 0, aheaders,
-					get_image_properties_callback)) < 0) {
+					&buffer, &length, &err)) {
 		return g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
 				"334Failed");
 	}
+	
+	object = get_null_terminated(buffer, length);
+	reply = dbus_message_new_method_return(message);
+	
+	dbus_message_iter_init_append(reply, &iter);
+	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &object);
+	g_free(object);
+	g_free(buffer);
 
-	session->msg = dbus_message_ref(message);
+	return reply;
+}
 
-	return NULL;
+static DBusMessage *delete_image(DBusConnection *connection,
+		DBusMessage *message, void *user_data)
+{
+	struct session_data *session = user_data;
+	DBusMessage *reply;
+	char *handle;
+	struct a_header *hdesc;
+	GSList *aheaders;
+	int err;
+
+	printf("requested delete image\n");
+	
+	if (dbus_message_get_args(message, NULL,
+					DBUS_TYPE_STRING, &handle,
+					DBUS_TYPE_INVALID) == FALSE)
+		return g_dbus_create_error(message,
+				"org.openobex.Error.InvalidArguments", NULL);
+
+	hdesc = create_handle(handle);
+	
+	if (hdesc == NULL)
+		return g_dbus_create_error(message,
+			"org.openobex.Error.InvalidArguments", NULL);
+	
+	aheaders = g_slist_append(NULL, hdesc);
+
+	if (!gw_obex_put_buf_with_aheaders(session->obex, NULL, "x-bt/img-img",
+					NULL, 0, aheaders,
+					NULL, 0, -1, &err)) {
+		return g_dbus_create_error(message,
+				"org.openobex.Error.Failed",
+				"334Failed");
+	}
+	
+	reply = dbus_message_new_method_return(message);
+	return reply;
 }
 
 static int parse_filter_dict(DBusMessageIter *iter,
@@ -597,8 +598,8 @@ GDBusMethodTable image_pull_methods[] = {
 		G_DBUS_METHOD_FLAG_ASYNC },
 	{ "GetImagesListingRangeFilter",	"qqa{ss}", "s", get_images_listing_range_filter,
 		G_DBUS_METHOD_FLAG_ASYNC },
-	{ "GetImageProperties",	"s", "s", get_image_properties,
-		G_DBUS_METHOD_FLAG_ASYNC },
+	{ "GetImageProperties",	"s", "s", get_image_properties },
+	{ "DeleteImage", "s", "", delete_image },
 	{ }
 };
 
