@@ -113,6 +113,7 @@ static const uint8_t IMAGE_PULL_TARGET[TARGET_SIZE] = {
 			0x84, 0x1A, 0x00, 0x02, 0xA5, 0x32, 0x5B, 0x4E };
 
 static const char * bip_dir="/tmp/bip/";
+static const char * att_suf = "_att";
 
 static void free_image_pull_session(struct image_pull_session *session) {
 }
@@ -132,6 +133,12 @@ static gint ctime_compare(gconstpointer a, gconstpointer b)
 	return g_strcmp0(ail->image, bil->image);
 }
 */
+
+char *get_att_dir(const char *image_path) {
+	GString *att_path = g_string_new(image_path);
+	att_path = g_string_append(att_path, att_suf);
+	return g_string_free(att_path, FALSE);
+}
 
 struct img_listing *get_listing(struct image_pull_session *session, int handle) {
 	GSList *images = session->image_list;

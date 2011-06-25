@@ -60,13 +60,6 @@ static const uint8_t IMAGE_PULL_TARGET[TARGET_SIZE] = {
 	0x8E, 0xE9, 0xB3, 0xD0, 0x46, 0x08, 0x11, 0xD5,
 	0x84, 0x1A, 0x00, 0x02, 0xA5, 0x32, 0x5B, 0x4E };
 
-static const char * att_suf = "_att";
-
-static char *get_att_dir(const char *image_path) {
-	GString *att_path = g_string_new(image_path);
-	att_path = g_string_append(att_path, att_suf);
-	return g_string_free(att_path, FALSE);
-}
 
 static char *verify_attachment(const char *image_path, const char *name) {
 	struct dirent *file;
