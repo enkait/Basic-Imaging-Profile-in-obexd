@@ -59,6 +59,11 @@ def get_image_attachment_callback(option, opt, value, parser):
         parser.values.get_settings = value.split(',')
         print parser.values.get_settings
 
+def get_image_properties_callback(option, opt, value, parser):
+        parser.values.get_properties = True
+        parser.values.get_settings = value.split(',')
+        print parser.values.get_settings
+
 def parse_options():
     parser.add_option("-d", "--device", dest="device",
                       help="Device to connect", metavar="DEVICE")
@@ -77,6 +82,9 @@ def parse_options():
     parser.add_option("-a", "--getimageattachment", type="string", action="callback",
                       callback=get_image_attachment_callback,
                       help="Get image attachment")
+    parser.add_option("-p", "--getimageproperties", type="string", action="callback",
+                      callback=get_image_properties_callback,
+                      help="Get image properties")
     parser.add_option("-v", "--verbose", action="store_true", dest="verbose")
 
     return parser.parse_args()
@@ -118,6 +126,10 @@ def images_listing(session):
 def imaging_capabilities(session):
     print "omg"
     print session.GetImagingCapabilities()
+
+def get_image_properties(session, handle):
+    print session.GetImageProperties(handle)
+    print "get image properties"
 
 def get_image(session, path, handle, encoding, width, height, transform):
         session.GetImage(path, handle, encoding, width+"*"+height, transform)
@@ -224,6 +236,9 @@ if  __name__ == '__main__':
        handle = options.get_settings[1]
        name = options.get_settings[2]
        get_image_attachment(bip, path, handle, name)
+    if hasattr(options, 'get_properties'):
+       handle = options.get_settings[0]
+       get_image_properties(bip, handle)
 
 
     mainloop.run()
