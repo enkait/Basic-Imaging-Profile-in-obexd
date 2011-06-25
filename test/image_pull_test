@@ -90,7 +90,7 @@ def parse_options():
     parser.add_option("-p", "--getimageproperties", type="string", action="callback",
                       callback=get_image_properties_callback,
                       help="Get image properties")
-    parser.add_option("-d", "--deleteimage", type="string", action="callback",
+    parser.add_option("-e", "--deleteimage", type="string", action="callback",
                       callback=delete_image_callback,
                       help="Delete image")
     parser.add_option("-v", "--verbose", action="store_true", dest="verbose")
@@ -252,7 +252,7 @@ if  __name__ == '__main__':
        get_image_properties(bip, handle)
     if hasattr(options, 'delete_image'):
        handle = options.get_settings[0]
-       get_image_properties(bip, handle)
+       delete_image(bip, handle)
 
 
     mainloop.run()
