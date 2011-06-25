@@ -33,6 +33,12 @@ struct image_attributes {
     unsigned long length;
 };
 
+struct encconv_pair {
+	gchar *bip, *im;
+};
+
+extern struct encconv_pair encconv_table[];
+
 uint8_t *encode_img_handle(const char *data, unsigned int length, unsigned int *newsize);
 char *decode_img_handle(const uint8_t *data, unsigned int length, unsigned int *newsize);
 uint8_t *encode_img_descriptor(const char *data, unsigned int length, unsigned int *newsize);

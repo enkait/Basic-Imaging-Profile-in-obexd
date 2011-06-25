@@ -235,8 +235,6 @@ static ssize_t imgimgpull_read(void *object, void *buf, size_t count,
 
 static int imgimgpull_close(void *object)
 {
-	
-
 	if (close(GPOINTER_TO_INT(object)) < 0)
 		return -errno;
 

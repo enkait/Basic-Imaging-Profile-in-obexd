@@ -151,6 +151,17 @@ struct img_listing *get_listing(struct image_pull_session *session, int handle) 
 	return NULL;
 }
 
+static gboolean remove_image(struct image_pull_session *session, struct img_listing *il) {
+	if (il == NULL)
+		return FALSE;
+
+	if (unlink(il->image) < 0)
+		return FALSE;
+
+	session->image_list = g_slist_remove(session->image_list, il);
+	return TRUE;
+}
+
 static GSList *get_image_list(int *err) {
 	struct dirent *file;
 	GSList *images = NULL;
@@ -315,11 +326,37 @@ int image_pull_get(struct obex_session *os, obex_object_t *obj,
 
 int image_pull_chkput(struct obex_session *os, void *user_data) {
 	printf("IMAGE PULL CHKPUT\n");
-	return 0;
+
+	if (obex_get_size(os) == OBJECT_SIZE_DELETE)
+		return 0;
+
+	return -EBADR;
 }
 
 int image_pull_put(struct obex_session *os, obex_object_t *obj, void *user_data) {
+	struct image_pull_session *session = user_data;
+	struct img_listing *il;
+	int handle;
 	printf("IMAGE PULL PUT\n");
+
+	if (obex_get_size(os) != OBJECT_SIZE_DELETE)
+		return -EBADR;
+
+	parse_user_headers(session, os, obj);
+	
+	handle = get_handle(session->handle_hdr, session->handle_hdr_len);
+
+	if (handle < 0)
+		return -ENOENT;
+
+	il = get_listing(session, handle);
+
+	if (il == NULL)
+		return -ENOENT;
+
+	if (!remove_image(session, il))
+		return -errno;
+	
 	return 0;
 }
 
