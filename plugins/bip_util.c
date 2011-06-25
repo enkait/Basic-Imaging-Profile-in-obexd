@@ -69,9 +69,7 @@ char *decode_img_descriptor(const uint8_t *data, unsigned int length, unsigned i
 	return buf;
 }
 
-struct encconv_pair {
-	gchar *bip, *im;
-} encconv_table[] = {
+struct encconv_pair encconv_table[] = {
 	{ "JPEG", "JPEG" },
 	{ "GIF", "GIF" },
 	{ "WBMP", "WBMP" },
