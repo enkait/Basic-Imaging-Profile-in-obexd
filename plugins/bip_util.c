@@ -107,6 +107,7 @@ int get_image_attributes(const char *image_file, struct image_attributes *attr) 
 	MagickSizeType size;
 	MagickWandGenesis();
 	wand = NewMagickWand();
+	printf("pinging path: %s\n", image_file);
 	err = MagickPingImage(wand, image_file);
 	if (err == MagickFalse) {
 		return -1;

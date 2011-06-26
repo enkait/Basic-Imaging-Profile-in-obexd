@@ -71,7 +71,12 @@ static const uint8_t IMAGE_PULL_TARGET[TARGET_SIZE] = {
 struct image_handles_desc *new_hdesc()
 {
 	struct image_handles_desc *hdesc = g_new0(struct image_handles_desc, 1);
-	hdesc->upper[0] = hdesc->upper[1] = -1;
+	hdesc->upper[0] = -1;
+	hdesc->upper[1] = -1;
+	hdesc->ctime_bounded[0] = FALSE;
+	hdesc->ctime_bounded[1] = FALSE;
+	hdesc->mtime_bounded[0] = FALSE;
+	hdesc->mtime_bounded[1] = FALSE;
 	return hdesc;
 }
 
@@ -81,46 +86,50 @@ static void free_image_handles_desc(struct image_handles_desc *hdesc)
 	g_free(hdesc);
 }
 
-static gboolean filter_image(const gchar *image_file, const struct image_handles_desc *hdesc) {
-	struct stat file_stat;
-	struct image_attributes attr;
-	lstat(image_file, &file_stat);
+static gboolean filter_image(struct img_listing *il, const struct image_handles_desc *hdesc) {
 
-	if (!(file_stat.st_mode & S_IFREG)) {
-		return FALSE;
-	}
+	printf("hdesc = %p\n", hdesc);
+
+	printf("hdesc %ld %ld\n", hdesc->ctime[0], hdesc->ctime[1]);
 
 	if (!hdesc)
 		return TRUE;
 
-	printf("image: %s\n", image_file);
+	printf("image: %s\n", il->image);
 
-	if (hdesc->ctime_bounded[0] && file_stat.st_ctime<hdesc->ctime[0])
-		return FALSE;
+	printf("PASS: %s %d %d\n", il->image, hdesc->ctime_bounded[0], hdesc->ctime_bounded[1]);
 
-	if (hdesc->ctime_bounded[1] && file_stat.st_ctime>hdesc->ctime[1])
+	if (hdesc->ctime_bounded[0] && il->ctime < hdesc->ctime[0])
 		return FALSE;
+	printf("PASS: %s\n", il->image);
 
-	if (hdesc->mtime_bounded[0] && file_stat.st_mtime<hdesc->mtime[0])
+	if (hdesc->ctime_bounded[1] && il->ctime > hdesc->ctime[1])
 		return FALSE;
+	printf("PASS: %s\n", il->image);
 
-	if (hdesc->mtime_bounded[1] && file_stat.st_mtime>hdesc->mtime[1])
+	if (hdesc->mtime_bounded[0] && il->mtime < hdesc->mtime[0])
 		return FALSE;
+	printf("PASS: %s\n", il->image);
 
-	if (get_image_attributes(image_file, &attr) < 0)
+	if (hdesc->mtime_bounded[1] && il->mtime > hdesc->mtime[1])
 		return FALSE;
+	printf("PASS: %s\n", il->image);
 
-	if (hdesc->encoding != NULL && g_strcmp0(hdesc->encoding,attr.format) != 0)
+	if (hdesc->encoding != NULL && g_strcmp0(hdesc->encoding, il->attr->format) != 0)
 		return FALSE;
+	printf("PASS: %s\n", il->image);
 
-	if (hdesc->lower[0] > attr.width || hdesc->lower[1] > attr.height)
+	if (hdesc->lower[0] > il->attr->width || hdesc->lower[1] > il->attr->height)
 		return FALSE;
+	printf("PASS: %s\n", il->image);
 
-	if (hdesc->upper[0] < attr.width || hdesc->upper[1] < attr.height)
+	if (hdesc->upper[0] < il->attr->width || hdesc->upper[1] < il->attr->height)
 		return FALSE;
+	printf("PASS: %s\n", il->image);
 
-	if (hdesc->fixed_ratio && hdesc->upper[1]*attr.width != hdesc->upper[0]*attr.height)
+	if (hdesc->fixed_ratio && hdesc->upper[1]*il->attr->width != hdesc->upper[0]*il->attr->height)
 		return FALSE;
+	printf("PASS: %s\n", il->image);
 
 	return TRUE;
 }
@@ -133,29 +142,31 @@ static GString *create_images_listing(struct image_pull_session *session, int co
 
 	images = session->image_list;
 
-	*res_count = 0;
+	if (res_count != NULL)
+		*res_count = 0;
 	while (images != NULL && count > 0) {
 		struct img_listing *listing = images->data;
 		printf("filtering: %s\n", listing->image);
 		printf("%p\n", filter_image);
-		if (!filter_image(listing->image, hdesc)) {
-			img_listing_free(listing);
+		if (!filter_image(listing, hdesc)) {
 			images = g_slist_next(images);
 			continue;
 		}
+		
 		if (offset == 0) {
 			strftime(mtime, 17, "%Y%m%dT%H%M%SZ", gmtime(&listing->mtime));
 			strftime(ctime, 17, "%Y%m%dT%H%M%SZ", gmtime(&listing->ctime));
 			snprintf(handle_str, 8, "%07d", listing->handle);
 			g_string_append_printf(listing_obj, IMG_LISTING_ELEMENT, handle_str, ctime, mtime);
-			(*res_count)++;
+			if (res_count != NULL)
+				(*res_count)++;
 			count--;
 		}
 		else
 			offset--;
+		
 		images = g_slist_next(images);
 	}
-	g_slist_free(images);
 	listing_obj = g_string_append(listing_obj, IMG_LISTING_END);
 	return listing_obj;
 }
@@ -254,7 +265,9 @@ static void *imglisting_open(const char *name, int oflag, mode_t mode,
 	if (err)
 		*err = 0;
 
-	desc = parse_handles_desc(session->handle_hdr, session->handle_hdr_len);
+	printf("object: %s\n", session->desc_hdr);
+
+	desc = parse_handles_desc(session->desc_hdr, session->desc_hdr_len);
 
 	printf("imglisting_open\n");
 
