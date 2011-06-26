@@ -204,6 +204,9 @@ static GSList *get_image_list(int *err) {
 		il->handle = handle++;
 		il->attr = attr;
 		images = g_slist_append(images, il);
+
+		printf("image added: %s\n", il->image);
+		g_assert(il->image != NULL);
 	}
 	//images = g_slist_sort(images, ctime_compare);
 	return images;
@@ -285,6 +288,12 @@ static void parse_user_headers(struct image_pull_session *ips,
 	obex_headerdata_t hd;
 	unsigned int hlen;
 	uint8_t hi;
+	
+	g_free(ips->desc_hdr);
+	ips->desc_hdr_len = 0;
+	g_free(ips->handle_hdr);
+	ips->handle_hdr_len = 0;
+
 	while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen));
 	OBEX_ObjectReParseHeaders(os->obex, obj);
 	printf("header search: %d %d\n", IMG_DESC_HDR, IMG_HANDLE_HDR);
