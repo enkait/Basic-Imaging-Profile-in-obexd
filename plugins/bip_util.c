@@ -2,15 +2,31 @@
 #include <config.h>
 #endif
 
+#include <stdio.h>
 #include <errno.h>
-#include <glib.h>
-#include <gdbus.h>
-#include <unistd.h>
+#include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/statvfs.h>
+#include <fcntl.h>
+#include <wait.h>
+
+#include <glib.h>
+#include <regex.h>
+
+#include <openobex/obex.h>
+#include <openobex/obex_const.h>
 
 #include "log.h"
+#include "obex-priv.h"
 #include "bip_util.h"
 #include "wand/MagickWand.h"
+
+const char *att_suf = "_att";
 
 uint8_t *encode_img_handle(const char *data, unsigned int length, unsigned int *newsize) {
 	glong newlen;
@@ -305,4 +321,49 @@ int get_handle(char *data, unsigned int length)
 	if (ret < 1)
 		return -1;
 	return handle;
+}
+
+void parse_bip_user_headers(const struct obex_session *os,
+		obex_object_t *obj, char **desc_hdr, unsigned int *desc_hdr_len,
+		char **handle_hdr, unsigned int *handle_hdr_len)
+{
+	obex_headerdata_t hd;
+	unsigned int hlen;
+	uint8_t hi;
+	
+	g_free(*desc_hdr);
+	*desc_hdr_len = 0;
+	g_free(*handle_hdr);
+	*handle_hdr_len = 0;
+
+	while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen));
+	OBEX_ObjectReParseHeaders(os->obex, obj);
+	printf("header search: %d %d\n", IMG_DESC_HDR, IMG_HANDLE_HDR);
+	while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen)) {
+		printf("header: %d %d %d\n", hi, IMG_DESC_HDR, IMG_HANDLE_HDR);
+		switch (hi) {
+			case IMG_DESC_HDR:
+				if (desc_hdr == NULL || desc_hdr_len == NULL)
+					continue;
+				*desc_hdr = decode_img_descriptor(hd.bs,
+						hlen,
+						desc_hdr_len);
+				break;
+			case IMG_HANDLE_HDR:
+				printf("handle header\n");
+				if (handle_hdr == NULL || handle_hdr_len == NULL)
+					continue;
+				*handle_hdr = decode_img_handle(hd.bs,
+						hlen,
+						handle_hdr_len);
+				break;
+		}
+	}
+	OBEX_ObjectReParseHeaders(os->obex, obj);
+}
+
+char *get_att_dir(const char *image_path) {
+	GString *att_path = g_string_new(image_path);
+	att_path = g_string_append(att_path, att_suf);
+	return g_string_free(att_path, FALSE);
 }

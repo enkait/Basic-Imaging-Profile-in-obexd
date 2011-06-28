@@ -49,7 +49,7 @@
 #include "obex.h"
 #include "mimetype.h"
 #include "service.h"
-#include "imgimg.h"
+#include "imgattpush.h"
 #include "image_push.h"
 #include "filesystem.h"
 
@@ -70,7 +70,7 @@ static const uint8_t IMAGE_PUSH_TARGET[TARGET_SIZE] = {
 	0xE3, 0x3D, 0x95, 0x45, 0x83, 0x74, 0x4A, 0xD7,
 	0x9E, 0xC5, 0xC1, 0x6B, 0xE3, 0x1E, 0xDE, 0x8E };
 
-static void *imgimg_open(const char *name, int oflag, mode_t mode,
+static void *imgattpush_open(const char *name, int oflag, mode_t mode,
 		void *context, size_t *size, int *err)
 {
 	struct image_push_session *session = context;
@@ -80,8 +80,8 @@ static void *imgimg_open(const char *name, int oflag, mode_t mode,
 			*err = -errno;
 		return NULL;
 	}
-	
-	session->fd = g_file_open_tmp(NULL, &session->file_path, NULL);
+
+	session->fd = g_file_open_tmp(NULL, &session->file_path);
 
 	if (session->fd < 0) {
 		if (err)
@@ -89,80 +89,46 @@ static void *imgimg_open(const char *name, int oflag, mode_t mode,
 		return NULL;
 	}
 
-	printf("imging_open\n");
+	printf("imgattpush_open\n");
 	return session;
 }
 
-static int imgimg_close(void *object)
+static int imgattpush_close(void *object)
 {
 	struct image_push_session *session = object;
 	if (close(session->fd) < 0)
 		return -errno;
-	printf("imging_close\n");
+	printf("imgattpush_close\n");
 	return 0;
 }
 
-static ssize_t imgimg_write(void *object, const void *buf, size_t count)
+static ssize_t imgattpush_write(void *object, const void *buf, size_t count)
 {
 	struct image_push_session *session = object;
 	ssize_t ret = write(session->fd, buf, count);
-	printf("imging_write\n");
+	printf("imgattpush_write\n");
 	if (ret < 0)
 		return -errno;
 	return ret;
 }
 
-static struct obex_mime_type_driver imgimg = {
+static struct obex_mime_type_driver imgattpush = {
 	.target = IMAGE_PUSH_TARGET,
 	.target_size = TARGET_SIZE,
-	.mimetype = "x-bt/img-img",
-	.open = imgimg_open,
-	.close = imgimg_close,
-	.write = imgimg_write,
+	.mimetype = "x-bt/img-attachment",
+	.open = imgattpush_open,
+	.close = imgattpush_close,
+	.write = imgattpush_write,
 };
 
-static void *img_capabilities_open(const char *name, int oflag, mode_t mode,
-		void *context, size_t *size, int *err)
+static int imgattpush_init(void)
 {
-	GString *capabilities = g_string_new(CAPABILITIES_BEGIN);
-	capabilities = g_string_append(capabilities, IMAGE_FORMATS);
-	capabilities = g_string_append(capabilities, CAPABILITIES_END);
-
-	if (err)
-		*err = 0;
-
-	return capabilities;
+	return obex_mime_type_driver_register(&imgattpush);
 }
 
-static ssize_t img_capabilities_read(void *object, void *buf, size_t count,
-		uint8_t *hi)
+static void imgattpush_exit(void)
 {
-	*hi = OBEX_HDR_BODY;
-	return string_read(object, buf, count);
+	obex_mime_type_driver_unregister(&imgattpush);
 }
 
-static struct obex_mime_type_driver img_capabilities = {
-	.target = IMAGE_PUSH_TARGET,
-	.target_size = TARGET_SIZE,
-	.mimetype = "x-bt/img-capabilities",
-	.open = img_capabilities_open,
-	.close = string_free,
-	.read = img_capabilities_read,
-};
-
-static int imgimg_init(void)
-{
-	int res;
-	if ((res = obex_mime_type_driver_register(&img_capabilities)) < 0) {
-		return res;
-	}
-	return obex_mime_type_driver_register(&imgimg);
-}
-
-static void imgimg_exit(void)
-{
-	obex_mime_type_driver_unregister(&img_capabilities);
-	obex_mime_type_driver_unregister(&imgimg);
-}
-
-OBEX_PLUGIN_DEFINE(imgimg, imgimg_init, imgimg_exit)
+OBEX_PLUGIN_DEFINE(imgattpush, imgattpush_init, imgattpush_exit)

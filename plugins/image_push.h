@@ -28,6 +28,11 @@ int image_push_chkput(struct obex_session *os, void *user_data);
 int image_push_put(struct obex_session *os, obex_object_t *obj, void *user_data);
 void image_push_disconnect(struct obex_session *os, void *user_data);
 
+struct pushed_image {
+	int handle;
+	char *image;
+};
+
 struct image_push_session {
     struct obex_session *os;
     int fd;
@@ -36,8 +41,11 @@ struct image_push_session {
     unsigned int handle_hdr_len;
     char *desc_hdr;
     unsigned int desc_hdr_len;
-    char *image_path;
+    char *file_path;
+    GSList *pushed_images;
 };
 
 void free_image_push_session(struct image_push_session *session);
 int obex_handle_write(struct obex_session *os, obex_object_t *obj, const char *data, unsigned int size);
+struct pushed_image *get_pushed_image(struct image_push_session *session,
+					int handle);

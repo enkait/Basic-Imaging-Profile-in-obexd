@@ -1,28 +1,5 @@
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
-
-#include <fcntl.h>
-#include <stdio.h>
-#include <errno.h>
-#include <stdlib.h>
-#include <string.h>
-#include <dirent.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <unistd.h>
-#include <string.h>
-#include <stdio.h>
-
-#define __USE_XOPEN
-#include <time.h>
-
-#include <glib.h>
-#include <regex.h>
-
-#include <openobex/obex.h>
-#include <openobex/obex_const.h>
+#define IMG_HANDLE_HDR (OBEX_HDR_TYPE_BYTES | 0x30)
+#define IMG_DESC_HDR (OBEX_HDR_TYPE_BYTES | 0x71)
 
 #define THUMBNAIL_WIDTH 160
 #define THUMBNAIL_HEIGHT 120
@@ -60,3 +37,9 @@ int make_modified_image(const char *image_path, const char *modified_path,
 			struct image_attributes *attr, const char *transform);
 gboolean make_thumbnail(const char *image_path, const char *modified_path);
 int get_handle(char *data, unsigned int length);
+void parse_bip_user_headers(const struct obex_session *os, obex_object_t *obj,
+				char **desc_hdr,
+				unsigned int *desc_hdr_len,
+				char **handle_hdr,
+				unsigned int *handle_hdr_len);
+char *get_att_dir(const char *image_path);
