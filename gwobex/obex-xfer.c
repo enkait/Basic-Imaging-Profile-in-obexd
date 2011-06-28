@@ -463,6 +463,31 @@ struct a_header *a_header_copy(struct a_header *ah) {
     return res;
 }
 
+struct a_header *make_a_header(uint8_t hi, obex_headerdata_t hv,
+                               unsigned int hlen) {
+    struct a_header *ah = g_new0(struct a_header, 1);
+    ah->hi = hi;
+    ah->hv_size = hlen;
+    switch (hi & OBEX_HDR_TYPE_MASK) {
+        case OBEX_HDR_TYPE_UINT8:
+        case OBEX_HDR_TYPE_UINT32:
+            ah->hv = hv;
+            break;
+        case OBEX_HDR_TYPE_BYTES:
+        case OBEX_HDR_TYPE_UNICODE:
+            ah->hv.bs = g_try_malloc(hlen);
+            if (ah->hv.bs != NULL)
+                memcpy((void *) ah->hv.bs, hv.bs, hlen);
+            else if (hlen > 0) {
+                g_free(ah);
+                return NULL;
+            }
+            ah->hv_size = hlen;
+        break;
+    }
+    return ah;
+}
+
 void a_header_free(struct a_header *ah) {
     switch (ah->hi & OBEX_HDR_TYPE_MASK) {
         case OBEX_HDR_TYPE_BYTES:

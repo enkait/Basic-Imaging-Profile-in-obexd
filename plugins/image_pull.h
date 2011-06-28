@@ -71,4 +71,3 @@ void image_pull_disconnect(struct obex_session *os, void *user_data);
 struct image_handles_desc *new_hdesc();
 void img_listing_free(struct img_listing *listing);
 struct img_listing *get_listing(struct image_pull_session *session, int handle);
-char *get_att_dir(const char *image_path);

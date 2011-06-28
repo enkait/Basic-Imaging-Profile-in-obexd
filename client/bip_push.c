@@ -6,16 +6,17 @@
 #include <glib.h>
 #include <gdbus.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
 #include "log.h"
 #include "transfer.h"
 #include "session.h"
-#include "bip_push.h"
-#include "bip_util.h"
-#include "bip_pull.h"
-#include "gwobex/obex-xfer.h"
-#include "gwobex/obex-priv.h"
+#include "obex-xfer.h"
+#include "obex-priv.h"
 #include "wand/MagickWand.h"
+#include "bip_util.h"
+#include "bip_push.h"
+#include "bip_pull.h"
 
 #define EOL_CHARS "\n"
 
@@ -35,6 +36,10 @@
 #define FILTERING_MODIFIED " modified=\"%s\""
 #define FILTERING_ENCODING " encoding=\"%s\""
 #define FILTERING_PIXEL " pixel=\"%s\""
+
+#define ATT_DESC "<attachment-descriptor version=\"1.0\">" EOL_CHARS \
+	"<attachment name=\"%s\" size=\"%lu\" created=\"%s\"/>" EOL_CHARS \
+	"</attachment-descriptor>" EOL_CHARS
 
 #define BIP_TEMP_FOLDER /tmp/bip/
 
@@ -111,6 +116,34 @@ static void create_image_descriptor(const struct image_attributes *attr, const c
 	ah->hi = IMG_DESC_HDR;
 	ah->hv_size = descriptor->len;
 	ah->hv.bs = (guint8 *) g_string_free(descriptor, FALSE);
+}
+
+static gboolean create_att_descriptor(const char *att_path, struct a_header *ah) {
+	char ctime[18], *name;
+	struct stat file_stat;
+	unsigned long size;
+	GString *descriptor = g_string_new("");
+	
+	if (lstat(att_path, &file_stat) < 0) {
+		return FALSE;
+	}
+
+	if (!S_ISREG(file_stat.st_mode)) {
+		return FALSE;
+	}
+
+	strftime(ctime, 17, "%Y%m%dT%H%M%SZ", gmtime(&file_stat.st_ctime));
+	name = g_path_get_basename(att_path);
+	size = file_stat.st_size;
+	
+	g_string_append_printf(descriptor, ATT_DESC, name, size, ctime);
+	
+	g_free(name);
+
+	ah->hi = IMG_DESC_HDR;
+	ah->hv.bs = encode_img_descriptor(descriptor->str, descriptor->len, &ah->hv_size);
+	g_string_free(descriptor, TRUE);
+	return TRUE;
 }
 
 static DBusMessage *put_transformed_image(DBusMessage *message, struct session_data *session,
@@ -290,11 +323,53 @@ static DBusMessage *get_imaging_capabilities(DBusConnection *connection,
 	return NULL;
 }
 
+static void create_handle(const char *handle, struct a_header *ah) {
+	ah->hi = IMG_HANDLE_HDR;
+	ah->hv.bs = encode_img_handle(handle, 7, &ah->hv_size);
+}
+
+static DBusMessage *put_image_attachment(DBusConnection *connection,
+		DBusMessage *message, void *user_data)
+{
+	struct session_data *session = user_data;
+	const char *att_path, *handle;
+	struct a_header ah;
+	GSList *aheaders;
+	int err;
+
+	if (dbus_message_get_args(message, NULL,
+				DBUS_TYPE_STRING, &att_path,
+				DBUS_TYPE_STRING, &handle,
+				DBUS_TYPE_INVALID) == FALSE)
+		return g_dbus_create_error(message,
+				"org.openobex.Error.InvalidArguments", NULL);
+
+	create_handle(handle, &ah);
+	aheaders = g_slist_append(NULL, &ah);
+	create_att_descriptor(att_path, &ah);
+	aheaders = g_slist_append(aheaders, &ah);
+
+	if (!att_path || strlen(att_path)==0)
+		return g_dbus_create_error(message,
+				"org.openobex.Error.InvalidArguments", NULL);
+	if ((err=session_put_with_aheaders(session, "x-bt/img-attachment", NULL,
+						att_path, NULL,
+						NULL, 0, aheaders,
+						put_image_callback)) < 0) {
+		return g_dbus_create_error(message,
+				"org.openobex.Error.Failed",
+				"258Failed");
+	}
+
+	return dbus_message_new_method_return(message);
+}
+
 static GDBusMethodTable image_push_methods[] = {
 	{ "GetImagingCapabilities",	"", "s", get_imaging_capabilities,
 		G_DBUS_METHOD_FLAG_ASYNC },
 	{ "PutImage", "s", "", put_image },
 	{ "PutImage", "ssuus", "", put_modified_image },
+	{ "PutImageAttachment", "ss", "", put_image_attachment },
 	{ }
 };
 

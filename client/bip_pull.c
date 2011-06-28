@@ -10,11 +10,11 @@
 #include "log.h"
 #include "transfer.h"
 #include "session.h"
+#include "obex-xfer.h"
+#include "obex-priv.h"
+#include "wand/MagickWand.h"
 #include "bip_pull.h"
 #include "bip_util.h"
-#include "gwobex/obex-xfer.h"
-#include "gwobex/obex-priv.h"
-#include "wand/MagickWand.h"
 
 #define EOL_CHARS "\n"
 

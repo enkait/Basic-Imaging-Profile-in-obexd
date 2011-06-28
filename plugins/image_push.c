@@ -92,7 +92,7 @@
   </attribute>								\
 </record>"
 
-#define IMG_HANDLE_HDR OBEX_HDR_TYPE_BYTES | 0x30
+#define HANDLE_LIMIT 10000000
 
 static const uint8_t IMAGE_PUSH_TARGET[TARGET_SIZE] = {
 	0xE3, 0x3D, 0x95, 0x45, 0x83, 0x74, 0x4A, 0xD7,
@@ -100,12 +100,25 @@ static const uint8_t IMAGE_PUSH_TARGET[TARGET_SIZE] = {
 
 static const char * bip_root="/tmp/bip/";
 
-static const gchar * valid_name_chars="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.";
+static const gchar * valid_name_chars="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 static const gchar rep_char='_';
 
 void free_image_push_session(struct image_push_session *session) {
-	g_free(session->image_path);
+	g_free(session->file_path);
 	g_free(session);
+}
+
+struct pushed_image *get_pushed_image(struct image_push_session *session,
+					int handle)
+{
+	GSList *images = session->pushed_images;
+	while (images != NULL) {
+		struct pushed_image *image = images->data;
+		if (image->handle == handle)
+			return image;
+		images = g_slist_next(images);
+	}
+	return NULL;
 }
 
 void *image_push_connect(struct obex_session *os, int *err)
@@ -157,36 +170,110 @@ int obex_handle_write(struct obex_session *os, obex_object_t *obj, const char *d
 			IMG_HANDLE_HDR, hd, headersize, 0);
 }
 
-static char *get_new_handle(struct image_push_session *ips) {
-	char *handle = g_try_malloc(8);
-	printf("%d\n", ips->next_handle);
-	snprintf(handle, 8, "%07d", ips->next_handle);
-	ips->next_handle++;
-	return handle;
+static int get_new_handle(struct image_push_session *ips) {
+	if (ips->next_handle >= HANDLE_LIMIT) {
+		return -1;
+	}
+	return ips->next_handle++;
+}
+
+static char *filter_name(const char *name) {
+	char *new_name = g_strdup(name);
+	return g_strcanon(new_name, valid_name_chars, rep_char);
+}
+
+static char *append_number(const char *path, unsigned int number) {
+	GString *new_path;
+	if (number > 1000000)
+		return NULL;
+	new_path = g_string_new(path);
+	g_string_append_printf(new_path, "_%u", number);
+	return g_string_free(new_path, FALSE);
+}
+
+static char *safe_rename(const char *name, const char *folder, const char *orig_path) {
+	char *new_name = filter_name(name);
+	char *new_path = g_build_filename(folder, new_name, NULL);
+	char *test_path = g_strdup(new_path);
+	int lock_fd = -1, number = 1;
+	
+	while((lock_fd = open(new_path, O_CREAT | O_EXCL, 0600)) < 0 &&
+			errno == EEXIST) {
+		number++;
+		g_free(test_path);
+		test_path = append_number(new_path, number);
+		if (test_path == NULL)
+			goto cleanup;
+	}
+	if (lock_fd < 0) {
+		g_free(test_path);
+		test_path = NULL;
+		goto cleanup;
+	}
+	if (rename(orig_path, test_path) < 0) {
+		g_free(test_path);
+		test_path = NULL;
+	}
+	close(lock_fd);
+
+cleanup:
+	g_free(new_name);
+	g_free(new_path);
+	return test_path;
 }
 
 int image_push_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 {
 	struct image_push_session *ips = user_data;
-	obex_headerdata_t hd;
-	unsigned int hlen, len;
-	uint8_t hi;
-	char *handle;
-	GString *imagename;
+	struct pushed_image *img;
 	printf("IMAGE PUSH PUT %s\n", os->name);
-	while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen)) {
-		printf("header numer=%d\n", hi);
+
+	parse_bip_user_headers(os, obj, &ips->desc_hdr, &ips->desc_hdr_len,
+				&ips->handle_hdr, &ips->handle_hdr_len);
+
+	if (g_strcmp0(os->type, "x-bt/img-img")) {
+		char *new_path;
+		if ((new_path = safe_rename(os->name, bip_root, ips->file_path))
+				!= NULL) {
+			return -errno;
+		}
+		img = g_try_new0(struct pushed_image, 1);
+		img->handle = get_new_handle(ips);
+		if (img->handle < 0) {
+			g_free(img);
+			g_free(new_path);
+			return -EBADR;
+		}
+		img->image = new_path;
+		ips->pushed_images = g_slist_append(ips->pushed_images, img);
+
+
 	}
-	len = strlen(bip_root) + strlen(os->name) + 7;
-	imagename = g_string_new(bip_root);
-	imagename = g_string_append(imagename, g_strcanon(os->name, valid_name_chars, rep_char));
-	close(mkstemp(imagename->str));
-	rename(ips->image_path, imagename->str);
-	printf("imagename=%s\n", imagename->str);
-	g_string_free(imagename, TRUE);
-	handle = get_new_handle(ips);
-	obex_handle_write(os, obj, handle, 7);
-	g_free(handle);
+	else if(g_strcmp0(os->type, "x-bt/img-attachment")) {
+		int handle = get_handle(ips->handle_hdr, ips->handle_hdr_len);
+		char *att_path, *new_path;
+		struct stat file_stat;
+		if (handle < 0)
+			return -EBADR;
+
+		img = get_pushed_image(ips, handle);
+
+		if (img == NULL)
+			return -EEXIST;
+
+		att_path = get_att_dir(img->image);
+
+		if (lstat(att_path, &file_stat) < 0) {
+			if (mkdir(att_path, 0600) < 0)
+				return -errno;
+		}
+		else if (!S_ISDIR(file_stat.st_mode))
+			return -EBADR;
+
+		if ((new_path = safe_rename(os->name, att_path, ips->file_path)) == NULL) {
+			return -errno;
+		}
+	}
 	return 0;
 	//obex_put_stream_start(os, "");
 }

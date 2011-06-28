@@ -93,6 +93,9 @@ struct a_header {
 
 void a_header_free(struct a_header *ah);
 
+struct a_header *make_a_header(uint8_t hi, obex_headerdata_t hv,
+                               unsigned int hlen);
+
 struct a_header *a_header_copy(struct a_header *ah);
 
 struct a_header *a_header_find(GSList *aheaders, uint8_t hi);
