@@ -147,6 +147,27 @@ static void put_attachment_callback(struct session_data *session, GError *err,
 	return;
 }
 
+static void put_thumbnail_callback(struct session_data *session, GError *err,
+		void *user_data)
+{
+	struct transfer_data *transfer = session->pending->data;
+	printf("thumbnail callback called\n");
+
+	if (err) {
+		g_dbus_emit_signal(session->conn, session->path,
+				IMAGE_PUSH_INTERFACE, "PutThumbnailFailed",
+				DBUS_TYPE_STRING, &err->message,
+				DBUS_TYPE_INVALID);
+		transfer_unregister(transfer);
+		return;
+	}
+	
+	g_dbus_emit_signal(session->conn, session->path,
+			IMAGE_PUSH_INTERFACE, "PutThumbnailCumpleted",
+			DBUS_TYPE_INVALID);
+	transfer_unregister(transfer);
+	return;
+}
 
 static void create_image_descriptor(const struct image_attributes *attr, const char *transform, struct a_header *ah) {
 	GString *descriptor = g_string_new(IMG_DESC_BEGIN);
@@ -276,6 +297,7 @@ static DBusMessage *put_modified_image(DBusConnection *connection,
 	return result;
 }
 
+
 static DBusMessage *put_image(DBusConnection *connection,
 		DBusMessage *message, void *user_data)
 {
@@ -379,6 +401,52 @@ static struct a_header *create_handle(const char *handle) {
 	return ah;
 }
 
+static DBusMessage *put_thumbnail(DBusConnection *connection,
+		DBusMessage *message, void *user_data)
+{
+	struct session_data *session = user_data;
+	char *thm_path, *image_path, *handle;
+	struct a_header *ah;
+	GSList *aheaders;
+	int fd, err;
+
+	if (dbus_message_get_args(message, NULL,
+				DBUS_TYPE_STRING, &image_path,
+				DBUS_TYPE_STRING, &handle,
+				DBUS_TYPE_INVALID) == FALSE)
+		return g_dbus_create_error(message,
+				"org.openobex.Error.InvalidArguments", NULL);
+	if (!image_path || strlen(image_path)==0) {
+		return g_dbus_create_error(message,"org.openobex.Error.InvalidArguments", NULL);
+	}
+	
+	ah = create_handle(handle);
+	printf("handle: %p\n", ah);
+	aheaders = g_slist_append(NULL, ah);
+
+	fd = g_file_open_tmp(NULL, &thm_path, NULL);
+	close(fd);
+	printf("requested put_thumbnail from %s\n", thm_path);
+
+	printf("new path: %s\n", thm_path);
+
+	if (!make_thumbnail(image_path, thm_path)) {
+		return g_dbus_create_error(message,
+				"org.openobex.Error.CanNotCreateModifiedImage", NULL);
+	}
+
+	if ((err=session_put_with_aheaders(session, "x-bt/img-thm", NULL,
+						thm_path, NULL, NULL, 0,
+						aheaders,
+						put_thumbnail_callback)) < 0) {
+		return g_dbus_create_error(message,
+				"org.openobex.Error.Failed",
+				"258Failed");
+	}
+	
+	return dbus_message_new_method_return(message);
+}
+
 static DBusMessage *put_image_attachment(DBusConnection *connection,
 		DBusMessage *message, void *user_data)
 {
@@ -423,6 +491,7 @@ static GDBusMethodTable image_push_methods[] = {
 	{ "PutImage", "s", "", put_image },
 	{ "PutImage", "ssuus", "", put_modified_image },
 	{ "PutImageAttachment", "ss", "", put_image_attachment },
+	{ "PutImageThumbnail", "ss", "", put_thumbnail },
 	{ }
 };
 
