@@ -166,18 +166,19 @@ static void create_image_descriptor(const struct image_attributes *attr, const c
 	ah->hv.bs = (guint8 *) g_string_free(descriptor, FALSE);
 }
 
-static gboolean create_att_descriptor(const char *att_path, struct a_header *ah) {
+static struct a_header *create_att_descriptor(const char *att_path) {
 	char ctime[18], *name;
 	struct stat file_stat;
 	unsigned long size;
+	struct a_header *ah = g_try_new(struct a_header, 1);
 	GString *descriptor = g_string_new("");
 	
 	if (lstat(att_path, &file_stat) < 0) {
-		return FALSE;
+		return NULL;
 	}
 
 	if (!S_ISREG(file_stat.st_mode)) {
-		return FALSE;
+		return NULL;
 	}
 
 	strftime(ctime, 17, "%Y%m%dT%H%M%SZ", gmtime(&file_stat.st_ctime));
@@ -191,7 +192,7 @@ static gboolean create_att_descriptor(const char *att_path, struct a_header *ah)
 	ah->hi = IMG_DESC_HDR;
 	ah->hv.bs = encode_img_descriptor(descriptor->str, descriptor->len, &ah->hv_size);
 	g_string_free(descriptor, TRUE);
-	return TRUE;
+	return ah;
 }
 
 static DBusMessage *put_transformed_image(DBusMessage *message, struct session_data *session,
@@ -371,9 +372,11 @@ static DBusMessage *get_imaging_capabilities(DBusConnection *connection,
 	return NULL;
 }
 
-static void create_handle(const char *handle, struct a_header *ah) {
+static struct a_header *create_handle(const char *handle) {
+	struct a_header *ah = g_try_new(struct a_header, 1);
 	ah->hi = IMG_HANDLE_HDR;
 	ah->hv.bs = encode_img_handle(handle, 7, &ah->hv_size);
+	return ah;
 }
 
 static DBusMessage *put_image_attachment(DBusConnection *connection,
@@ -381,7 +384,7 @@ static DBusMessage *put_image_attachment(DBusConnection *connection,
 {
 	struct session_data *session = user_data;
 	const char *att_path, *handle;
-	struct a_header ah;
+	struct a_header *ah;
 	GSList *aheaders;
 	int err;
 
@@ -392,10 +395,12 @@ static DBusMessage *put_image_attachment(DBusConnection *connection,
 		return g_dbus_create_error(message,
 				"org.openobex.Error.InvalidArguments", NULL);
 
-	create_handle(handle, &ah);
-	aheaders = g_slist_append(NULL, &ah);
-	create_att_descriptor(att_path, &ah);
-	aheaders = g_slist_append(aheaders, &ah);
+	ah = create_handle(handle);
+	printf("handle: %p\n", ah);
+	aheaders = g_slist_append(NULL, ah);
+	ah = create_att_descriptor(att_path);
+	printf("att: %p\n", ah);
+	aheaders = g_slist_append(aheaders, ah);
 
 	if (!att_path || strlen(att_path)==0)
 		return g_dbus_create_error(message,
