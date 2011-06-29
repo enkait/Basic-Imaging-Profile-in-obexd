@@ -55,17 +55,6 @@
 
 #define EOL_CHARS "\n"
 
-#define CAPABILITIES_BEGIN "<imaging-capabilities version=\"1.0\">" EOL_CHARS
-
-#define IMAGE_FORMATS "<image-formats encoding=\"JPEG\" pixel=\"0*0-65535*65535\">" EOL_CHARS \
-                      "<image-formats encoding=\"GIF\" pixel=\"0*0-65535*65535\">" EOL_CHARS \
-                      "<image-formats encoding=\"WBMP\" pixel=\"0*0-65535*65535\">" EOL_CHARS \
-                      "<image-formats encoding=\"PNG\" pixel=\"0*0-65535*65535\">" EOL_CHARS \
-                      "<image-formats encoding=\"JPEG2000\" pixel=\"0*0-65535*65535\">" EOL_CHARS \
-                      "<image-formats encoding=\"BMP\" pixel=\"0*0-65535*65535\">" EOL_CHARS \
-
-#define CAPABILITIES_END "</imaging-capabilities>" EOL_CHARS
-
 static const uint8_t IMAGE_PUSH_TARGET[TARGET_SIZE] = {
 	0xE3, 0x3D, 0x95, 0x45, 0x83, 0x74, 0x4A, 0xD7,
 	0x9E, 0xC5, 0xC1, 0x6B, 0xE3, 0x1E, 0xDE, 0x8E };
