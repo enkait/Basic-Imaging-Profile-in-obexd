@@ -331,10 +331,17 @@ void parse_bip_user_headers(const struct obex_session *os,
 	unsigned int hlen;
 	uint8_t hi;
 	
-	g_free(*desc_hdr);
-	*desc_hdr_len = 0;
-	g_free(*handle_hdr);
-	*handle_hdr_len = 0;
+	if (desc_hdr)
+		g_free(*desc_hdr);
+	
+	if (desc_hdr_len != NULL)
+		*desc_hdr_len = 0;
+	
+	if (handle_hdr)
+		g_free(*handle_hdr);
+	
+	if (handle_hdr_len != NULL)
+		*handle_hdr_len = 0;
 
 	while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen));
 	OBEX_ObjectReParseHeaders(os->obex, obj);

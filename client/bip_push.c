@@ -43,32 +43,54 @@
 
 #define BIP_TEMP_FOLDER /tmp/bip/
 
-static gunichar2 *extract_handle(struct session_data *session, unsigned int *size) {
+void parse_client_user_headers(const struct session_data *session,
+				char **desc_hdr,
+				unsigned int *desc_hdr_len,
+				char **handle_hdr,
+				unsigned int *handle_hdr_len)
+{
 	struct transfer_data *transfer = session->pending->data;
 	GwObexXfer *xfer = transfer->xfer;
 	struct a_header *ah;
-	gunichar2 *buf;
-	if(!xfer)
-		return NULL;
+	
+	if (desc_hdr != NULL && desc_hdr_len != NULL) {
+		g_free(*desc_hdr);
+		*desc_hdr_len = 0;
+	}
+
+	if (handle_hdr != NULL && handle_hdr_len != NULL) {
+		g_free(*handle_hdr);
+		*handle_hdr_len = 0;
+	}
+
+	if (!xfer)
+		return;
+
 	ah = a_header_find(xfer->aheaders, IMG_HANDLE_HDR);
-	if(!ah)
-		return NULL;
-	buf = g_try_malloc(ah->hv_size-2);
-	g_memmove(buf,ah->hv.bs+2,ah->hv_size-2);
-	*size = (ah->hv_size-3)/2;
-	return buf;
+	
+	if (ah != NULL) {
+		printf("handle: %u\n", ah->hv_size);
+		*handle_hdr = decode_img_handle(ah->hv.bs, ah->hv_size, handle_hdr_len);
+	}
+	
+	ah = a_header_find(xfer->aheaders, IMG_DESC_HDR);
+
+	if (ah != NULL) {
+		printf("desc: %u\n", ah->hv_size);
+		*desc_hdr = decode_img_descriptor(ah->hv.bs, ah->hv_size, desc_hdr_len);
+	}
 }
+
+const char *improper = "Improper handle returned";
 
 static void put_image_callback(struct session_data *session, GError *err,
 		void *user_data)
 {
 	struct transfer_data *transfer = session->pending->data;
-	unsigned int utf16size = 0;
-	glong size;
-	gunichar2 *utf16_handle;
-	char *handle;
+	unsigned int length = 0;
+	char *handle = NULL;
 	int required;
-	if(err) {
+	if (err) {
 		g_dbus_emit_signal(session->conn, session->path,
 				IMAGE_PUSH_INTERFACE, "PutImageFailed",
 				DBUS_TYPE_STRING, &err->message,
@@ -77,16 +99,19 @@ static void put_image_callback(struct session_data *session, GError *err,
 		return;
 	}
 	required = (session->obex->obex_rsp == OBEX_RSP_PARTIAL_CONTENT)?(1):(0);
-	utf16_handle = extract_handle(session, &utf16size);
-	if(!utf16_handle) {
+	parse_client_user_headers(session, NULL, NULL, &handle, &length);
+	
+	printf("callback called %s\n", handle);
+
+	if (handle == NULL) {
 		g_dbus_emit_signal(session->conn, session->path,
 				IMAGE_PUSH_INTERFACE, "PutImageFailed",
-				DBUS_TYPE_STRING, &("Improper handle returned"),
+				DBUS_TYPE_STRING, &improper,
 				DBUS_TYPE_INVALID);
+		transfer_unregister(transfer);
+		return;
 	}
-	handle = g_utf16_to_utf8(utf16_handle,utf16size,NULL,&size,NULL);
-	g_free(utf16_handle);
-	printf("callback called %s\n", handle);
+
 	dbus_message_unref(session->msg);
 	session->msg = NULL;
 
@@ -99,6 +124,29 @@ static void put_image_callback(struct session_data *session, GError *err,
 	transfer_unregister(transfer);
 	return;
 }
+
+static void put_attachment_callback(struct session_data *session, GError *err,
+		void *user_data)
+{
+	struct transfer_data *transfer = session->pending->data;
+	printf("attachment callback called\n");
+
+	if (err) {
+		g_dbus_emit_signal(session->conn, session->path,
+				IMAGE_PUSH_INTERFACE, "PutAttachmentFailed",
+				DBUS_TYPE_STRING, &err->message,
+				DBUS_TYPE_INVALID);
+		transfer_unregister(transfer);
+		return;
+	}
+	
+	g_dbus_emit_signal(session->conn, session->path,
+			IMAGE_PUSH_INTERFACE, "PutAttachmentCompleted",
+			DBUS_TYPE_INVALID);
+	transfer_unregister(transfer);
+	return;
+}
+
 
 static void create_image_descriptor(const struct image_attributes *attr, const char *transform, struct a_header *ah) {
 	GString *descriptor = g_string_new(IMG_DESC_BEGIN);
@@ -355,7 +403,7 @@ static DBusMessage *put_image_attachment(DBusConnection *connection,
 	if ((err=session_put_with_aheaders(session, "x-bt/img-attachment", NULL,
 						att_path, NULL,
 						NULL, 0, aheaders,
-						put_image_callback)) < 0) {
+						put_attachment_callback)) < 0) {
 		return g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
 				"258Failed");
@@ -376,6 +424,8 @@ static GDBusMethodTable image_push_methods[] = {
 static GDBusSignalTable image_push_signals[] = {
 	{ "PutImageCompleted",	"sb" },
 	{ "PutImageFailed",	"s" },
+	{ "PutAttachmentCompleted",	"" },
+	{ "PutAttachmentFailed",	"s" },
 	{ }
 };
 

@@ -28,3 +28,8 @@ gboolean bip_register_interface(DBusConnection *connection, const char *path,
 				void *user_data, GDBusDestroyFunction destroy);
 void bip_unregister_interface(DBusConnection *connection, const char *path,
 				void *user_data);
+void parse_client_user_headers(const struct session_data *session,
+				char **desc_hdr,
+				unsigned int *desc_hdr_len,
+				char **handle_hdr,
+				unsigned int *handle_hdr_len);
