@@ -364,6 +364,7 @@ void parse_bip_user_headers(const struct obex_session *os,
 
 char *get_att_dir(const char *image_path) {
 	GString *att_path = g_string_new(image_path);
+	printf("img Path :%s\n", image_path);
 	att_path = g_string_append(att_path, att_suf);
 	return g_string_free(att_path, FALSE);
 }

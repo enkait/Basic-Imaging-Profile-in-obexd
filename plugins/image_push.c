@@ -197,7 +197,9 @@ static char *safe_rename(const char *name, const char *folder, const char *orig_
 	char *test_path = g_strdup(new_path);
 	int lock_fd = -1, number = 1;
 	
-	while((lock_fd = open(new_path, O_CREAT | O_EXCL, 0600)) < 0 &&
+	printf("test_path: %s %s %s %s\n", test_path, folder, new_name, name);
+
+	while((lock_fd = open(test_path, O_CREAT | O_EXCL, 0600)) < 0 &&
 			errno == EEXIST) {
 		number++;
 		g_free(test_path);
@@ -222,6 +224,71 @@ cleanup:
 	return test_path;
 }
 
+static gboolean add_reply_handle(struct obex_session *os, obex_object_t *obj, int handle) {
+	GString *handle_str = g_string_new("");
+	obex_headerdata_t handle_hdr;
+	unsigned int handle_hdr_len;
+	if (handle < 0 || handle >= HANDLE_LIMIT) {
+		g_string_free(handle_str, TRUE);
+		return FALSE;
+	}
+	g_string_append_printf(handle_str, "%07d", handle);
+	handle_hdr.bs = encode_img_handle(handle_str->str, handle_str->len, &handle_hdr_len);
+	g_string_free(handle_str, TRUE);
+	if (handle_hdr.bs == NULL)
+		return FALSE;
+	OBEX_ObjectAddHeader(os->obex, obj, IMG_HANDLE_HDR, handle_hdr, handle_hdr_len, OBEX_FL_FIT_ONE_PACKET);
+	return TRUE;
+}
+
+struct att_desc {
+	char *name;
+};
+
+static void att_element(GMarkupParseContext *ctxt,
+		const gchar *element,
+		const gchar **names,
+		const gchar **values,
+		gpointer user_data,
+		GError **gerr)
+{
+	struct att_desc *desc = user_data;
+	gchar **key;
+
+	printf("element: %s\n", element);
+	printf("names\n");
+
+	if (g_str_equal(element, "attachment") != TRUE)
+		return;
+
+	printf("names: %p\n", names);
+	for (key = (gchar **) names; *key; key++, values++) {
+		printf("key: %s\n", *key);
+		if (g_str_equal(*key, "name")) {
+			desc->name = g_strdup(*values);
+			printf("name: %s\n", desc->name);
+		}
+	}
+}
+
+static const GMarkupParser handles_desc_parser = {
+	att_element,
+	NULL,
+	NULL,
+	NULL,
+	NULL
+};
+
+static struct att_desc *parse_att_desc(char *data, unsigned int length)
+{
+	struct att_desc *desc = g_try_new0(struct att_desc, 1);
+	GMarkupParseContext *ctxt = g_markup_parse_context_new(&handles_desc_parser,
+			0, desc, NULL);
+	g_markup_parse_context_parse(ctxt, data, length, NULL);
+	g_markup_parse_context_free(ctxt);
+	return desc;
+}
+
 int image_push_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 {
 	struct image_push_session *ips = user_data;
@@ -231,46 +298,62 @@ int image_push_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 	parse_bip_user_headers(os, obj, &ips->desc_hdr, &ips->desc_hdr_len,
 				&ips->handle_hdr, &ips->handle_hdr_len);
 
-	if (g_strcmp0(os->type, "x-bt/img-img")) {
+	printf("os->type = %s\n", os->type);
+	if (g_strcmp0(os->type, "x-bt/img-img") == 0) {
 		char *new_path;
+		printf("wtf\n");
 		if ((new_path = safe_rename(os->name, bip_root, ips->file_path))
-				!= NULL) {
+				== NULL) {
+			printf("lol\n");
 			return -errno;
 		}
+		printf("newpath: %s\n", new_path);
 		img = g_try_new0(struct pushed_image, 1);
 		img->handle = get_new_handle(ips);
+		printf("handle: %d\n", img->handle);
 		if (img->handle < 0) {
 			g_free(img);
 			g_free(new_path);
+			printf("lol2\n");
 			return -EBADR;
 		}
 		img->image = new_path;
 		ips->pushed_images = g_slist_append(ips->pushed_images, img);
-
-
+		add_reply_handle(os, obj, img->handle);
 	}
-	else if(g_strcmp0(os->type, "x-bt/img-attachment")) {
+	else if(g_strcmp0(os->type, "x-bt/img-attachment") == 0) {
 		int handle = get_handle(ips->handle_hdr, ips->handle_hdr_len);
 		char *att_path, *new_path;
 		struct stat file_stat;
+		struct att_desc *desc;
+		printf("handle: %s\n", ips->handle_hdr);
+		printf("%d\n", handle);
 		if (handle < 0)
 			return -EBADR;
 
 		img = get_pushed_image(ips, handle);
+
+		printf("%p\n", img);
 
 		if (img == NULL)
 			return -EEXIST;
 
 		att_path = get_att_dir(img->image);
 
+		printf("att_path = %s\n", att_path);
+
 		if (lstat(att_path, &file_stat) < 0) {
-			if (mkdir(att_path, 0600) < 0)
+			if (mkdir(att_path, 0700) < 0)
 				return -errno;
 		}
 		else if (!S_ISDIR(file_stat.st_mode))
 			return -EBADR;
 
-		if ((new_path = safe_rename(os->name, att_path, ips->file_path)) == NULL) {
+		printf("name: %s\n", os->name);
+
+		desc = parse_att_desc(ips->desc_hdr, ips->desc_hdr_len);
+
+		if ((new_path = safe_rename(desc->name, att_path, ips->file_path)) == NULL) {
 			return -errno;
 		}
 	}

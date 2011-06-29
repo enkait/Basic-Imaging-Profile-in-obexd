@@ -74,6 +74,7 @@ static void *imgattpush_open(const char *name, int oflag, mode_t mode,
 		void *context, size_t *size, int *err)
 {
 	struct image_push_session *session = context;
+	printf("imgattpush_open\n");
 	
 	if (!name) {
 		if (err)
@@ -81,7 +82,7 @@ static void *imgattpush_open(const char *name, int oflag, mode_t mode,
 		return NULL;
 	}
 
-	session->fd = g_file_open_tmp(NULL, &session->file_path);
+	session->fd = g_file_open_tmp(NULL, &session->file_path, NULL);
 
 	if (session->fd < 0) {
 		if (err)
@@ -89,7 +90,6 @@ static void *imgattpush_open(const char *name, int oflag, mode_t mode,
 		return NULL;
 	}
 
-	printf("imgattpush_open\n");
 	return session;
 }
 
