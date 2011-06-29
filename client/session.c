@@ -44,11 +44,11 @@
 #include "log.h"
 #include "pbap.h"
 #include "sync.h"
-#include "bip_push.h"
-#include "bip_pull.h"
 #include "transfer.h"
 #include "session.h"
 #include "btio.h"
+#include "bip_push.h"
+#include "bip_pull.h"
 
 #define AGENT_INTERFACE  "org.openobex.Agent"
 

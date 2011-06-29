@@ -44,11 +44,25 @@ class Agent(dbus.service.Object):
     def Release(self):
         mainloop.quit()
 
+tasks = []
+
+def put_image_attachment_callback(option, opt, value, parser):
+        print value
+        tasks.append(("attachment", value.split(',')))
+
+def put_image_callback(option, opt, value, parser):
+        print value
+        tasks.append(("image", value.split(',')))
+
 def parse_options():
     parser.add_option("-d", "--device", dest="device",
                       help="Device to connect", metavar="DEVICE")
-    parser.add_option("-p", "--push", action="append", dest="image_file",
-                      help="Push image", metavar="FILE")
+    parser.add_option("-a", "--att", type="string", action="callback",
+                      callback=put_image_attachment_callback,
+                      help="Push image attachment")
+    parser.add_option("-p", "--push", type="string", action="callback",
+                      callback=put_image_callback,
+                      help="Push image")
     parser.add_option("-c", "--capabilities", action="store_true",
                       dest="capabilities",
                       help="Get imaging capabilities")
@@ -56,29 +70,47 @@ def parse_options():
 
     return parser.parse_args()
 
-L = []
 cur = 0
 bip = None
 
 def image_push(session, filename):
     session.PutImage(os.path.abspath(filename),"BMP",1000,200,"fill")
 
+def image_attachment_push(session, filename, handle):
+    session.PutImageAttachment(os.path.abspath(filename),handle)
+    print "Push Attachment finished"
+
 def imaging_capabilities(session):
     print "omg"
     print session.GetImagingCapabilities()
 
+def execute():
+    global tasks
+    if len(tasks) == 0:
+        return
+    entry = tasks[0]
+    tasks.pop(0)
+    if entry[0] == "image":
+        image_push(bip, entry[1][0])
+    if entry[0] == "attachment":
+        image_attachment_push(bip, entry[1][0], entry[1][1])
+
 def image_push_completed(handle, thumbnail):
-    global L, cur, bip
     print "Image pushed, received handle: "+handle
     print "Is thumbnail requested? "+str(thumbnail)
-    cur+=1
-    print cur
-    print L[cur]
-    print bip
-    image_push(bip, L[cur])
+    execute()
 
 def image_push_failed(reason):
     print "Image push failed, reason: "+reason
+    execute()
+
+def attachment_push_completed():
+    print "Attachment push completed"
+    execute()
+
+def attachment_push_failed(reason):
+    print "Attachment push failed, reason: "+reason
+    execute()
 
 if  __name__ == '__main__':
 
@@ -105,6 +137,14 @@ if  __name__ == '__main__':
     bus.add_signal_receiver(image_push_failed,
 	dbus_interface="org.openobex.ImagePush",
 	signal_name="PutImageFailed")
+    
+    bus.add_signal_receiver(attachment_push_completed,
+	dbus_interface="org.openobex.ImagePush",
+	signal_name="PutAttachmentCompleted")
+    
+    bus.add_signal_receiver(attachment_push_failed,
+	dbus_interface="org.openobex.ImagePush",
+	signal_name="PutAttachmentFailed")
 
     client = dbus.Interface(bus.get_object("org.openobex.client", "/"),
                             "org.openobex.Client")
@@ -120,9 +160,6 @@ if  __name__ == '__main__':
     bip = dbus.Interface(bus.get_object("org.openobex.client", session_path),
                  "org.openobex.ImagePush")
     
-    L = options.image_file
-    if options.image_file:
-       print options.image_file[0]
-       image_push(bip, options.image_file[0])
+    execute()
 
     mainloop.run()
