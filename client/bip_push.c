@@ -17,6 +17,7 @@
 #include "bip_util.h"
 #include "bip_push.h"
 #include "bip_pull.h"
+#include "bip_arch.h"
 
 #define EOL_CHARS "\n"
 
@@ -509,16 +510,47 @@ gboolean bip_register_interface(DBusConnection *connection, const char *path,
 	struct session_data * session = user_data;
 	printf("INTERFACE\n");
 	/** should be memcmp0 from obex.c */
-	if(memcmp(session->target, IMAGE_PUSH_UUID, session->target_len)==0) {
+	if (memcmp(session->target, IMAGE_PUSH_UUID,
+				session->target_len) == 0) {
 		printf("PUSH_INTERFACE\n");
-		return g_dbus_register_interface(connection, path, IMAGE_PUSH_INTERFACE,
-				image_push_methods, image_push_signals, NULL, user_data, destroy);
+		return g_dbus_register_interface(connection, path,
+							IMAGE_PUSH_INTERFACE,
+							image_push_methods,
+							image_push_signals,
+							NULL, user_data,
+							destroy);
 	}
-	else if(memcmp(session->target, IMAGE_PULL_UUID, session->target_len)==0) {
+	else if (memcmp(session->target, IMAGE_PULL_UUID,
+				session->target_len) == 0) {
 		printf("PULL_INTERFACE\n");
-		return g_dbus_register_interface(connection, path, IMAGE_PULL_INTERFACE,
-				image_pull_methods, image_pull_signals, NULL, user_data, destroy);
+		return g_dbus_register_interface(connection, path,
+							IMAGE_PULL_INTERFACE,
+							image_pull_methods,
+							image_pull_signals,
+							NULL, user_data,
+							destroy);
 	}
+	else if (memcmp(session->target, ARCHIVE_UUID,
+				session->target_len) == 0) {
+		printf("AUTOMATIC_ARCHIVE_INTERFACE\n");
+		return g_dbus_register_interface(connection, path,
+							ARCHIVE_INTERFACE,
+							archive_methods,
+							archive_signals,
+							NULL, user_data,
+							destroy);
+	}
+	else if (memcmp(session->target, ARCHIVED_OBJECTS_UUID,
+				session->target_len) == 0) {
+		printf("ARCHIVE_OBJECT_SERVICE_INTERFACE\n");
+		return g_dbus_register_interface(connection, path,
+							IMAGE_PULL_INTERFACE,
+							image_pull_methods,
+							image_pull_signals,
+							NULL, user_data,
+							destroy);
+	}
+
 	printf("FALSE\n");
 	return FALSE;
 }
@@ -527,10 +559,12 @@ void bip_unregister_interface(DBusConnection *connection, const char *path,
 		void *user_data)
 {
 	struct session_data * session = user_data;
-	if(memcmp(session->target, IMAGE_PUSH_UUID, session->target_len)==0) {
+	if (memcmp(session->target, IMAGE_PUSH_UUID, session->target_len) == 0)
 		g_dbus_unregister_interface(connection, path, IMAGE_PUSH_INTERFACE);
-	}
-	else if(memcmp(session->target, IMAGE_PULL_UUID, session->target_len)==0) {
+	else if (memcmp(session->target, IMAGE_PULL_UUID, session->target_len) == 0)
 		g_dbus_unregister_interface(connection, path, IMAGE_PULL_INTERFACE);
-	}
+	else if (memcmp(session->target, ARCHIVE_UUID, session->target_len) == 0)
+		g_dbus_unregister_interface(connection, path, ARCHIVE_INTERFACE);
+	else if (memcmp(session->target, ARCHIVED_OBJECTS_UUID, session->target_len) == 0)
+		g_dbus_unregister_interface(connection, path, IMAGE_PULL_INTERFACE);
 }

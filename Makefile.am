@@ -89,6 +89,9 @@ builtin_sources += plugins/irmc.c
 builtin_modules += image_push
 builtin_sources += plugins/image_push.c
 
+builtin_modules += image_arch
+builtin_sources += plugins/image_arch.c
+
 builtin_modules += image_pull
 builtin_sources += plugins/image_pull.c
 
@@ -152,7 +155,8 @@ client_obex_client_SOURCES = $(gdbus_sources) \
 				client/transfer.h client/transfer.c \
 				client/bip_pull.h client/bip_pull.c \
 				client/bip_push.h client/bip_push.c \
-				client/bip_util.h client/bip_util.c
+				client/bip_util.h client/bip_util.c \
+				client/bip_arch.h client/bip_arch.c
 
 client_obex_client_LDADD = @GLIB_LIBS@ @DBUS_LIBS@ @OPENOBEX_LIBS@ @BLUEZ_LIBS@ @MAGICKWAND_LIBS@
 endif

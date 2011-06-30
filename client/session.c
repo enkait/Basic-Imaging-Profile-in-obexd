@@ -590,6 +590,14 @@ struct session_data *session_create(const char *source,
 		sdp_uuid16_create(&session->uuid, IMAGING_RESPONDER_SVCLASS_ID);
 		session->target = IMAGE_PULL_UUID;
 		session->target_len = IMAGE_PULL_UUID_LEN;
+	} else if (!g_ascii_strncasecmp(service, "BIP:AA", 8)) {
+		sdp_uuid16_create(&session->uuid, IMAGING_RESPONDER_SVCLASS_ID);
+		session->target = ARCHIVE_UUID;
+		session->target_len = ARCHIVE_UUID_LEN;
+	} else if (!g_ascii_strncasecmp(service, "BIP:AOS", 8)) {
+		sdp_uuid16_create(&session->uuid, IMAGING_ARCHIVE_SVCLASS_ID);
+		session->target = ARCHIVED_OBJECTS_UUID;
+		session->target_len = ARCHIVED_OBJECTS_UUID_LEN;
 	} else if (!g_ascii_strncasecmp(service, "FTP", 3)) {
 		sdp_uuid16_create(&session->uuid, OBEX_FILETRANS_SVCLASS_ID);
 		session->target = OBEX_FTP_UUID;
@@ -1546,82 +1554,83 @@ int session_register(struct session_data *session)
 					ftp_methods, NULL, NULL, session, NULL);
 		break;
 	case IMAGING_RESPONDER_SVCLASS_ID:
-        result = bip_register_interface(session->conn,
-                    session->path, session, NULL);
-        break;
-    case PBAP_PSE_SVCLASS_ID:
-        result = pbap_register_interface(session->conn,
-                session->path, session, NULL);
-        break;
-    case IRMC_SYNC_SVCLASS_ID:
-        result = sync_register_interface(session->conn,
-                session->path, session, NULL);
-    }
+	case IMAGING_ARCHIVE_SVCLASS_ID:
+		result = bip_register_interface(session->conn, session->path,
+						session, NULL);
+		break;
+	case PBAP_PSE_SVCLASS_ID:
+		result = pbap_register_interface(session->conn,
+		session->path, session, NULL);
+		break;
+	case IRMC_SYNC_SVCLASS_ID:
+		result = sync_register_interface(session->conn,	session->path,
+							session, NULL);
+	}
 
-    if (result == FALSE) {
-        g_dbus_unregister_interface(session->conn,
-                session->path, SESSION_INTERFACE);
-        return -EIO;
-    }
+	if (result == FALSE) {
+		g_dbus_unregister_interface(session->conn,
+				session->path, SESSION_INTERFACE);
+		return -EIO;
+	}
 
-    DBG("Session(%p) registered %s", session, session->path);
+	DBG("Session(%p) registered %s", session, session->path);
 
-    return 0;
+	return 0;
 }
 
 void *session_get_data(struct session_data *session)
 {
-    return session->priv;
+	return session->priv;
 }
 
 void session_set_data(struct session_data *session, void *priv)
 {
-    session->priv = priv;
+	session->priv = priv;
 }
 
 static void session_prepare_put(struct session_data *session,
-        GError *err, void *data)
+		GError *err, void *data)
 {
-    struct transfer_data *transfer = data;
-    int ret;
+	struct transfer_data *transfer = data;
+	int ret;
 
-    ret = transfer_put(transfer, transfer_progress, session);
-    if (ret < 0) {
-        GError *gerr = NULL;
+	ret = transfer_put(transfer, transfer_progress, session);
+	if (ret < 0) {
+		GError *gerr = NULL;
 
-        g_set_error(&gerr, OBEX_IO_ERROR, ret, "%s (%d)",
-                strerror(-ret), -ret);
-        session_notify_error(session, transfer, gerr);
-        g_clear_error(&gerr);
-        return;
-    }
+		g_set_error(&gerr, OBEX_IO_ERROR, ret, "%s (%d)",
+				strerror(-ret), -ret);
+		session_notify_error(session, transfer, gerr);
+		g_clear_error(&gerr);
+		return;
+	}
 
-    DBG("Transfer(%p) started", transfer);
+	DBG("Transfer(%p) started", transfer);
 }
 
 int session_put(struct session_data *session, char *buf, const char *targetname)
 {
-    struct transfer_data *transfer;
-    int err;
+	struct transfer_data *transfer;
+	int err;
 
-    if (session->obex == NULL)
-        return -ENOTCONN;
+	if (session->obex == NULL)
+		return -ENOTCONN;
 
-    if (session->pending != NULL)
-        return -EISCONN;
+	if (session->pending != NULL)
+		return -EISCONN;
 
 	transfer = transfer_register(session, NULL, targetname, NULL, NULL, NULL);
 	if (transfer == NULL)
 		return -EIO;
 
-    transfer->size = strlen(buf);
-    transfer->buffer = buf;
+	transfer->size = strlen(buf);
+	transfer->buffer = buf;
 
-    err = session_request(session, session_prepare_put, transfer);
-    if (err < 0)
-        return err;
+	err = session_request(session, session_prepare_put, transfer);
+	if (err < 0)
+		return err;
 
-    return 0;
+	return 0;
 }
 
 int session_put_with_aheaders(struct session_data *session, const char *type,
@@ -1654,13 +1663,13 @@ int session_put_with_aheaders(struct session_data *session, const char *type,
 		const GSList *aheaders_src = aheaders;
 		while(aheaders_src) {
 			aheaders_copy = g_slist_append(aheaders_copy,
-				a_header_copy(aheaders_src->data));
+					a_header_copy(aheaders_src->data));
 			aheaders_src = g_slist_next(aheaders_src);
 		}
 	}
 
 	transfer = transfer_register(session, filename, targetname, type, params,
-                                                              aheaders_copy);
+			aheaders_copy);
 	if (transfer == NULL) {
 		if (aheaders_copy != NULL) {
 			while (aheaders_copy)
@@ -1694,50 +1703,50 @@ int session_put_with_aheaders(struct session_data *session, const char *type,
 }
 
 int session_set_agent(struct session_data *session, const char *name,
-        const char *path)
+		const char *path)
 {
-    struct agent_data *agent;
+	struct agent_data *agent;
 
-    if (session == NULL)
-        return -EINVAL;
+	if (session == NULL)
+		return -EINVAL;
 
-    if (session->agent)
-        return -EALREADY;
+	if (session->agent)
+		return -EALREADY;
 
-    agent = g_new0(struct agent_data, 1);
-    agent->name = g_strdup(name);
-    agent->path = g_strdup(path);
+	agent = g_new0(struct agent_data, 1);
+	agent->name = g_strdup(name);
+	agent->path = g_strdup(path);
 
-    if (session->watch == 0)
-        session_set_owner(session, name, owner_disconnected);
+	if (session->watch == 0)
+		session_set_owner(session, name, owner_disconnected);
 
-    agent->watch = g_dbus_add_disconnect_watch(session->conn, name,
-            agent_disconnected,
-            session, NULL);
+	agent->watch = g_dbus_add_disconnect_watch(session->conn, name,
+			agent_disconnected,
+			session, NULL);
 
-    session->agent = agent;
+	session->agent = agent;
 
-    return 0;
+	return 0;
 }
 
 const char *session_get_agent(struct session_data *session)
 {
-    struct agent_data *agent;
+	struct agent_data *agent;
 
-    if (session == NULL)
-        return NULL;
+	if (session == NULL)
+		return NULL;
 
-    agent = session->agent;
-    if (agent == NULL)
-        return NULL;
+	agent = session->agent;
+	if (agent == NULL)
+		return NULL;
 
-    return agent->name;
+	return agent->name;
 }
 
 const char *session_get_owner(struct session_data *session)
 {
-    if (session == NULL)
-        return NULL;
+	if (session == NULL)
+		return NULL;
 
-    return session->owner;
+	return session->owner;
 }
