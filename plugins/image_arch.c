@@ -96,9 +96,6 @@
   </attribute>								\
 </record>"
 
-#define SID_TAG 0x09
-#define SID_LEN 16
-
 static const uint8_t IMAGE_ARCH_TARGET[TARGET_SIZE] = {
 			0x94, 0x01, 0x26, 0xC0, 0x46, 0x08, 0x11, 0xD5,
 			0x84, 0x1A, 0x00, 0x02, 0xA5, 0x32, 0x5B, 0x4E };
@@ -131,8 +128,11 @@ static struct aa_aparam *parse_aparam(const uint8_t *buffer, uint32_t hlen)
 	struct aa_aparam *param = g_new0(struct aa_aparam, 1);
 	struct sa_aparam_header *hdr;
 	uint32_t len = 0;
+	int i;
+
 
 	while (len < hlen) {
+		printf("got %u %u of data\n", len, hlen);
 		hdr = (void *) buffer + len;
 
 		switch (hdr->tag) {
@@ -140,7 +140,7 @@ static struct aa_aparam *parse_aparam(const uint8_t *buffer, uint32_t hlen)
 			if (hdr->len != SID_LEN)
 				goto failed;
 			memcpy(param->serviceid, hdr->val,
-					sizeof(param->serviceid));
+					SID_LEN);
 			break;
 
 		default:
@@ -149,6 +149,9 @@ static struct aa_aparam *parse_aparam(const uint8_t *buffer, uint32_t hlen)
 
 		len += hdr->len + sizeof(struct sa_aparam_header);
 	}
+			for(i=0;i<16;i++) {
+				printf("%x\n", (char) param->serviceid[i]);
+			}
 
 	return param;
 
@@ -195,8 +198,9 @@ int image_arch_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 	if (g_strcmp0(os->type, "x-bt/img-archive") == 0) {
 		int i;
 		printf("start archive\n");
-		for (i = 0;i<16;i++)
-			printf("%x\n", (char) aparam->serviceid[i]);
+			for(i=0;i<16;i++) {
+				printf("%x\n", (char) aparam->serviceid[i]);
+			}
 	}
 	return 0;
 }
@@ -210,8 +214,8 @@ void image_arch_disconnect(struct obex_session *os, void *user_data)
 }
 
 static struct obex_service_driver image_arch = {
-	.name = "OBEXD Image Pull Server",
-	.service = OBEX_BIP_PULL,
+	.name = "OBEXD Automatic Archive Server",
+	.service = OBEX_BIP_ARCH,
 	.channel = IMAGE_ARCH_CHANNEL,
 	.record = IMAGE_ARCH_RECORD,
 	.target = IMAGE_ARCH_TARGET,
