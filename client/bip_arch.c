@@ -30,19 +30,12 @@ static DBusMessage *start_archive(DBusConnection *connection,
 {
 	struct session_data *session = user_data;
 	DBusMessage *reply;
-	char *handle;
 	struct sa_aparam *aparam;
 	GSList *aheaders;
 	int err;
 
 	printf("requested start archive\n");
 	
-	if (dbus_message_get_args(message, NULL,
-					DBUS_TYPE_STRING, &handle,
-					DBUS_TYPE_INVALID) == FALSE)
-		return g_dbus_create_error(message,
-				"org.openobex.Error.InvalidArguments", NULL);
-
 	aparam = create_sa_aparam(AOS_SID);
 
 	if (!gw_obex_put_buf_with_aheaders(session->obex, NULL,
