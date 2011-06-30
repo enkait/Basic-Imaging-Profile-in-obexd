@@ -21,8 +21,11 @@
  *
  */
 
+#define SID_TAG 0x09
+#define SID_LEN 16
+
 struct aa_aparam {
-    uint8_t *serviceid;
+    uint8_t serviceid[SID_LEN];
 };
 
 struct archive_session {
