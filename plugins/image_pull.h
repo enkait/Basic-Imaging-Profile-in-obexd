@@ -29,36 +29,15 @@ struct img_listing {
 	struct image_attributes *attr;
 };
 
-struct pull_aparam_field {
-    uint16_t nbreturnedhandles;
-    uint16_t liststartoffset;
-    uint8_t latestcapturedimages;
-};
-
-struct image_handles_desc {
-    time_t ctime[2];
-    gboolean ctime_bounded[2];
-    time_t mtime[2];
-    gboolean mtime_bounded[2];
-    char *encoding;
-    unsigned int lower[2], upper[2];
-    gboolean fixed_ratio;
-};
-
-struct pull_aparam_header {
-	uint8_t tag;
-	uint8_t len;
-	uint8_t val[0];
-} __attribute__ ((packed));
-
 struct image_pull_session {
     struct obex_session *os;
-    struct pull_aparam_field *aparam;
+    uint8_t *aparam_data;
+    unsigned int aparam_data_len;
     char *handle_hdr;
     unsigned int handle_hdr_len;
     char *desc_hdr;
     unsigned int desc_hdr_len;
-    GSList * image_list;
+    GSList *image_list;
 };
 
 void *image_pull_connect(struct obex_session *os, int *err);
@@ -70,4 +49,4 @@ void image_pull_disconnect(struct obex_session *os, void *user_data);
 
 struct image_handles_desc *new_hdesc();
 void img_listing_free(struct img_listing *listing);
-struct img_listing *get_listing(struct image_pull_session *session, int handle);
+struct img_listing *get_listing(struct image_pull_session *session, int handle, int *err);

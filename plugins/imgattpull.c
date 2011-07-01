@@ -124,8 +124,8 @@ static void *imgattpull_open(const char *name, int oflag, mode_t mode,
 
 	printf("handle = %d\n", handle);
 
-	if ((il = get_listing(session, handle)) == NULL)
-		goto enoent;
+	if ((il = get_listing(session, handle, err)) == NULL)
+		return NULL;
 
 	if ((att_path = verify_attachment(il->image, name)) == NULL)
 		goto enoent;

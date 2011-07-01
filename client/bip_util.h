@@ -5,7 +5,7 @@
 #define THUMBNAIL_HEIGHT 120
 
 struct image_attributes {
-    char * format;
+    char *encoding;
     size_t width, height;
     unsigned long length;
 };
@@ -21,9 +21,9 @@ char *decode_img_handle(const uint8_t *data, unsigned int length, unsigned int *
 uint8_t *encode_img_descriptor(const char *data, unsigned int length, unsigned int *newsize);
 char *decode_img_descriptor(const uint8_t *data, unsigned int length, unsigned int *newsize);
 
-const gchar *convert_encoding_BIP_to_IM(const gchar *encoding);
-const gchar *convert_encoding_IM_to_BIP(const gchar *encoding);
-int get_image_attributes(const char * image_file, struct image_attributes * attr);
+const gchar *convBIP2IM(const gchar *encoding);
+const gchar *convIM2BIP(const gchar *encoding);
+int get_image_attributes(const char * image_file, struct image_attributes * attr, int *err);
 void free_image_attributes(struct image_attributes *attr);
 
 /** Convert a time string in ISO8601 format to time_t

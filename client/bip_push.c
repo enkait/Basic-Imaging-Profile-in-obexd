@@ -175,12 +175,12 @@ static void create_image_descriptor(const struct image_attributes *attr, const c
 	if (transform) {
 		g_string_append_printf(descriptor,
 				IMG_DESC_WITH_TRANSFORM_FORMAT,
-				attr->format, attr->width, attr->height, attr->length, transform);
+				attr->encoding, attr->width, attr->height, attr->length, transform);
 	}
 	else {
 		g_string_append_printf(descriptor,
 				IMG_DESC_FORMAT,
-				attr->format, attr->width, attr->height, attr->length);
+				attr->encoding, attr->width, attr->height, attr->length);
 	}
 	descriptor = g_string_append(descriptor, IMG_DESC_END);
 	ah->hi = IMG_DESC_HDR;
@@ -225,8 +225,8 @@ static DBusMessage *put_transformed_image(DBusMessage *message, struct session_d
 	struct a_header *descriptor = g_try_new(struct a_header, 1);
 	GSList * aheaders = NULL;
 
-	attr.format = NULL;
-	if (get_image_attributes(local_image, &attr) < 0) {
+	attr.encoding = NULL;
+	if (get_image_attributes(local_image, &attr, &err) < 0) {
 		free_image_attributes(&attr);
 		return g_dbus_create_error(message,
 				"org.openobex.Error.InvalidArguments", NULL);
@@ -255,7 +255,7 @@ static DBusMessage *put_modified_image(DBusConnection *connection,
 		DBusMessage *message, void *user_data)
 {
 	struct session_data *session = user_data;
-	const char *image_path, *format, *transform;
+	const char *image_path, *encoding, *transform;
 	int fd;
 	struct image_attributes attr;
 	GString *new_image_path;
@@ -263,14 +263,14 @@ static DBusMessage *put_modified_image(DBusConnection *connection,
 
 	if (dbus_message_get_args(message, NULL,
 				DBUS_TYPE_STRING, &image_path,
-				DBUS_TYPE_STRING, &format,
+				DBUS_TYPE_STRING, &encoding,
 				DBUS_TYPE_UINT32, &attr.width,
 				DBUS_TYPE_UINT32, &attr.height,
 				DBUS_TYPE_STRING, &transform,
 				DBUS_TYPE_INVALID) == FALSE)
 		return g_dbus_create_error(message,
 				"org.openobex.Error.InvalidArguments", NULL);
-	attr.format = g_strdup(format);
+	attr.encoding = g_strdup(encoding);
 
 	if (!image_path || strlen(image_path)==0) {
 		return g_dbus_create_error(message,"org.openobex.Error.InvalidArguments", NULL);
