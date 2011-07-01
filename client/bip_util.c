@@ -26,6 +26,9 @@
 #include "bip_util.h"
 #include "wand/MagickWand.h"
 
+#define HANDLE_LEN 7
+#define HANDLE_MAX 10000000
+
 const char *att_suf = "_att";
 
 uint8_t *encode_img_handle(const char *data, unsigned int length, unsigned int *newsize) {
@@ -95,7 +98,7 @@ struct encconv_pair encconv_table[] = {
 	{ }
 };
 
-const gchar *convert_encoding_BIP_to_IM(const gchar *encoding) {
+const gchar *convBIP2IM(const gchar *encoding) {
 	struct encconv_pair *et = encconv_table;
 	while (et->bip) {
 		if (g_strcmp0(encoding, et->bip) == 0) {
@@ -106,7 +109,7 @@ const gchar *convert_encoding_BIP_to_IM(const gchar *encoding) {
 	return NULL;
 }
 
-const gchar *convert_encoding_IM_to_BIP(const gchar *encoding) {
+const gchar *convIM2BIP(const gchar *encoding) {
 	struct encconv_pair *et = encconv_table;
 	while (et->im) {
 		if (g_strcmp0(encoding, et->im) == 0) {
@@ -117,28 +120,36 @@ const gchar *convert_encoding_IM_to_BIP(const gchar *encoding) {
 	return NULL;
 }
 
-int get_image_attributes(const char *image_file, struct image_attributes *attr) {
-	int err;
+gboolean get_image_attributes(const char *image_file, struct image_attributes *attr,
+								int *err)
+{
 	MagickWand *wand;
 	MagickSizeType size;
+	char *encoding;
 	MagickWandGenesis();
 	wand = NewMagickWand();
 	printf("pinging path: %s\n", image_file);
-	err = MagickPingImage(wand, image_file);
-	if (err == MagickFalse) {
-		return -1;
+	if (!MagickPingImage(wand, image_file)) {
+		if (err)
+			*err = -ENOENT;
+		return FALSE;
 	}
-	attr->format = g_strdup(convert_encoding_IM_to_BIP(MagickGetImageFormat(wand)));
+	encoding = MagickGetImageFormat(wand);
+	attr->encoding = g_strdup(convIM2BIP(encoding));
 	attr->width = MagickGetImageWidth(wand);
 	attr->height = MagickGetImageHeight(wand);
 	MagickGetImageLength(wand, &size);
 	attr->length = (unsigned long) size;
 	MagickWandTerminus();
-	return 0;
+
+	if (err)
+		*err = 0;
+	return TRUE;
 }
 
 void free_image_attributes(struct image_attributes *attr) {
-	g_free(attr->format);
+	g_free(attr->encoding);
+	g_free(attr);
 }
 
 time_t parse_iso8601_bip(const gchar *str, int len) {
@@ -258,7 +269,7 @@ int make_modified_image(const char *image_path, const char *modified_path,
 	else {
 		return -1;
 	}
-	if (MagickSetImageFormat(wand, attr->format) == MagickFalse) {
+	if (MagickSetImageFormat(wand, attr->encoding) == MagickFalse) {
 		return -1;
 	}
 	if (MagickWriteImage(wand, modified_path) == MagickFalse) {
@@ -317,8 +328,12 @@ int get_handle(char *data, unsigned int length)
 	int handle, ret;
 	if (data == NULL)
 		return -1;
+	if (length != HANDLE_LEN)
+		return -1;
 	ret = sscanf(data, "%d", &handle);
 	if (ret < 1)
+		return -1;
+	if (handle < 0 || handle >= HANDLE_MAX)
 		return -1;
 	return handle;
 }
@@ -331,10 +346,15 @@ void parse_bip_user_headers(const struct obex_session *os,
 	unsigned int hlen;
 	uint8_t hi;
 	
-	g_free(*desc_hdr);
-	*desc_hdr_len = 0;
-	g_free(*handle_hdr);
-	*handle_hdr_len = 0;
+	if (desc_hdr != NULL && desc_hdr_len != NULL) {
+		g_free(*desc_hdr);
+		*desc_hdr_len = 0;
+	}
+	
+	if (handle_hdr != NULL && handle_hdr_len != NULL) {
+		g_free(*handle_hdr);
+		*handle_hdr_len = 0;
+	}
 
 	while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen));
 	OBEX_ObjectReParseHeaders(os->obex, obj);
@@ -342,21 +362,19 @@ void parse_bip_user_headers(const struct obex_session *os,
 	while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen)) {
 		printf("header: %d %d %d\n", hi, IMG_DESC_HDR, IMG_HANDLE_HDR);
 		switch (hi) {
-			case IMG_DESC_HDR:
-				if (desc_hdr == NULL || desc_hdr_len == NULL)
-					continue;
-				*desc_hdr = decode_img_descriptor(hd.bs,
-						hlen,
-						desc_hdr_len);
-				break;
-			case IMG_HANDLE_HDR:
-				printf("handle header\n");
-				if (handle_hdr == NULL || handle_hdr_len == NULL)
-					continue;
-				*handle_hdr = decode_img_handle(hd.bs,
-						hlen,
-						handle_hdr_len);
-				break;
+		case IMG_DESC_HDR:
+			if (desc_hdr == NULL || desc_hdr_len == NULL)
+				continue;
+			*desc_hdr = decode_img_descriptor(hd.bs, hlen,
+								desc_hdr_len);
+			break;
+		case IMG_HANDLE_HDR:
+			printf("handle header\n");
+			if (handle_hdr == NULL || handle_hdr_len == NULL)
+				continue;
+			*handle_hdr = decode_img_handle(hd.bs, hlen,
+							handle_hdr_len);
+			break;
 		}
 	}
 	OBEX_ObjectReParseHeaders(os->obex, obj);

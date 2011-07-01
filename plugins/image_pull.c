@@ -96,59 +96,69 @@
   </attribute>								\
 </record>"
 
-#define NBRETURNEDHANDLES_TAG 0x01
-#define NBRETURNEDHANDLES_LEN 0x02
-#define LISTSTARTOFFSET_TAG 0x02
-#define LISTSTARTOFFSET_LEN 0x02
-#define LATESTCAPTUREDIMAGES_TAG 0x03
-#define LATESTCAPTUREDIMAGES_LEN 0x01
-
-#define GETALLIMAGES 65535
-
 static const uint8_t IMAGE_PULL_TARGET[TARGET_SIZE] = {
 			0x8E, 0xE9, 0xB3, 0xD0, 0x46, 0x08, 0x11, 0xD5,
 			0x84, 0x1A, 0x00, 0x02, 0xA5, 0x32, 0x5B, 0x4E };
 
 static const char * bip_dir="/tmp/bip/";
 
-static void free_image_pull_session(struct image_pull_session *session) {
-}
-
 void img_listing_free(struct img_listing *listing)
 {
 	g_free(listing->image);
+	free_image_attributes(listing->attr);
 	g_free(listing);
 }
 
-/*
-static gint ctime_compare(gconstpointer a, gconstpointer b)
+static void free_image_pull_session(struct image_pull_session *session)
 {
-	const struct img_listing *ail = a, *bil = b;
-	if(ail->ctime < bil->ctime) return -1;
-	else if(ail->ctime > bil->ctime) return 1;
-	return g_strcmp0(ail->image, bil->image);
+	GSList *image_list = session->image_list;
+	while (image_list != NULL) {
+		img_listing_free(image_list->data);
+		image_list = g_slist_next(image_list);
+	}
+	g_slist_free(session->image_list);
+	g_free(session->aparam_data);
+	g_free(session->handle_hdr);
+	g_free(session->desc_hdr);
+	g_free(session);
 }
-*/
 
-struct img_listing *get_listing(struct image_pull_session *session, int handle) {
+struct img_listing *get_listing(struct image_pull_session *session, int handle, int *err)
+{
 	GSList *images = session->image_list;
+
+	if (err != NULL)
+		*err = 0;
+
 	while (images != NULL) {
 		struct img_listing *il = images->data;
 		if (il->handle == handle)
 			return il;
 		images = g_slist_next(images);
 	}
+	
+	if (err != NULL)
+		*err = -ENOENT;
 	return NULL;
 }
 
-static gboolean remove_image(struct image_pull_session *session, struct img_listing *il) {
-	if (il == NULL)
+static gboolean remove_image(struct image_pull_session *session, struct img_listing *il, int *err) {
+	if (il == NULL) {
+		if (err != NULL)
+			*err = -ENOENT;
 		return FALSE;
+	}
 
-	if (unlink(il->image) < 0)
+	if (unlink(il->image) < 0) {
+		if (err != NULL)
+			*err = -errno;
 		return FALSE;
+	}
 
 	session->image_list = g_slist_remove(session->image_list, il);
+
+	if (err != NULL)
+		*err = 0;
 	return TRUE;
 }
 
@@ -160,35 +170,37 @@ static GSList *get_image_list(int *err) {
 	int handle = 0;
 	DIR *img_dir = opendir(bip_dir);
 
-	if (!img_dir) {
-		if (err)
+	if (img_dir != NULL) {
+		if (err != NULL)
 			*err = -errno;
 		return NULL;
 	}
 
 	while ((file = readdir(img_dir)) != NULL) {
-		GString *str = g_string_new(bip_dir);
+		char *path = g_build_filename(bip_dir, file->d_name, NULL);
 		struct image_attributes *attr;
-		//fix filename creation with g_build_path
-		str = g_string_append(str, file->d_name);
-		lstat(str->str, &file_stat);
+		
+		if (lstat(path, &file_stat) < 0) {
+			g_free(path);
+			continue;
+		}
 
 		if (!(file_stat.st_mode & S_IFREG)) {
-			g_string_free(str, TRUE);
+			g_free(path);
 			continue;
 		}
 
-		attr = g_try_new0(struct image_attributes, 1);
-		if (get_image_attributes(str->str, attr) < 0) {
+		attr = g_new0(struct image_attributes, 1);
+		if (get_image_attributes(path, attr, err) < 0) {
 			g_free(attr);
-			g_string_free(str, TRUE);
+			g_free(path);
 			continue;
 		}
 
-		printf("passed verification: %s\n", str->str);
+		printf("passed verification: %s\n", path);
 
-		il = g_try_new0(struct img_listing, 1);
-		il->image = g_string_free(str, FALSE);
+		il = g_new0(struct img_listing, 1);
+		il->image = path;
 		il->mtime = file_stat.st_mtime;
 		il->ctime = file_stat.st_ctime;
 		il->handle = handle++;
@@ -196,94 +208,57 @@ static GSList *get_image_list(int *err) {
 		images = g_slist_append(images, il);
 
 		printf("image added: %s\n", il->image);
-		g_assert(il->image != NULL);
 	}
-	//images = g_slist_sort(images, ctime_compare);
+
+	closedir(img_dir);
+	if (err != NULL)
+		*err = 0;
 	return images;
 }
 
 void *image_pull_connect(struct obex_session *os, int *err) {
-	struct image_pull_session *ips;
+	struct image_pull_session *session;
 	printf("IMAGE PULL CONNECT\n");
 	manager_register_session(os);
 
-	ips = g_new0(struct image_pull_session, 1);
-	ips->os = os;
-	ips->image_list = get_image_list(err);
-	if (ips->image_list == NULL)
+	session = g_new0(struct image_pull_session, 1);
+	session->os = os;
+	session->image_list = get_image_list(err);
+
+	if (session->image_list == NULL)
 		return NULL;
 
-	if (err)
+	if (err != NULL)
 		*err = 0;
 
-	return ips;
-}
-
-static struct pull_aparam_field *parse_aparam(const uint8_t *buffer, uint32_t hlen)
-{
-	struct pull_aparam_field *param;
-	struct pull_aparam_header *hdr;
-	uint32_t len = 0;
-	uint16_t val16;
-
-	param = g_new0(struct pull_aparam_field, 1);
-
-	while (len < hlen) {
-		hdr = (void *) buffer + len;
-
-		switch (hdr->tag) {
-			case NBRETURNEDHANDLES_TAG:
-				if (hdr->len != NBRETURNEDHANDLES_LEN)
-					goto failed;
-
-				memcpy(&val16, hdr->val, sizeof(val16));
-				param->nbreturnedhandles = GUINT16_FROM_BE(val16);
-				break;
-
-			case LISTSTARTOFFSET_TAG:
-				if (hdr->len != LISTSTARTOFFSET_LEN)
-					goto failed;
-
-				memcpy(&val16, hdr->val, sizeof(val16));
-				param->liststartoffset = GUINT16_FROM_BE(val16);
-				break;
-			case LATESTCAPTUREDIMAGES_TAG:
-				if (hdr->len != LATESTCAPTUREDIMAGES_LEN)
-					goto failed;
-
-				param->latestcapturedimages = hdr->val[0];
-				break;
-			default:
-				goto failed;
-		}
-
-		len += hdr->len + sizeof(struct pull_aparam_header);
-	}
-
-	DBG("nb %x ls %x lc %x",
-			param->nbreturnedhandles, param->liststartoffset, param->latestcapturedimages);
-
-	return param;
-
-failed:
-	g_free(param);
-
-	return NULL;
+	return session;
 }
 
 int image_pull_get(struct obex_session *os, obex_object_t *obj,
 		gboolean *stream, void *user_data) {
-	struct image_pull_session *ips = user_data;
+	struct image_pull_session *session = user_data;
 	const uint8_t *buffer;
 	int ret;
 	ssize_t rsize = obex_aparam_read(os, obj, &buffer);
 
 	printf("IMAGE PULL GET\n");
-	ips->aparam = parse_aparam(buffer, rsize);
-	parse_bip_user_headers(os, obj, &ips->desc_hdr, &ips->desc_hdr_len,
-				&ips->handle_hdr, &ips->handle_hdr_len);
+
+	g_free(session->aparam_data);
+	session->aparam_data = NULL;
+	session->aparam_data_len = 0;
+
+	if (rsize >= 0) {
+		session->aparam_data = g_memdup(buffer, rsize);
+		session->aparam_data_len = rsize;
+	}
+
+	parse_bip_user_headers(os, obj,	&session->desc_hdr,
+					&session->desc_hdr_len,
+					&session->handle_hdr,
+					&session->handle_hdr_len);
 
 	ret = obex_get_stream_start(os, os->name);
+
 	if (ret < 0)
 		return ret;
 	return 0;
@@ -298,39 +273,41 @@ int image_pull_chkput(struct obex_session *os, void *user_data) {
 	return -EBADR;
 }
 
-int image_pull_put(struct obex_session *os, obex_object_t *obj, void *user_data) {
+int image_pull_put(struct obex_session *os, obex_object_t *obj,
+							void *user_data)
+{
 	struct image_pull_session *session = user_data;
 	struct img_listing *il;
-	int handle;
+	int handle, err;
 	printf("IMAGE PULL PUT\n");
 
 	if (obex_get_size(os) != OBJECT_SIZE_DELETE)
 		return -EBADR;
 
-	parse_bip_user_headers(os, obj, &session->desc_hdr, &session->desc_hdr_len,
-				&session->handle_hdr, &session->handle_hdr_len);
+	parse_bip_user_headers(os, obj, &session->desc_hdr,
+					&session->desc_hdr_len,
+					&session->handle_hdr,
+					&session->handle_hdr_len);
 	
 	handle = get_handle(session->handle_hdr, session->handle_hdr_len);
 
 	if (handle < 0)
-		return -ENOENT;
+		return -EBADR;
 
-	il = get_listing(session, handle);
-
-	if (il == NULL)
-		return -ENOENT;
-
-	if (!remove_image(session, il))
-		return -errno;
+	if ((il = get_listing(session, handle, &err)) == NULL)
+		return err;
+	
+	if (!remove_image(session, il, &err))
+		return err;
 	
 	return 0;
 }
 
 void image_pull_disconnect(struct obex_session *os, void *user_data)
 {
-	struct image_pull_session *ips = user_data;
+	struct image_pull_session *session = user_data;
 	printf("IMAGE PULL DISCONNECT\n");
-	free_image_pull_session(ips);
+	free_image_pull_session(session);
 	manager_unregister_session(os);
 }
 

@@ -157,7 +157,7 @@ static int get_image_fd(char *image_path, struct image_desc *desc) {
 
 	printf("fd = %d\n", fd);
 	
-	attr.format = desc->encoding;
+	attr.encoding = desc->encoding;
 	attr.width = desc->upper[0];
 	attr.height = desc->upper[1];
 	if (make_modified_image(image_path, new_image_path->str, &attr,

@@ -118,7 +118,7 @@ static GString *create_image_properties(struct image_pull_session *session, stru
 	g_string_append_printf(object, IMG_PROPERTIES_BEGIN, il->handle, image_name);
 	g_free(image_name);
 
-	g_string_append_printf(object, NATIVE_ELEMENT, il->attr->format,
+	g_string_append_printf(object, NATIVE_ELEMENT, il->attr->encoding,
 				il->attr->width, il->attr->height,
 				il->attr->length);
 
@@ -157,13 +157,8 @@ static void *imgpropull_open(const char *name, int oflag, mode_t mode,
 		return NULL;
 	}
 	
-	il = get_listing(session, handle);
-
-	if (il == NULL) {
-		if (err)
-			*err = -ENOENT;
+	if ((il = get_listing(session, handle, err)) == NULL)
 		return NULL;
-	}
 
 	object = create_image_properties(session, il);
 	return object;

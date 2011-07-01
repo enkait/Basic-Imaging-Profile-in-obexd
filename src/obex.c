@@ -658,11 +658,9 @@ static int obex_write_stream(struct obex_session *os,
 		flags = len ? OBEX_FL_STREAM_DATA : OBEX_FL_STREAM_DATAEND;
 		break;
 	case OBEX_HDR_APPARAM:
+	default:
 		flags =  0;
 		break;
-	default:
-		error("read(): unkown header type %u", hi);
-		return -EIO;
 	}
 
 	OBEX_ObjectAddHeader(obex, obj, hi, hd, len, flags);
