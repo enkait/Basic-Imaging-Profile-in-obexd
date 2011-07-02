@@ -184,7 +184,7 @@ static char *filter_name(const char *name) {
 
 static char *append_number(const char *path, unsigned int number) {
 	GString *new_path;
-	if (number > 1000000)
+	if (number > 10000000)
 		return NULL;
 	new_path = g_string_new(path);
 	g_string_append_printf(new_path, "_%u", number);

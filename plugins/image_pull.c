@@ -281,7 +281,8 @@ int image_pull_put(struct obex_session *os, obex_object_t *obj,
 	int handle, err;
 	printf("IMAGE PULL PUT\n");
 
-	if (obex_get_size(os) != OBJECT_SIZE_DELETE)
+	if (obex_get_size(os) != OBJECT_SIZE_DELETE ||
+					!g_str_equal(os->type, "x-bt/img-img"))
 		return -EBADR;
 
 	parse_bip_user_headers(os, obj, &session->desc_hdr,

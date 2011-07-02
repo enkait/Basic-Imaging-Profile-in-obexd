@@ -83,39 +83,40 @@ static GString *append_attachments(GString *object, char *image_path) {
 		goto done;
 
 	while ((file = readdir(att_dir)) != NULL) {
-		char *path = g_build_filename(att_dir_path, file->d_name, NULL);
+		char *path = g_build_filename(att_dir_path, file->d_name,
+									NULL);
 		printf("path: %s\n", path);
-		lstat(path, &file_stat);
-		
-		printf("%d\n", file_stat.st_mode);
-
-		if (!S_ISREG(file_stat.st_mode)) {
+		if (!lstat(path, &file_stat) || !S_ISREG(file_stat.st_mode)) {
 			printf("nie baldzo: %s\n", path);
 			g_free(path);
 			continue;
 		}
 		
-		strftime(mtime, 17, "%Y%m%dT%H%M%SZ", gmtime(&file_stat.st_mtime));
-		strftime(ctime, 17, "%Y%m%dT%H%M%SZ", gmtime(&file_stat.st_ctime));
+		strftime(mtime, 17, "%Y%m%dT%H%M%SZ",
+						gmtime(&file_stat.st_mtime));
+		strftime(ctime, 17, "%Y%m%dT%H%M%SZ",
+						gmtime(&file_stat.st_ctime));
 		g_string_append_printf(object, ATTACHMENT_ELEMENT,
 					file->d_name, file_stat.st_size,
 					ctime, mtime);
-
 		g_free(path);
 	}
 	printf("attachment not found\n");
+	closedir(att_dir);
 
 done:
 	g_free(att_dir_path);
 	return object;
 }
 
-static GString *create_image_properties(struct image_pull_session *session, struct img_listing *il) {
+static GString *create_image_properties(struct image_pull_session *session,
+						struct img_listing *il) {
 	struct encconv_pair * ep = encconv_table;
 	char *image_name = g_path_get_basename(il->image);
-	
+
 	GString *object = g_string_new("");
-	g_string_append_printf(object, IMG_PROPERTIES_BEGIN, il->handle, image_name);
+	g_string_append_printf(object, IMG_PROPERTIES_BEGIN, il->handle,
+								image_name);
 	g_free(image_name);
 
 	g_string_append_printf(object, NATIVE_ELEMENT, il->attr->encoding,
@@ -123,8 +124,7 @@ static GString *create_image_properties(struct image_pull_session *session, stru
 				il->attr->length);
 
 	while (ep->bip != NULL) {
-		g_string_append_printf(object, VARIANT_ELEMENT,
-					ep->bip);
+		g_string_append_printf(object, VARIANT_ELEMENT,	ep->bip);
 		ep++;
 	}
 
@@ -135,7 +135,7 @@ static GString *create_image_properties(struct image_pull_session *session, stru
 }
 
 static void *imgpropull_open(const char *name, int oflag, mode_t mode,
-		void *context, size_t *size, int *err)
+					void *context, size_t *size, int *err)
 {
 	struct image_pull_session *session = context;
 	int handle;
@@ -144,15 +144,13 @@ static void *imgpropull_open(const char *name, int oflag, mode_t mode,
 	
 	printf("imgpropull_open\n");
 
-	if (err)
+	if (err != NULL)
 		*err = 0;
 
 	handle = get_handle(session->handle_hdr, session->handle_hdr_len);
 
-	printf("handle: %d\n", handle);
-
 	if (handle < 0) {
-		if (err)
+		if (err != NULL)
 			*err = -EINVAL;
 		return NULL;
 	}
@@ -165,7 +163,7 @@ static void *imgpropull_open(const char *name, int oflag, mode_t mode,
 }
 
 static ssize_t imgpropull_read(void *object, void *buf, size_t count,
-		uint8_t *hi)
+								uint8_t *hi)
 {
 	*hi = OBEX_HDR_BODY;
 	printf("imgpropull_read\n");

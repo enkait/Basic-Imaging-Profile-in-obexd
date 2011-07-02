@@ -58,12 +58,6 @@
 
 #define EOL_CHARS "\n"
 
-#define IMG_LISTING_BEGIN "<images-listing version=\"1.0\">" EOL_CHARS
-
-#define IMG_LISTING_ELEMENT "<image handle=\"%s\" created=\"%s\" modified=\"%s\">" EOL_CHARS
-
-#define IMG_LISTING_END "</images-listing>" EOL_CHARS
-
 static const uint8_t IMAGE_PULL_TARGET[TARGET_SIZE] = {
 	0x8E, 0xE9, 0xB3, 0xD0, 0x46, 0x08, 0x11, 0xD5,
 	0x84, 0x1A, 0x00, 0x02, 0xA5, 0x32, 0x5B, 0x4E };
@@ -76,8 +70,8 @@ struct image_desc {
 	char *transform;
 };
 
-static struct image_desc *new_image_desc() {
-	struct image_desc *desc = g_try_new0(struct image_desc, 1);
+static struct image_desc *create_image_desc() {
+	struct image_desc *desc = g_new0(struct image_desc, 1);
 	desc->upper[0] = desc->upper[1] = -1;
 	desc->maxsize = -1;
 	return desc;
@@ -87,6 +81,47 @@ static void free_image_desc(struct image_desc *desc) {
 	g_free(desc->encoding);
 	g_free(desc->transform);
 	g_free(desc);
+}
+
+static gboolean parse_attr(struct image_desc *desc, const gchar *key,
+					const gchar *value, GError **gerr)
+{
+	printf("key: %s\n", key);
+	if (g_str_equal(key, "maxsize")) {
+		if (sscanf(value, "%u", &desc->maxsize) < 1)
+			goto invalid;
+		printf("maxsize: %u\n", desc->maxsize);
+	}
+	else if (g_str_equal(key, "encoding")) {
+		desc->encoding = g_strdup(convBIP2IM(value));
+		if (desc->encoding == NULL)
+			goto invalid;
+		printf("encoding: %s\n", desc->encoding);
+	}
+	else if (g_str_equal(key, "transformation")) {
+		if (!verify_transform(value))
+			goto invalid;
+		desc->transform = g_strdup(value);
+		printf("transform: %s\n", desc->transform);
+	}
+	else if (g_str_equal(key, "pixel")) {
+		if (!parse_pixel_range(value, desc->lower, desc->upper,
+							&desc->fixed_ratio))
+			goto invalid;
+		printf("pixel: %u %u %u %u %d\n", desc->lower[0],
+				desc->lower[1], desc->upper[0], desc->upper[1],
+							desc->fixed_ratio);
+	}
+	else {
+		g_set_error(gerr, G_MARKUP_ERROR,
+				G_MARKUP_ERROR_UNKNOWN_ATTRIBUTE, NULL);
+		return FALSE;
+	}
+	return TRUE;
+invalid:
+	g_set_error(gerr, G_MARKUP_ERROR, G_MARKUP_ERROR_INVALID_CONTENT,
+									NULL);
+	return FALSE;
 }
 
 static void image_element(GMarkupParseContext *ctxt,
@@ -106,25 +141,9 @@ static void image_element(GMarkupParseContext *ctxt,
 		return;
 
 	printf("names: %p\n", names);
-	for (key = (gchar **) names; *key; key++, values++) {
-		printf("key: %s\n", *key);
-		if (g_str_equal(*key, "maxsize")) {
-			sscanf(*values, "%u", &desc->maxsize);
-			printf("maxsize: %u\n", desc->maxsize);
-		}
-		else if (g_str_equal(*key, "encoding")) {
-			desc->encoding = g_strdup(*values);
-			printf("encoding: %s\n", desc->encoding);
-		}
-		else if (g_str_equal(*key, "transformation")) {
-			desc->transform = g_strdup(*values);
-			printf("transform: %s\n", desc->transform);
-		}
-		else if (g_str_equal(*key, "pixel")) {
-			parse_pixel_range(*values, desc->lower, desc->upper, &desc->fixed_ratio);
-			printf("pixel: %u %u %u %u %d\n", desc->lower[0], desc->lower[1], desc->upper[0], desc->upper[1], desc->fixed_ratio);
-		}
-	}
+	for (key = (gchar **) names; *key; key++, values++)
+		if (!parse_attr(desc, *key, *values, gerr))
+			return;
 }
 
 
@@ -136,36 +155,62 @@ static const GMarkupParser image_desc_parser = {
 	NULL
 };
 
-static struct image_desc *parse_image_desc(char *data, unsigned int length)
+static struct image_desc *parse_image_desc(char *data, unsigned int length,
+								int *err)
 {
-	struct image_desc *desc = new_image_desc();
-	GMarkupParseContext *ctxt = g_markup_parse_context_new(&image_desc_parser,
-			0, desc, NULL);
-	g_markup_parse_context_parse(ctxt, data, length, NULL);
+	struct image_desc *desc = create_image_desc();
+	GMarkupParseContext *ctxt = g_markup_parse_context_new(
+					&image_desc_parser, 0, desc, NULL);
+	if (err != NULL)
+		*err = 0;
+	if (!g_markup_parse_context_parse(ctxt, data, length, NULL)) {
+		if (err != NULL)
+			*err = -EINVAL;
+		free_image_desc(desc);
+		desc = NULL;
+	}
 	g_markup_parse_context_free(ctxt);
 	return desc;
 }
 
-static int get_image_fd(char *image_path, struct image_desc *desc) {
+static gboolean get_file_size(int fd, unsigned int *size, int *err) {
+	struct stat st;
+	if (fstat(fd, &st) < 0) {
+		if (err != NULL)
+			*err = -EBADR;
+		return FALSE;
+	}
+	*size = st.st_size;
+	if (err != NULL)
+		*err = 0;
+	return TRUE;
+}
+
+static int get_image_fd(char *image_path, struct image_desc *desc, int *err)
+{
 	int fd;
-	GString *new_image_path = g_string_new(image_path);
 	struct image_attributes attr;
-	new_image_path = g_string_append(new_image_path, "XXXXXX");
-	
-	if ((fd = mkstemp(new_image_path->str)) < 0)
+	char *new_image_path;
+	GError *gerr;
+
+	if ((fd = g_file_open_tmp(NULL, &new_image_path, &gerr)) < 0) {
+		if (err != NULL)
+			*err = gerr->code;
 		return -1;
+	}
 
 	printf("fd = %d\n", fd);
 	
 	attr.encoding = desc->encoding;
 	attr.width = desc->upper[0];
 	attr.height = desc->upper[1];
-	if (make_modified_image(image_path, new_image_path->str, &attr,
-				desc->transform) < 0) {
+	if (!make_modified_image(image_path, new_image_path, &attr,
+						desc->transform, err)) {
 		close(fd);
 		return -1;
 	}
-	unlink(new_image_path->str);
+
+	unlink(new_image_path);
 	return fd;
 }
 
@@ -174,14 +219,12 @@ static void *imgimgpull_open(const char *name, int oflag, mode_t mode,
 {
 	struct image_pull_session *session = context;
 	struct image_desc *desc;
-	int handle;
-	GSList *images = session->image_list;
-	int fd = -1;
+	int handle, fd = -1;
+	struct img_listing *il;
 
 	if (err)
 		*err = 0;
 
-	desc = parse_image_desc(session->desc_hdr, session->desc_hdr_len);
 	handle = get_handle(session->handle_hdr, session->handle_hdr_len);
 
 	if (handle == -1) {
@@ -192,32 +235,35 @@ static void *imgimgpull_open(const char *name, int oflag, mode_t mode,
 
 	printf("handle = %d\n", handle);
 
-	while (images != NULL) {
-		struct img_listing *il = images->data;
-		if (il->handle == handle) {
-			printf("plik: %s\n", il->image);
-			fd = get_image_fd(il->image, desc);
-			break;
-		}
-		images = g_slist_next(images);
-	}
+	il = get_listing(session, handle, err);
 
+	if (il == NULL)
+		return NULL;
+	
+	desc = parse_image_desc(session->desc_hdr, session->desc_hdr_len, err);
+
+	if (desc == NULL)
+		return NULL;
+
+	fd = get_image_fd(il->image, desc, err);
+	free_image_desc(desc);
 	printf("fd = %d\n", fd);
 
-	if (fd == -1) {
-		if (err)
-			*err = -ENOENT;
+	if (fd == -1)
+		return NULL;
+	
+	if (!get_file_size(fd, size, err)) {
+		close(fd);
 		return NULL;
 	}
 
 	printf("imgimgpull_open\n");
 
-	free_image_desc(desc);
 	return GINT_TO_POINTER(fd);
 }
 
 static ssize_t imgimgpull_read(void *object, void *buf, size_t count,
-		uint8_t *hi)
+								uint8_t *hi)
 {
 	ssize_t ret;
 	

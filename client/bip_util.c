@@ -120,6 +120,23 @@ const gchar *convIM2BIP(const gchar *encoding) {
 	return NULL;
 }
 
+char *transforms[] = {
+	"crop",
+	"stretch",
+	"fill",
+	NULL
+};
+
+gboolean verify_transform(const char *transform) {
+	char **str = transforms;
+	while (*str != NULL) {
+		if (g_str_equal(transform, *str))
+			return TRUE;
+		str++;
+	}
+	return FALSE;
+}
+
 gboolean get_image_attributes(const char *image_file, struct image_attributes *attr,
 								int *err)
 {
@@ -243,84 +260,99 @@ gboolean parse_pixel_range(const gchar *dim, unsigned int *lower, unsigned int *
 	return TRUE;
 }
 
-int make_modified_image(const char *image_path, const char *modified_path,
-			struct image_attributes *attr, const char *transform) {
+gboolean make_modified_image(const char *image_path, const char *modified_path,
+					struct image_attributes *attr,
+					const char *transform, int *err)
+{
 	MagickWand *wand;
 	MagickWandGenesis();
 	wand = NewMagickWand();
-	if (MagickReadImage(wand, image_path) == MagickFalse)
-		return -1;
+
+	if (err != NULL)
+		*err = 0;
+
+	if (!MagickReadImage(wand, image_path)) {
+		if (err != NULL)
+			*err = -ENOENT;
+		MagickWandTerminus();
+		return FALSE;
+	}
+
 	if (g_strcmp0(transform, "crop") == 0) {
 		printf("crop\n");
-		if(MagickCropImage(wand, attr->width, attr->height, 0, 0) == MagickFalse)
-			return -1;
+		if (!MagickCropImage(wand, attr->width, attr->height, 0, 0))
+			goto failed;
 	}
 	else if (g_strcmp0(transform, "fill") == 0) {
 		printf("fill\n");
-		if(MagickExtentImage(wand, attr->width, attr->height, 0, 0) == MagickFalse)
-			return -1;
+		if (!MagickExtentImage(wand, attr->width, attr->height, 0, 0))
+			goto failed;
 	}
 	else if (g_strcmp0(transform, "stretch") == 0){
 		printf("stretch\n");
 		if(MagickResizeImage(wand, attr->width, attr->height,
 					LanczosFilter, 1.0) == MagickFalse)
-			return -1;
+			goto failed;
 	}
 	else {
-		return -1;
+		goto failed;
 	}
-	if (MagickSetImageFormat(wand, attr->encoding) == MagickFalse) {
-		return -1;
-	}
-	if (MagickWriteImage(wand, modified_path) == MagickFalse) {
-		return -1;
-	}
+
+	if (!MagickSetImageFormat(wand, attr->encoding))
+		goto failed;
+
+	if (!MagickWriteImage(wand, modified_path))
+		goto failed;
+
 	MagickWandTerminus();
-	return 0;
+	return TRUE;
+failed:
+	MagickWandTerminus();
+	if (err != NULL)
+		*err = -EBADR;
+	return FALSE;
 }
 
-gboolean make_thumbnail(const char *image_path, const char *modified_path) {
-	gboolean status = TRUE;
+gboolean make_thumbnail(const char *image_path, const char *modified_path,
+								int *err)
+{
 	MagickWand *wand;
 	MagickWandGenesis();
 	wand = NewMagickWand();
 	printf("lol\n");
+	
+	if (err != NULL)
+		*err = 0;
 
-	if (MagickReadImage(wand, image_path) == MagickFalse) {
+	if (!MagickReadImage(wand, image_path)) {
 		printf("read failed\n");
-		status = FALSE;
-		goto cleanup;
+		if (err != NULL)
+			*err = -ENOENT;
+		MagickWandTerminus();
+		return FALSE;
 	}
 	
-	if (MagickSetImageColorspace(wand, sRGBColorspace) == MagickFalse) {
-		printf("set colorspace failed\n");
-		status = FALSE;
-		goto cleanup;
-	}
+	if (!MagickSetImageColorspace(wand, sRGBColorspace))
+		goto failed;
 	
-	if (MagickResizeImage(wand, THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT,
-				LanczosFilter, 1.0) == MagickFalse) {
-		printf("resize failed\n");
-		status = FALSE;
-		goto cleanup;
-	}
+	if (!MagickResizeImage(wand, THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT,
+							LanczosFilter, 1.0))
+		goto failed;
 	
-	if (MagickSetImageFormat(wand, "JPEG") == MagickFalse) {
-		printf("set format failed\n");
-		status = FALSE;
-		goto cleanup;
-	}
+	if (!MagickSetImageFormat(wand, "JPEG"))
+		goto failed;
 	
-	if (MagickWriteImage(wand, modified_path) == MagickFalse) {
-		printf("write failed\n");
-		status = FALSE;
-		goto cleanup;
-	}
-	status = TRUE;
+	if (!MagickWriteImage(wand, modified_path))
+		goto failed;
+	
 	printf("lol\n");
-cleanup:
 	MagickWandTerminus();
-	return status;
+	return TRUE;
+failed:
+	MagickWandTerminus();
+	if (err != NULL)
+		*err = -EBADR;
+	return FALSE;
 }
 
 int get_handle(char *data, unsigned int length)

@@ -16,14 +16,20 @@ struct encconv_pair {
 
 extern struct encconv_pair encconv_table[];
 
-uint8_t *encode_img_handle(const char *data, unsigned int length, unsigned int *newsize);
-char *decode_img_handle(const uint8_t *data, unsigned int length, unsigned int *newsize);
-uint8_t *encode_img_descriptor(const char *data, unsigned int length, unsigned int *newsize);
-char *decode_img_descriptor(const uint8_t *data, unsigned int length, unsigned int *newsize);
+uint8_t *encode_img_handle(const char *data, unsigned int length,
+						unsigned int *newsize);
+char *decode_img_handle(const uint8_t *data, unsigned int length,
+						unsigned int *newsize);
+uint8_t *encode_img_descriptor(const char *data, unsigned int length,
+						unsigned int *newsize);
+char *decode_img_descriptor(const uint8_t *data, unsigned int length,
+						unsigned int *newsize);
 
 const gchar *convBIP2IM(const gchar *encoding);
 const gchar *convIM2BIP(const gchar *encoding);
-int get_image_attributes(const char * image_file, struct image_attributes * attr, int *err);
+gboolean verify_transform(const char *transform);
+int get_image_attributes(const char * image_file,
+				struct image_attributes * attr, int *err);
 void free_image_attributes(struct image_attributes *attr);
 
 /** Convert a time string in ISO8601 format to time_t
@@ -32,10 +38,13 @@ void free_image_attributes(struct image_attributes *attr);
  * @returns time as time_t format
  */
 time_t parse_iso8601_bip(const gchar *str, int len);
-gboolean parse_pixel_range(const gchar *dim, unsigned int *lower, unsigned int *upper, gboolean *fixed_ratio);
+gboolean parse_pixel_range(const gchar *dim, unsigned int *lower,
+				unsigned int *upper, gboolean *fixed_ratio);
 int make_modified_image(const char *image_path, const char *modified_path,
-			struct image_attributes *attr, const char *transform);
-gboolean make_thumbnail(const char *image_path, const char *modified_path);
+			struct image_attributes *attr, const char *transform,
+			int *err);
+gboolean make_thumbnail(const char *image_path, const char *modified_path,
+								int *err);
 int get_handle(char *data, unsigned int length);
 void parse_bip_user_headers(const struct obex_session *os, obex_object_t *obj,
 				char **desc_hdr,

@@ -287,12 +287,19 @@ static const GMarkupParser handles_desc_parser = {
 };
 
 static struct img_hdesc *parse_handles_desc(char *data,
-		unsigned int length)
+						unsigned int length, int *err)
 {
 	struct img_hdesc *desc = get_hdesc();
-	GMarkupParseContext *ctxt = g_markup_parse_context_new(&handles_desc_parser,
-			0, desc, NULL);
-	g_markup_parse_context_parse(ctxt, data, length, NULL);
+	GMarkupParseContext *ctxt = g_markup_parse_context_new(
+					&handles_desc_parser, 0, desc, NULL);
+	if (err != NULL)
+		*err = 0;
+	if (!g_markup_parse_context_parse(ctxt, data, length, NULL)) {
+		if (err != NULL)
+			*err = -EINVAL;
+		free_img_hdesc(desc);
+		desc = NULL;
+	}
 	g_markup_parse_context_free(ctxt);
 	return desc;
 }
@@ -430,7 +437,8 @@ static void *imglisting_open(const char *name, int oflag, mode_t mode,
 
 	printf("object: %s\n", session->desc_hdr);
 
-	desc = parse_handles_desc(session->desc_hdr, session->desc_hdr_len);
+	desc = parse_handles_desc(session->desc_hdr, session->desc_hdr_len,
+									err);
 
 	printf("imglisting_open\n");
 
