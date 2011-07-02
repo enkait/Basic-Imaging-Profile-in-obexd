@@ -256,7 +256,7 @@ static DBusMessage *put_modified_image(DBusConnection *connection,
 {
 	struct session_data *session = user_data;
 	const char *image_path, *encoding, *transform;
-	int fd;
+	int fd, err;
 	struct image_attributes attr;
 	GString *new_image_path;
 	DBusMessage *result;
@@ -287,7 +287,7 @@ static DBusMessage *put_modified_image(DBusConnection *connection,
 
 	printf("new path: %s\n", new_image_path->str);
 
-	if (make_modified_image(image_path, new_image_path->str, &attr, transform) < 0) {
+	if (make_modified_image(image_path, new_image_path->str, &attr, transform, &err) < 0) {
 		return g_dbus_create_error(message,
 				"org.openobex.Error.CanNotCreateModifiedImage", NULL);
 	}
@@ -431,7 +431,7 @@ static DBusMessage *put_thumbnail(DBusConnection *connection,
 
 	printf("new path: %s\n", thm_path);
 
-	if (!make_thumbnail(image_path, thm_path)) {
+	if (!make_thumbnail(image_path, thm_path, &err)) {
 		return g_dbus_create_error(message,
 				"org.openobex.Error.CanNotCreateModifiedImage", NULL);
 	}

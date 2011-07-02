@@ -61,7 +61,7 @@ static const uint8_t IMAGE_PULL_TARGET[TARGET_SIZE] = {
 	0x84, 0x1A, 0x00, 0x02, 0xA5, 0x32, 0x5B, 0x4E };
 
 
-static char *verify_attachment(const char *image_path, const char *name) {
+static char *get_att_path(const char *image_path, const char *name, int *err) {
 	struct dirent *file;
 	struct stat file_stat;
 	char *att_dir_path = get_att_dir(image_path);
@@ -70,25 +70,30 @@ static char *verify_attachment(const char *image_path, const char *name) {
 
 	printf("%s\n", att_dir_path);
 
-	if (att_dir == NULL)
+	if (att_dir == NULL) {
+		if (err == NULL)
+			*err = -ENOENT;
 		goto done;
+	}
 	
 	while ((file = readdir(att_dir)) != NULL) {
 		char *path = g_build_filename(att_dir_path, file->d_name, NULL);
 		printf("path: %s\n", path);
-		lstat(path, &file_stat);
+		if (lstat(path, &file_stat) < 0) {
+			g_free(path);
+			continue;
+		}
 		
 		printf("%d\n", file_stat.st_mode);
 
 		if (!S_ISREG(file_stat.st_mode)) {
-			printf("nie baldzo: %s\n", path);
 			g_free(path);
 			continue;
 		}
 
 		printf("porownojemy: %s %s\n", file->d_name, name);
 
-		if (g_strcmp0(file->d_name, name) == 0) {
+		if (g_str_equal(file->d_name, name)) {
 			printf("attachment path: %s\n", path);
 			ret = path;
 			goto done;
@@ -119,31 +124,33 @@ static void *imgattpull_open(const char *name, int oflag, mode_t mode,
 
 	handle = get_handle(session->handle_hdr, session->handle_hdr_len);
 
-	if (handle == -1)
-		goto enoent;
+	if (handle == -1) {
+		if (err)
+			*err = -ENOENT;
+		return NULL;
+	}
 
 	printf("handle = %d\n", handle);
 
 	if ((il = get_listing(session, handle, err)) == NULL)
 		return NULL;
 
-	if ((att_path = verify_attachment(il->image, name)) == NULL)
-		goto enoent;
+	if ((att_path = get_att_path(il->image, name, err)) == NULL)
+		return NULL;
 
 	printf("path: %s\n", att_path);
 
 	fd = open(att_path, oflag, mode);
 	g_free(att_path);
+
+	if (fd < 0) {
+		if (err != NULL)
+			*err = -errno;
+		return NULL;
+	}
 	printf("fd = %d\n", fd);
 
-	if (fd == -1)
-		goto enoent;
-
 	return GINT_TO_POINTER(fd);
-enoent:
-	if (err)
-		*err = -ENOENT;
-	return NULL;
 }
 
 static ssize_t imgattpull_read(void *object, void *buf, size_t count,

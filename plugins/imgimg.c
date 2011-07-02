@@ -76,7 +76,7 @@ static void *imgimg_open(const char *name, int oflag, mode_t mode,
 	struct image_push_session *session = context;
 	
 	if (!name) {
-		if (err)
+		if (err != NULL)
 			*err = -errno;
 		return NULL;
 	}
@@ -84,7 +84,7 @@ static void *imgimg_open(const char *name, int oflag, mode_t mode,
 	session->fd = g_file_open_tmp(NULL, &session->file_path, NULL);
 
 	if (session->fd < 0) {
-		if (err)
+		if (err != NULL)
 			*err = -errno;
 		return NULL;
 	}

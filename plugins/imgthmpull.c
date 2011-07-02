@@ -60,22 +60,25 @@ static const uint8_t IMAGE_PULL_TARGET[TARGET_SIZE] = {
 	0x8E, 0xE9, 0xB3, 0xD0, 0x46, 0x08, 0x11, 0xD5,
 	0x84, 0x1A, 0x00, 0x02, 0xA5, 0x32, 0x5B, 0x4E };
 
-static int get_thumbnail_fd(char *image_path) {
-	int fd;
-	GString *new_image_path = g_string_new(image_path);
-	new_image_path = g_string_append(new_image_path, "XXXXXX");
+static int get_thumbnail_fd(char *image_path, int *err) {
+	char *thm_path;
+	int fd = g_file_open_tmp(NULL, &thm_path, NULL);
 	
-	if ((fd = mkstemp(new_image_path->str)) < 0)
+	if (fd < 0) {
+		if (err != NULL)
+			*err = -errno;
 		return -1;
+	}
 
 	printf("fd = %d\n", fd);
 	
-	if (!make_thumbnail(image_path, new_image_path->str)) {
+	if (!make_thumbnail(image_path, thm_path, err)) {
 		close(fd);
 		return -1;
 	}
-	printf("thumbnail path: %s\n", new_image_path->str);
-	unlink(new_image_path->str);
+	
+	printf("thumbnail path: %s\n", thm_path);
+	unlink(thm_path);
 	return fd;
 }
 
@@ -83,42 +86,31 @@ static void *imgthmpull_open(const char *name, int oflag, mode_t mode,
 		void *context, size_t *size, int *err)
 {
 	struct image_pull_session *session = context;
-	int handle;
-	GSList *images = session->image_list;
-	int fd = -1;
+	int handle, fd = -1;
+	struct img_listing *il;
 
-	if (err)
+	if (err != NULL)
 		*err = 0;
+	
+	printf("imgthmpull_open\n");
 
 	handle = get_handle(session->handle_hdr, session->handle_hdr_len);
 
 	if (handle == -1) {
-		if (err)
+		if (err != NULL)
 			*err = -ENOENT;
 		return NULL;
 	}
 
 	printf("handle = %d\n", handle);
+	
+	if ((il = get_listing(session, handle, err)) == NULL)
+		return NULL;
 
-	while (images != NULL) {
-		struct img_listing *il = images->data;
-		if (il->handle == handle) {
-			printf("plik: %s\n", il->image);
-			fd = get_thumbnail_fd(il->image);
-			break;
-		}
-		images = g_slist_next(images);
-	}
+	if ((fd = get_thumbnail_fd(il->image, err)) < 0)
+		return NULL;
 
 	printf("fd = %d\n", fd);
-
-	if (fd == -1) {
-		if (err)
-			*err = -ENOENT;
-		return NULL;
-	}
-
-	printf("imgthmpull_open\n");
 
 	return GINT_TO_POINTER(fd);
 }
