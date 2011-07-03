@@ -200,16 +200,16 @@ int image_arch_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 	
 	if (g_strcmp0(os->type, "x-bt/img-archive") == 0) {
 		GIOChannel *io = os->io;
-		char source[18];
+		char dest[18];
 		int i;
-		for(i=0;i<18;i++) {
-			printf("%c\n", source[i]);
-		}
 		for(i=0;i<16;i++) {
 			printf("%x\n", (char) aparam->serviceid[i]);
 		}
-		bt_io_get(io, BT_IO_RFCOMM, &err, BT_IO_OPT_SOURCE, source,
+		bt_io_get(io, BT_IO_RFCOMM, &err, BT_IO_OPT_DEST, dest,
 							BT_IO_OPT_INVALID);
+		for(i=0;i<18;i++) {
+			printf("lol:%x\n", dest[i]);
+		}
 		printf("start archive\n");
 
 	}
