@@ -57,6 +57,7 @@
 #include "obex-priv.h"
 #include "image_arch.h"
 #include "bip_util.h"
+#include "btio.h"
 
 #define IMAGE_ARCH_CHANNEL 22
 #define IMAGE_ARCH_RECORD "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>		\
@@ -182,11 +183,13 @@ int image_arch_chkput(struct obex_session *os, void *user_data) {
 	return -EBADR;
 }
 
-int image_arch_put(struct obex_session *os, obex_object_t *obj, void *user_data) {
+int image_arch_put(struct obex_session *os, obex_object_t *obj, void *user_data)
+{
 	//struct archive_session *as = user_data;
 	static struct aa_aparam *aparam;
 	const uint8_t *buffer;
 	ssize_t rsize;
+	GError *err;
 	printf("IMAGE PULL PUT\n");
 
 	if (obex_get_size(os) != OBJECT_SIZE_DELETE)
@@ -196,11 +199,19 @@ int image_arch_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 	aparam = parse_aparam(buffer, rsize);
 	
 	if (g_strcmp0(os->type, "x-bt/img-archive") == 0) {
+		GIOChannel *io = os->io;
+		char source[18];
 		int i;
+		for(i=0;i<18;i++) {
+			printf("%c\n", source[i]);
+		}
+		for(i=0;i<16;i++) {
+			printf("%x\n", (char) aparam->serviceid[i]);
+		}
+		bt_io_get(io, BT_IO_RFCOMM, &err, BT_IO_OPT_SOURCE, source,
+							BT_IO_OPT_INVALID);
 		printf("start archive\n");
-			for(i=0;i<16;i++) {
-				printf("%x\n", (char) aparam->serviceid[i]);
-			}
+
 	}
 	return 0;
 }
