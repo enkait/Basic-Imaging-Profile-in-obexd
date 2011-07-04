@@ -181,8 +181,9 @@ int image_arch_get(struct obex_session *os, obex_object_t *obj,
 int image_arch_chkput(struct obex_session *os, void *user_data) {
 	printf("IMAGE PULL CHKPUT\n");
 
-	if (obex_get_size(os) == OBJECT_SIZE_DELETE)
-		return 0;
+	if (obex_get_size(os) == OBJECT_SIZE_DELETE) {
+		return obex_put_stream_start(os, NULL);
+	}
 
 	return -EBADR;
 }
@@ -300,5 +301,45 @@ static void image_arch_exit(void)
 {
 	obex_service_driver_unregister(&image_arch);
 }
+
+static void *imgarch_open(const char *name, int oflag, mode_t mode,
+		void *context, size_t *size, int *err)
+{
+	printf("imgarch open\n");
+	return 0;
+}
+
+static int imgarch_close(void *object)
+{
+	printf("imgarch close\n");
+	return 0;
+}
+
+static ssize_t imgarch_write(void *object, const void *buf, size_t count)
+{
+	printf("imgarch write\n");
+	return 0;
+}
+
+static struct obex_mime_type_driver imgarch = {
+	.target = IMAGE_ARCH_TARGET,
+	.target_size = TARGET_SIZE,
+	.mimetype = "x-bt/img-archive",
+	.open = imgarch_open,
+	.close = imgarch_close,
+	.write = imgarch_write,
+};
+
+static int imgarch_init(void)
+{
+	return obex_mime_type_driver_register(&imgarch);
+}
+
+static void imgarch_exit(void)
+{
+	obex_mime_type_driver_unregister(&imgarch);
+}
+
+OBEX_PLUGIN_DEFINE(imgarch, imgarch_init, imgarch_exit)
 
 OBEX_PLUGIN_DEFINE(image_arch, image_arch_init, image_arch_exit)
