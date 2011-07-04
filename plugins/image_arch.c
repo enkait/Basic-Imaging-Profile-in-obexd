@@ -97,6 +97,10 @@
   </attribute>								\
 </record>"
 
+#define CLIENT_ADDRESS "org.openobex.client"
+#define CLIENT_OBJECT_PATH "/"
+#define CLIENT_INTERFACE "org.openobex.Client"
+
 static const uint8_t IMAGE_ARCH_TARGET[TARGET_SIZE] = {
 			0x94, 0x01, 0x26, 0xC0, 0x46, 0x08, 0x11, 0xD5,
 			0x84, 0x1A, 0x00, 0x02, 0xA5, 0x32, 0x5B, 0x4E };
@@ -183,14 +187,56 @@ int image_arch_chkput(struct obex_session *os, void *user_data) {
 	return -EBADR;
 }
 
+static gboolean get_ret_address(struct obex_session *os, char *address) {
+	GError *err;
+	bt_io_get(os->io, BT_IO_RFCOMM, &err, BT_IO_OPT_DEST, address,
+							BT_IO_OPT_INVALID);
+	if (err != NULL) {
+		g_error_free(err);
+		return FALSE;
+	}
+	return TRUE;
+}
+
+//static DBusConnection *connect_to_client() {
+//	return dbus_connection_open(CLIENT_ADDRESS, NULL);
+//}
+
+/*
+static get_aos_interface_callback(DBusPendingCall *call, void *user_data) {
+	struct archive_session *session = user_data;
+	DBusMessage *msg;
+	dbus_pending_call_steal_reply(call);
+}
+*/
+
+/*
+static DBusConnection *get_aos_interface(struct archive_session *session,
+							DBusConnection *conn)
+{
+	DBusMessage *msg;
+	DBusPendingCall *result;
+	msg = dbus_message_new_method_call(CLIENT_ADDRESS, CLIENT_PATH,
+							CLIENT_INTERFACE,
+							"CreateSession");
+	if (!dbus_connection_send_with_reply(conn, msg, &result, -1)) {
+	}
+
+	dbus_pending_call_set_notify(result, &get_aos_interface_callback,
+								session, NULL);
+
+	//dbus_
+}*/
+
 int image_arch_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 {
 	//struct archive_session *as = user_data;
 	static struct aa_aparam *aparam;
 	const uint8_t *buffer;
 	ssize_t rsize;
-	GError *err;
 	printf("IMAGE PULL PUT\n");
+
+	sleep(30);
 
 	if (obex_get_size(os) != OBJECT_SIZE_DELETE)
 		return -EBADR;
@@ -199,17 +245,24 @@ int image_arch_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 	aparam = parse_aparam(buffer, rsize);
 	
 	if (g_strcmp0(os->type, "x-bt/img-archive") == 0) {
-		GIOChannel *io = os->io;
 		char dest[18];
 		int i;
+//		DBusConnection *conn;
 		for(i=0;i<16;i++) {
 			printf("%x\n", (char) aparam->serviceid[i]);
 		}
-		bt_io_get(io, BT_IO_RFCOMM, &err, BT_IO_OPT_DEST, dest,
-							BT_IO_OPT_INVALID);
+		if (!get_ret_address(os, dest))
+			return -EBADR;
+
 		for(i=0;i<18;i++) {
 			printf("lol:%x\n", dest[i]);
 		}
+
+//		if (connect_to_client() == NULL)
+//			return -EBADR;
+
+//		if ()
+
 		printf("start archive\n");
 
 	}
