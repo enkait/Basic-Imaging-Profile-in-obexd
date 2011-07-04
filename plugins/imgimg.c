@@ -112,6 +112,12 @@ static ssize_t imgimg_write(void *object, const void *buf, size_t count)
 	return ret;
 }
 
+static int imgimg_flush(void *object)
+{
+	printf("lol omfg flushing\n");
+	return 0;
+}
+
 static struct obex_mime_type_driver imgimg = {
 	.target = IMAGE_PUSH_TARGET,
 	.target_size = TARGET_SIZE,
@@ -119,6 +125,7 @@ static struct obex_mime_type_driver imgimg = {
 	.open = imgimg_open,
 	.close = imgimg_close,
 	.write = imgimg_write,
+	.flush = imgimg_flush,
 };
 
 static void *img_capabilities_open(const char *name, int oflag, mode_t mode,

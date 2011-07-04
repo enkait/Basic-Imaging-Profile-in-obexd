@@ -187,7 +187,6 @@ static struct obex_mime_type_driver imgattpull = {
 	.read = imgattpull_read,
 };
 
-
 static int imgattpull_init(void)
 {
 	return obex_mime_type_driver_register(&imgattpull);
