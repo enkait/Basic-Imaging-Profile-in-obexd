@@ -170,7 +170,7 @@ static GSList *get_image_list(int *err) {
 	int handle = 0;
 	DIR *img_dir = opendir(bip_dir);
 
-	if (img_dir != NULL) {
+	if (img_dir == NULL) {
 		if (err != NULL)
 			*err = -errno;
 		return NULL;
@@ -216,15 +216,19 @@ static GSList *get_image_list(int *err) {
 
 void *image_pull_connect(struct obex_session *os, int *err) {
 	struct image_pull_session *session;
+	int priv_err = 0;
 	printf("IMAGE PULL CONNECT\n");
 	manager_register_session(os);
 
 	session = g_new0(struct image_pull_session, 1);
 	session->os = os;
-	session->image_list = get_image_list(err);
+	session->image_list = get_image_list(&priv_err);
 
-	if (session->image_list == NULL)
+	if (priv_err < 0) {
+		if (err != NULL)
+			*err = priv_err;
 		return NULL;
+	}
 
 	if (err != NULL)
 		*err = 0;
@@ -241,6 +245,7 @@ int image_pull_get(struct obex_session *os, obex_object_t *obj,
 
 	printf("IMAGE PULL GET\n");
 
+	printf("%p: session->aparam_data", session->aparam_data);
 	g_free(session->aparam_data);
 	session->aparam_data = NULL;
 	session->aparam_data_len = 0;
