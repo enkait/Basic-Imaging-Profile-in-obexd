@@ -1073,16 +1073,21 @@ static void cmd_put(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 	}
 
 	err = os->service->put(os, obj, os->service_data);
+	printf("KAIT: PREPREFLUSHING\n");
 	if (err < 0) {
 		os_set_response(obj, err);
 		return;
 	}
+	
+	printf("KAIT: PREFLUSHING %d\n", (int)os->size);
 
 	/* Check if there is a body and it is not empty (size > 0), otherwise
 	   openobex won't notify us with OBEX_EV_STREAMAVAIL and it gonna reply
 	   right away */
-	if (os->size != 0)
+	if (os->size > 0 || os->size == OBJECT_SIZE_UNKNOWN)
 		return;
+
+	printf("KAIT: FLUSHING\n");
 
 	/* Flush immediatly since there is nothing to write so the driver
 	   has a chance to do something before we reply */

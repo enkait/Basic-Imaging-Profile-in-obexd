@@ -65,6 +65,9 @@ builtin_sources += plugins/imgpropull.c plugins/imgpropull.h
 builtin_modules += imgattpush
 builtin_sources += plugins/imgattpush.c plugins/imgattpush.h
 
+builtin_modules += imgarch
+builtin_sources += plugins/imgarch.c
+
 if NOKIA_PCSUITE
 builtin_modules += pcsuite
 builtin_sources += plugins/pcsuite.c

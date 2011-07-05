@@ -31,6 +31,7 @@ struct aa_aparam {
 struct archive_session {
     struct obex_session *os;
     struct aa_aparam *aparam;
+    gboolean called;
     char *address;
 };
 
