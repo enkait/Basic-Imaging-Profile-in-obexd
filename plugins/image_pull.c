@@ -58,6 +58,8 @@
 #include "image_pull.h"
 #include "bip_util.h"
 
+#define AOS_SID "000102030405060708090A0B0C0D0E0F"
+
 #define IMAGE_PULL_CHANNEL 21
 #define IMAGE_AOS_CHANNEL 23
 #define IMAGE_PULL_RECORD "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>		\
@@ -85,6 +87,47 @@
 									\
   <attribute id=\"0x0100\">						\
     <text value=\"%s\" name=\"name\"/>					\
+  </attribute>								\
+									\
+  <attribute id=\"0x0009\">						\
+    <sequence>								\
+      <sequence>							\
+        <uuid value=\"0x111a\"/>					\
+        <uint16 value=\"0x0100\" name=\"version\"/>			\
+      </sequence>							\
+    </sequence>								\
+  </attribute>								\
+</record>"
+
+#define IMAGE_AOS_RECORD "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>		\
+<record>								\
+  <attribute id=\"0x0001\">						\
+    <sequence>								\
+      <uuid value=\"0x111c\"/>						\
+    </sequence>								\
+  </attribute>								\
+									\
+  <attribute id=\"0x0004\">						\
+    <sequence>								\
+      <sequence>							\
+        <uuid value=\"0x0100\"/>					\
+      </sequence>							\
+      <sequence>							\
+        <uuid value=\"0x0003\"/>					\
+        <uint8 value=\"%u\" name=\"channel\"/>				\
+      </sequence>							\
+      <sequence>							\
+        <uuid value=\"0x0008\"/>					\
+      </sequence>							\
+    </sequence>								\
+  </attribute>								\
+									\
+  <attribute id=\"0x0100\">						\
+    <text value=\"%s\" name=\"name\"/>					\
+  </attribute>								\
+									\
+  <attribute id=\"0x0003\">						\
+    <uuid value=\"" AOS_SID "\"/>					\
   </attribute>								\
 									\
   <attribute id=\"0x0009\">						\
@@ -330,7 +373,7 @@ static struct obex_service_driver image_aos = {
 	.name = "OBEXD Archived Objects Service",
 	.service = OBEX_BIP_AOS,
 	.channel = IMAGE_AOS_CHANNEL,
-	.record = IMAGE_PULL_RECORD,
+	.record = IMAGE_AOS_RECORD,
 	.target = IMAGE_AOS_TARGET,
 	.target_size = TARGET_SIZE,
 	.connect = image_pull_connect,
