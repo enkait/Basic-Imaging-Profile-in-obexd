@@ -56,10 +56,6 @@
 #include "filesystem.h"
 #include "bip_util.h"
 
-static const uint8_t IMAGE_PULL_TARGET[TARGET_SIZE] = {
-	0x8E, 0xE9, 0xB3, 0xD0, 0x46, 0x08, 0x11, 0xD5,
-	0x84, 0x1A, 0x00, 0x02, 0xA5, 0x32, 0x5B, 0x4E };
-
 static int get_thumbnail_fd(char *image_path, int *err) {
 	char *thm_path;
 	int fd = g_file_open_tmp(NULL, &thm_path, NULL);
@@ -149,14 +145,27 @@ static struct obex_mime_type_driver imgthmpull = {
 	.read = imgthmpull_read,
 };
 
+static struct obex_mime_type_driver imgthmpull_aos = {
+	.target = IMAGE_AOS_TARGET,
+	.target_size = TARGET_SIZE,
+	.mimetype = "x-bt/img-thm",
+	.open = imgthmpull_open,
+	.close = imgthmpull_close,
+	.read = imgthmpull_read,
+};
 
 static int imgthmpull_init(void)
 {
-	return obex_mime_type_driver_register(&imgthmpull);
+	int ret;
+	if ((ret = obex_mime_type_driver_register(&imgthmpull)) < 0)
+		return ret;
+
+	return obex_mime_type_driver_register(&imgthmpull_aos);
 }
 
 static void imgthmpull_exit(void)
 {
+	obex_mime_type_driver_unregister(&imgthmpull_aos);
 	obex_mime_type_driver_unregister(&imgthmpull);
 }
 

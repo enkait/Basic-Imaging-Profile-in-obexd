@@ -56,11 +56,6 @@
 #include "filesystem.h"
 #include "bip_util.h"
 
-static const uint8_t IMAGE_PULL_TARGET[TARGET_SIZE] = {
-	0x8E, 0xE9, 0xB3, 0xD0, 0x46, 0x08, 0x11, 0xD5,
-	0x84, 0x1A, 0x00, 0x02, 0xA5, 0x32, 0x5B, 0x4E };
-
-
 static char *get_att_path(const char *image_path, const char *name, int *err) {
 	struct dirent *file;
 	struct stat file_stat;
@@ -187,13 +182,27 @@ static struct obex_mime_type_driver imgattpull = {
 	.read = imgattpull_read,
 };
 
+static struct obex_mime_type_driver imgattpull_aos = {
+	.target = IMAGE_AOS_TARGET,
+	.target_size = TARGET_SIZE,
+	.mimetype = "x-bt/img-attachment",
+	.open = imgattpull_open,
+	.close = imgattpull_close,
+	.read = imgattpull_read,
+};
+
 static int imgattpull_init(void)
 {
-	return obex_mime_type_driver_register(&imgattpull);
+	int ret;
+	if ((ret = obex_mime_type_driver_register(&imgattpull)) < 0)
+		return ret;
+
+	return obex_mime_type_driver_register(&imgattpull_aos);
 }
 
 static void imgattpull_exit(void)
 {
+	obex_mime_type_driver_unregister(&imgattpull_aos);
 	obex_mime_type_driver_unregister(&imgattpull);
 }
 
