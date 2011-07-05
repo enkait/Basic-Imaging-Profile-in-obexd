@@ -137,9 +137,9 @@ gboolean verify_transform(const char *transform) {
 	return FALSE;
 }
 
-gboolean get_image_attributes(const char *image_file, struct image_attributes *attr,
-								int *err)
+struct image_attributes *get_image_attributes(const char *image_file, int *err)
 {
+	struct image_attributes *attr;
 	MagickWand *wand;
 	MagickSizeType size;
 	char *encoding;
@@ -149,9 +149,10 @@ gboolean get_image_attributes(const char *image_file, struct image_attributes *a
 	if (!MagickPingImage(wand, image_file)) {
 		if (err)
 			*err = -ENOENT;
-		return FALSE;
+		return NULL;
 	}
 	encoding = MagickGetImageFormat(wand);
+	attr = g_new0(struct image_attributes, 1);
 	attr->encoding = g_strdup(convIM2BIP(encoding));
 	attr->width = MagickGetImageWidth(wand);
 	attr->height = MagickGetImageHeight(wand);
@@ -161,7 +162,7 @@ gboolean get_image_attributes(const char *image_file, struct image_attributes *a
 
 	if (err)
 		*err = 0;
-	return TRUE;
+	return attr;
 }
 
 void free_image_attributes(struct image_attributes *attr) {
