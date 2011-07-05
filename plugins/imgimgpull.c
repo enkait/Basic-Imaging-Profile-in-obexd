@@ -58,10 +58,6 @@
 
 #define EOL_CHARS "\n"
 
-static const uint8_t IMAGE_PULL_TARGET[TARGET_SIZE] = {
-	0x8E, 0xE9, 0xB3, 0xD0, 0x46, 0x08, 0x11, 0xD5,
-	0x84, 0x1A, 0x00, 0x02, 0xA5, 0x32, 0x5B, 0x4E };
-
 struct image_desc {
 	char *encoding;
 	unsigned int lower[2], upper[2];
@@ -296,14 +292,27 @@ static struct obex_mime_type_driver imgimgpull = {
 	.read = imgimgpull_read,
 };
 
+static struct obex_mime_type_driver imgimgpull_aos = {
+	.target = IMAGE_AOS_TARGET,
+	.target_size = TARGET_SIZE,
+	.mimetype = "x-bt/img-img",
+	.open = imgimgpull_open,
+	.close = imgimgpull_close,
+	.read = imgimgpull_read,
+};
 
 static int imgimgpull_init(void)
 {
-	return obex_mime_type_driver_register(&imgimgpull);
+	int ret;
+	if ((ret = obex_mime_type_driver_register(&imgimgpull)) < 0)
+		return ret;
+
+	return obex_mime_type_driver_register(&imgimgpull_aos);
 }
 
 static void imgimgpull_exit(void)
 {
+	obex_mime_type_driver_unregister(&imgimgpull_aos);
 	obex_mime_type_driver_unregister(&imgimgpull);
 }
 

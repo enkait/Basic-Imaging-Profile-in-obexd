@@ -71,10 +71,6 @@
 #define LATESTCAPTUREDIMAGES_TAG 0x03
 #define LATESTCAPTUREDIMAGES_LEN 0x01
 
-static const uint8_t IMAGE_PULL_TARGET[TARGET_SIZE] = {
-	0x8E, 0xE9, 0xB3, 0xD0, 0x46, 0x08, 0x11, 0xD5,
-	0x84, 0x1A, 0x00, 0x02, 0xA5, 0x32, 0x5B, 0x4E };
-
 struct img_hdesc {
     time_t ctime[2];
     gboolean ctime_bounded[2];
@@ -507,14 +503,27 @@ static struct obex_mime_type_driver imglisting = {
 	.read = imglisting_read,
 };
 
+static struct obex_mime_type_driver imglisting_aos = {
+	.target = IMAGE_AOS_TARGET,
+	.target_size = TARGET_SIZE,
+	.mimetype = "x-bt/img-listing",
+	.open = imglisting_open,
+	.close = imglisting_close,
+	.read = imglisting_read,
+};
 
 static int imglisting_init(void)
 {
-	return obex_mime_type_driver_register(&imglisting);
+	int ret;
+	if ((ret = obex_mime_type_driver_register(&imglisting)) < 0)
+		return ret;
+
+	return obex_mime_type_driver_register(&imglisting_aos);
 }
 
 static void imglisting_exit(void)
 {
+	obex_mime_type_driver_unregister(&imglisting_aos);
 	obex_mime_type_driver_unregister(&imglisting);
 }
 

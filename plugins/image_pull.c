@@ -59,6 +59,7 @@
 #include "bip_util.h"
 
 #define IMAGE_PULL_CHANNEL 21
+#define IMAGE_AOS_CHANNEL 23
 #define IMAGE_PULL_RECORD "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>		\
 <record>								\
   <attribute id=\"0x0001\">						\
@@ -95,10 +96,6 @@
     </sequence>								\
   </attribute>								\
 </record>"
-
-static const uint8_t IMAGE_PULL_TARGET[TARGET_SIZE] = {
-			0x8E, 0xE9, 0xB3, 0xD0, 0x46, 0x08, 0x11, 0xD5,
-			0x84, 0x1A, 0x00, 0x02, 0xA5, 0x32, 0x5B, 0x4E };
 
 static const char * bip_dir="/tmp/bip/";
 
@@ -329,13 +326,32 @@ static struct obex_service_driver image_pull = {
 	.disconnect = image_pull_disconnect
 };
 
+static struct obex_service_driver image_aos = {
+	.name = "OBEXD Archived Objects Service",
+	.service = OBEX_BIP_AOS,
+	.channel = IMAGE_AOS_CHANNEL,
+	.record = IMAGE_PULL_RECORD,
+	.target = IMAGE_AOS_TARGET,
+	.target_size = TARGET_SIZE,
+	.connect = image_pull_connect,
+	.get = image_pull_get,
+	.put = image_pull_put,
+	.chkput = image_pull_chkput,
+	.disconnect = image_pull_disconnect
+};
+
 static int image_pull_init(void)
 {
-	return obex_service_driver_register(&image_pull);
+	int ret;
+	if ((ret = obex_service_driver_register(&image_pull)) < 0)
+		return ret;
+
+	return obex_service_driver_register(&image_aos);
 }
 
 static void image_pull_exit(void)
 {
+	obex_service_driver_unregister(&image_aos);
 	obex_service_driver_unregister(&image_pull);
 }
 

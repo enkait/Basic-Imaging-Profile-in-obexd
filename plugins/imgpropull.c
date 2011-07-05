@@ -68,10 +68,6 @@
 
 #define IMG_PROPERTIES_END "</image-properties>" EOL_CHARS
 
-static const uint8_t IMAGE_PULL_TARGET[TARGET_SIZE] = {
-	0x8E, 0xE9, 0xB3, 0xD0, 0x46, 0x08, 0x11, 0xD5,
-	0x84, 0x1A, 0x00, 0x02, 0xA5, 0x32, 0x5B, 0x4E };
-
 static GString *append_attachments(GString *object, char *image_path) {
 	char *att_dir_path = get_att_dir(image_path);
 	DIR *att_dir = opendir(att_dir_path);
@@ -179,14 +175,27 @@ static struct obex_mime_type_driver imgpropull = {
 	.read = imgpropull_read,
 };
 
+static struct obex_mime_type_driver imgpropull_aos = {
+	.target = IMAGE_AOS_TARGET,
+	.target_size = TARGET_SIZE,
+	.mimetype = "x-bt/img-properties",
+	.open = imgpropull_open,
+	.close = string_free,
+	.read = imgpropull_read,
+};
 
 static int imgpropull_init(void)
 {
-	return obex_mime_type_driver_register(&imgpropull);
+	int ret;
+	if ((ret = obex_mime_type_driver_register(&imgpropull)) < 0)
+		return ret;
+
+	return obex_mime_type_driver_register(&imgpropull_aos);
 }
 
 static void imgpropull_exit(void)
 {
+	obex_mime_type_driver_unregister(&imgpropull_aos);
 	obex_mime_type_driver_unregister(&imgpropull);
 }
 
