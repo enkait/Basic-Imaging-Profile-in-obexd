@@ -221,30 +221,30 @@ static DBusMessage *put_transformed_image(DBusMessage *message, struct session_d
 		const char *local_image, const char *remote_image, const char *transform)
 {
 	int err;
-	struct image_attributes attr;
+	struct image_attributes *attr;
 	struct a_header *descriptor = g_try_new(struct a_header, 1);
 	GSList * aheaders = NULL;
 
-	attr.encoding = NULL;
-	if (get_image_attributes(local_image, &attr, &err) < 0) {
-		free_image_attributes(&attr);
+	if ((attr = get_image_attributes(local_image, &err)) == NULL) {
 		return g_dbus_create_error(message,
 				"org.openobex.Error.InvalidArguments", NULL);
 	}
 
-	create_image_descriptor(&attr, transform, descriptor);
+	create_image_descriptor(attr, transform, descriptor);
 	printf("descriptor: %p %d\n", descriptor->hv.bs, descriptor->hv_size);
 	aheaders = g_slist_append(NULL, descriptor);
 
 	if ((err=session_put_with_aheaders(session, "x-bt/img-img", NULL,
-					local_image, remote_image, NULL, 0, aheaders, put_image_callback)) < 0) {
-		free_image_attributes(&attr);
+						local_image, remote_image,
+						NULL, 0, aheaders,
+						put_image_callback)) < 0) {
+		free_image_attributes(attr);
 		return g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
 				"258Failed");
 	}
 	session->msg = dbus_message_ref(message);
-	free_image_attributes(&attr);
+	free_image_attributes(attr);
 	g_slist_free(aheaders);
 	a_header_free(descriptor);
 
@@ -257,20 +257,20 @@ static DBusMessage *put_modified_image(DBusConnection *connection,
 	struct session_data *session = user_data;
 	const char *image_path, *encoding, *transform;
 	int fd, err;
-	struct image_attributes attr;
+	struct image_attributes *attr = g_new0(struct image_attributes, 1);
 	GString *new_image_path;
 	DBusMessage *result;
 
 	if (dbus_message_get_args(message, NULL,
 				DBUS_TYPE_STRING, &image_path,
 				DBUS_TYPE_STRING, &encoding,
-				DBUS_TYPE_UINT32, &attr.width,
-				DBUS_TYPE_UINT32, &attr.height,
+				DBUS_TYPE_UINT32, &attr->width,
+				DBUS_TYPE_UINT32, &attr->height,
 				DBUS_TYPE_STRING, &transform,
 				DBUS_TYPE_INVALID) == FALSE)
 		return g_dbus_create_error(message,
 				"org.openobex.Error.InvalidArguments", NULL);
-	attr.encoding = g_strdup(encoding);
+	attr->encoding = g_strdup(encoding);
 
 	if (!image_path || strlen(image_path)==0) {
 		return g_dbus_create_error(message,"org.openobex.Error.InvalidArguments", NULL);
@@ -287,14 +287,14 @@ static DBusMessage *put_modified_image(DBusConnection *connection,
 
 	printf("new path: %s\n", new_image_path->str);
 
-	if (make_modified_image(image_path, new_image_path->str, &attr, transform, &err) < 0) {
+	if (make_modified_image(image_path, new_image_path->str, attr, transform, &err) < 0) {
 		return g_dbus_create_error(message,
 				"org.openobex.Error.CanNotCreateModifiedImage", NULL);
 	}
 
 	result = put_transformed_image(message, session, new_image_path->str, image_path, transform);
 
-	free_image_attributes(&attr);
+	free_image_attributes(attr);
 	return result;
 }
 
