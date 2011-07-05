@@ -44,6 +44,7 @@
 
 #include <glib.h>
 #include <regex.h>
+#include <dbus/dbus.h>
 
 #include <openobex/obex.h>
 #include <openobex/obex_const.h>
@@ -98,8 +99,10 @@
 </record>"
 
 #define CLIENT_ADDRESS "org.openobex.client"
-#define CLIENT_OBJECT_PATH "/"
+#define CLIENT_PATH "/"
 #define CLIENT_INTERFACE "org.openobex.Client"
+const char *dest_entry = "Destination";
+const char *channel_entry = "Channel";
 
 static const uint8_t IMAGE_ARCH_TARGET[TARGET_SIZE] = {
 			0x94, 0x01, 0x26, 0xC0, 0x46, 0x08, 0x11, 0xD5,
@@ -180,7 +183,6 @@ int image_arch_get(struct obex_session *os, obex_object_t *obj,
 
 int image_arch_chkput(struct obex_session *os, void *user_data) {
 	printf("IMAGE PULL CHKPUT\n");
-
 	if (obex_get_size(os) == OBJECT_SIZE_DELETE) {
 		return obex_put_stream_start(os, NULL);
 	}
@@ -199,45 +201,60 @@ static gboolean get_ret_address(struct obex_session *os, char *address) {
 	return TRUE;
 }
 
-//static DBusConnection *connect_to_client() {
-//	return dbus_connection_open(CLIENT_ADDRESS, NULL);
+static DBusConnection *connect_to_client() {
+	return dbus_connection_open(CLIENT_ADDRESS, NULL);
+}
+
+//static void get_aos_interface_callback(DBusPendingCall *call, void *user_data) {
+//	struct archive_session *session = user_data;
+//	DBusMessage *msg;
+//	dbus_pending_call_steal_reply(call);
 //}
 
-/*
-static get_aos_interface_callback(DBusPendingCall *call, void *user_data) {
-	struct archive_session *session = user_data;
-	DBusMessage *msg;
-	dbus_pending_call_steal_reply(call);
-}
-*/
 
-/*
 static DBusConnection *get_aos_interface(struct archive_session *session,
 							DBusConnection *conn)
 {
 	DBusMessage *msg;
+	DBusMessageIter args, dict, entry, value;
 	DBusPendingCall *result;
 	msg = dbus_message_new_method_call(CLIENT_ADDRESS, CLIENT_PATH,
 							CLIENT_INTERFACE,
 							"CreateSession");
-	if (!dbus_connection_send_with_reply(conn, msg, &result, -1)) {
-	}
+	if (!dbus_connection_send_with_reply(conn, msg, &result, -1))
+		return NULL;
 
-	dbus_pending_call_set_notify(result, &get_aos_interface_callback,
+/*	dbus_pending_call_set_notify(result, &get_aos_interface_callback,
 								session, NULL);
+*/
 
-	//dbus_
-}*/
+	dbus_message_iter_init_append(msg, &args);
+	dbus_message_iter_open_container(&args, DBUS_TYPE_ARRAY, "{sv}", &dict);
+	dbus_message_iter_open_container(&dict, DBUS_TYPE_DICT_ENTRY, NULL,
+								&entry);
+	dbus_message_iter_append_basic(&entry, DBUS_TYPE_STRING,
+								&dest_entry);
+	dbus_message_iter_open_container(&entry, DBUS_TYPE_VARIANT, "s",
+							&value);
+	dbus_message_iter_append_basic(&value, DBUS_TYPE_STRING,
+							&session->address);
+	dbus_message_iter_close_container(&dict, &entry);
+	dbus_message_iter_close_container(&args, &dict);
+
+	dbus_connection_flush(conn);
+
+	dbus_message_unref(msg);
+
+	return NULL;
+}
 
 int image_arch_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 {
-	//struct archive_session *as = user_data;
+	struct archive_session *session = user_data;
 	static struct aa_aparam *aparam;
 	const uint8_t *buffer;
 	ssize_t rsize;
 	printf("IMAGE PULL PUT\n");
-
-	sleep(30);
 
 	if (obex_get_size(os) != OBJECT_SIZE_DELETE)
 		return -EBADR;
@@ -246,23 +263,25 @@ int image_arch_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 	aparam = parse_aparam(buffer, rsize);
 	
 	if (g_strcmp0(os->type, "x-bt/img-archive") == 0) {
-		char dest[18];
 		int i;
-//		DBusConnection *conn;
+		DBusConnection *conn;
 		for(i=0;i<16;i++) {
 			printf("%x\n", (char) aparam->serviceid[i]);
 		}
-		if (!get_ret_address(os, dest))
+
+		session->address = g_malloc0(18);
+
+		if (!get_ret_address(os, session->address))
 			return -EBADR;
 
 		for(i=0;i<18;i++) {
-			printf("lol:%x\n", dest[i]);
+			printf("lol:%x\n", session->address[i]);
 		}
 
-//		if (connect_to_client() == NULL)
-//			return -EBADR;
+		if ((conn = connect_to_client()) == NULL)
+			return -EBADR;
 
-//		if ()
+		get_aos_interface(session, conn);
 
 		printf("start archive\n");
 

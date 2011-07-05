@@ -28,8 +28,7 @@ char *decode_img_descriptor(const uint8_t *data, unsigned int length,
 const gchar *convBIP2IM(const gchar *encoding);
 const gchar *convIM2BIP(const gchar *encoding);
 gboolean verify_transform(const char *transform);
-int get_image_attributes(const char * image_file,
-				struct image_attributes * attr, int *err);
+struct image_attributes *get_image_attributes(const char *image_file, int *err);
 void free_image_attributes(struct image_attributes *attr);
 
 /** Convert a time string in ISO8601 format to time_t

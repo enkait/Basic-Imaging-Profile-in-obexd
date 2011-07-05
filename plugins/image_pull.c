@@ -190,9 +190,7 @@ static GSList *get_image_list(int *err) {
 			continue;
 		}
 
-		attr = g_new0(struct image_attributes, 1);
-		if (get_image_attributes(path, attr, err) < 0) {
-			g_free(attr);
+		if ((attr = get_image_attributes(path, err)) == NULL) {
 			g_free(path);
 			continue;
 		}
