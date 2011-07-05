@@ -220,7 +220,7 @@ static DBusConnection *get_aos_interface(struct archive_session *session,
 	DBusMessage *msg;
 	DBusMessageIter args, dict, entry, value;
 	DBusError err;
-	//DBusPendingCall *result;
+	DBusPendingCall *result;
 	msg = dbus_message_new_method_call(CLIENT_ADDRESS, CLIENT_PATH,
 							CLIENT_INTERFACE,
 							"CreateSession");
@@ -239,17 +239,18 @@ static DBusConnection *get_aos_interface(struct archive_session *session,
 	dbus_message_iter_close_container(&args, &dict);
 	
 	dbus_error_init(&err);
-	if (!dbus_connection_send_with_reply_and_block(conn, msg, -1, &err)) {
+	if (!dbus_connection_send_with_reply(conn, msg, &result, -1)) {
 		fprintf(stderr, "Conn error: (%s)\n", err.message);
 		return NULL;
 	}
 
-//	dbus_pending_call_set_notify(result, &get_aos_interface_callback,
-//								session, NULL);
+	dbus_pending_call_set_notify(result, get_aos_interface_callback,
+								session, NULL);
 
 	printf("lawl %p\n", &get_aos_interface_callback);
 
 	dbus_message_unref(msg);
+	dbus_pending_call_unref(result);
 
 	printf("omg?\n");
 
