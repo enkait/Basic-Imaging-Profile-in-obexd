@@ -184,14 +184,15 @@ int image_arch_get(struct obex_session *os, obex_object_t *obj,
 int image_arch_chkput(struct obex_session *os, void *user_data) {
 	printf("IMAGE PULL CHKPUT\n");
 	if (obex_get_size(os) == OBJECT_SIZE_DELETE) {
-		return obex_put_stream_start(os, NULL);
+		//return obex_put_stream_start(os, NULL);
+		return 0;
 	}
 
 	return -EBADR;
 }
 
 static gboolean get_ret_address(struct obex_session *os, char *address) {
-	GError *err;
+	GError *err = NULL;
 	bt_io_get(os->io, BT_IO_RFCOMM, &err, BT_IO_OPT_DEST, address,
 							BT_IO_OPT_INVALID);
 	if (err != NULL) {
@@ -201,15 +202,16 @@ static gboolean get_ret_address(struct obex_session *os, char *address) {
 	return TRUE;
 }
 
-static DBusConnection *connect_to_client() {
-	return dbus_connection_open(CLIENT_ADDRESS, NULL);
+static DBusConnection *connect_to_client(void) {
+	return obex_dbus_get_connection();
 }
 
-//static void get_aos_interface_callback(DBusPendingCall *call, void *user_data) {
-//	struct archive_session *session = user_data;
-//	DBusMessage *msg;
-//	dbus_pending_call_steal_reply(call);
-//}
+static void get_aos_interface_callback(DBusPendingCall *call, void *user_data) {
+	//struct archive_session *session = user_data;
+	//DBusMessage *msg;
+	//dbus_pending_call_steal_reply(call);
+	printf("callback\n");
+}
 
 
 static DBusConnection *get_aos_interface(struct archive_session *session,
@@ -217,16 +219,11 @@ static DBusConnection *get_aos_interface(struct archive_session *session,
 {
 	DBusMessage *msg;
 	DBusMessageIter args, dict, entry, value;
-	DBusPendingCall *result;
+	DBusError err;
+	//DBusPendingCall *result;
 	msg = dbus_message_new_method_call(CLIENT_ADDRESS, CLIENT_PATH,
 							CLIENT_INTERFACE,
 							"CreateSession");
-	if (!dbus_connection_send_with_reply(conn, msg, &result, -1))
-		return NULL;
-
-/*	dbus_pending_call_set_notify(result, &get_aos_interface_callback,
-								session, NULL);
-*/
 
 	dbus_message_iter_init_append(msg, &args);
 	dbus_message_iter_open_container(&args, DBUS_TYPE_ARRAY, "{sv}", &dict);
@@ -240,10 +237,21 @@ static DBusConnection *get_aos_interface(struct archive_session *session,
 							&session->address);
 	dbus_message_iter_close_container(&dict, &entry);
 	dbus_message_iter_close_container(&args, &dict);
+	
+	dbus_error_init(&err);
+	if (!dbus_connection_send_with_reply_and_block(conn, msg, -1, &err)) {
+		fprintf(stderr, "Conn error: (%s)\n", err.message);
+		return NULL;
+	}
 
-	dbus_connection_flush(conn);
+//	dbus_pending_call_set_notify(result, &get_aos_interface_callback,
+//								session, NULL);
+
+	printf("lawl %p\n", &get_aos_interface_callback);
 
 	dbus_message_unref(msg);
+
+	printf("omg?\n");
 
 	return NULL;
 }
