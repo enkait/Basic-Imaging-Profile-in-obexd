@@ -75,28 +75,60 @@ static DBusConnection *connect_to_client(void) {
 	return obex_dbus_get_connection();
 }
 
+
+
 static void get_aos_interface_callback(DBusPendingCall *call, void *user_data) {
-	//struct archive_session *session = user_data;
-	//DBusMessage *msg;
-	//dbus_pending_call_steal_reply(call);
+	struct archive_session *session = user_data;
+	DBusMessage *msg = dbus_pending_call_steal_reply(call);
+	char *path;
+
+	if (msg == NULL)
+		goto failed;
+
+	if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_OBJECT_PATH, &path,
+						DBUS_TYPE_INVALID))
+		goto failed;
+
+	session->path = path;
+
+	printf("got path: %s\n", session->path);
+
+
+
 	printf("callback\n");
+failed:
+	session->err = -EBADR;
+	obex_object_set_io_flags(session, G_IO_OUT, 0);
 }
 
-static void append_sv_dict_entry(DBusMessageIter *dict, const char *key,
+static gboolean append_sv_dict_entry(DBusMessageIter *dict, const char *key,
 							int type, void *val)
 {
 	DBusMessageIter entry, value;
-	dbus_message_iter_open_container(dict, DBUS_TYPE_DICT_ENTRY, NULL,
-								&entry);
-	dbus_message_iter_append_basic(&entry, DBUS_TYPE_STRING, &key);
-	dbus_message_iter_open_container(&entry, DBUS_TYPE_VARIANT, "s",
-							&value);
-	dbus_message_iter_append_basic(&value, type, val);
-	dbus_message_iter_close_container(&entry, &value);
-	dbus_message_iter_close_container(dict, &entry);
+	if (!dbus_message_iter_open_container(dict, DBUS_TYPE_DICT_ENTRY, NULL,
+								&entry))
+		return FALSE;
+
+	if (!dbus_message_iter_append_basic(&entry, DBUS_TYPE_STRING, &key))
+		return FALSE;
+
+	if (!dbus_message_iter_open_container(&entry, DBUS_TYPE_VARIANT, "s",
+									&value))
+		return FALSE;
+
+	if (!dbus_message_iter_append_basic(&value, type, val))
+		return FALSE;
+
+	if (!dbus_message_iter_close_container(&entry, &value))
+		return FALSE;
+
+	if (!dbus_message_iter_close_container(dict, &entry))
+		return FALSE;
+
+	return TRUE;
 }
 
-static DBusConnection *get_aos_interface(struct archive_session *session,
+static gboolean get_aos_interface(struct archive_session *session,
 							DBusConnection *conn)
 {
 	DBusMessage *msg;
@@ -106,22 +138,32 @@ static DBusConnection *get_aos_interface(struct archive_session *session,
 	msg = dbus_message_new_method_call(CLIENT_ADDRESS, CLIENT_PATH,
 							CLIENT_INTERFACE,
 							"CreateSession");
+	if (msg == NULL)
+		return FALSE;
 
 	dbus_message_iter_init_append(msg, &args);
-	dbus_message_iter_open_container(&args, DBUS_TYPE_ARRAY, "{sv}", &dict);
-	append_sv_dict_entry(&dict, "Destination", DBUS_TYPE_STRING,
-							&session->address);
-	append_sv_dict_entry(&dict, "Target", DBUS_TYPE_STRING,	&bip_aos);
-	dbus_message_iter_close_container(&args, &dict);
+	if (!dbus_message_iter_open_container(&args, DBUS_TYPE_ARRAY, "{sv}", &dict))
+		return FALSE;
+
+	if (!append_sv_dict_entry(&dict, "Destination", DBUS_TYPE_STRING,
+							&session->address))
+		return FALSE;
+
+	if (!append_sv_dict_entry(&dict, "Target", DBUS_TYPE_STRING, &bip_aos))
+		return FALSE;
+
+	if (!dbus_message_iter_close_container(&args, &dict))
+		return FALSE;
 	
 	dbus_error_init(&err);
 	if (!dbus_connection_send_with_reply(conn, msg, &result, -1)) {
 		fprintf(stderr, "Conn error: (%s)\n", err.message);
-		return NULL;
+		return FALSE;
 	}
 
-	dbus_pending_call_set_notify(result, get_aos_interface_callback,
-								session, NULL);
+	if (!dbus_pending_call_set_notify(result, get_aos_interface_callback,
+								session, NULL))
+		return FALSE;
 
 	printf("lawl %p\n", get_aos_interface_callback);
 
@@ -130,7 +172,7 @@ static DBusConnection *get_aos_interface(struct archive_session *session,
 
 	printf("omg?\n");
 
-	return NULL;
+	return TRUE;
 }
 
 static void *imgarch_open(const char *name, int oflag, mode_t mode,
@@ -138,7 +180,6 @@ static void *imgarch_open(const char *name, int oflag, mode_t mode,
 {
 	struct archive_session *session = context;
 	printf("imgarch open\n");
-	session->called = FALSE;
 	return session;
 }
 
@@ -150,23 +191,20 @@ static int imgarch_close(void *object)
 
 static ssize_t imgarch_write(void *object, const void *buf, size_t count)
 {
-	struct archive_session *session = object;
-	DBusConnection *conn;
-	printf("imgarch write\n");
-	if ((conn = connect_to_client()) == NULL)
-		return -EBADR;
-	get_aos_interface(session, conn);
-	return -EAGAIN;
+	return -EINVAL;
 }
 
 static ssize_t imgarch_flush(void *object)
 {
 	struct archive_session *session = object;
 	DBusConnection *conn;
+	if (session->err < 0)
+		return session->err;
 	printf("imgarch flush\n");
 	if ((conn = connect_to_client()) == NULL)
 		return -EBADR;
-	get_aos_interface(session, conn);
+	if (!get_aos_interface(session, conn))
+		return -EBADR;
 	return -EAGAIN;
 }
 

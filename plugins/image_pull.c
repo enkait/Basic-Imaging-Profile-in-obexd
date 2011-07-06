@@ -211,6 +211,7 @@ static GSList *get_image_list(int *err) {
 	DIR *img_dir = opendir(bip_dir);
 
 	if (img_dir == NULL) {
+		printf("no folder, errno: %d\n", errno);
 		if (err != NULL)
 			*err = -errno;
 		return NULL;
@@ -254,7 +255,8 @@ static GSList *get_image_list(int *err) {
 	return images;
 }
 
-void *image_pull_connect(struct obex_session *os, int *err) {
+void *image_pull_connect(struct obex_session *os, int *err)
+{
 	struct image_pull_session *session;
 	int priv_err = 0;
 	printf("IMAGE PULL CONNECT\n");
@@ -277,11 +279,13 @@ void *image_pull_connect(struct obex_session *os, int *err) {
 }
 
 int image_pull_get(struct obex_session *os, obex_object_t *obj,
-		gboolean *stream, void *user_data) {
+					gboolean *stream, void *user_data)
+{
 	struct image_pull_session *session = user_data;
 	const uint8_t *buffer;
 	int ret;
-	ssize_t rsize = obex_aparam_read(os, obj, &buffer);
+	ssize_t rsize;
+	rsize = obex_aparam_read(os, obj, &buffer);
 
 	printf("IMAGE PULL GET\n");
 
@@ -307,7 +311,8 @@ int image_pull_get(struct obex_session *os, obex_object_t *obj,
 	return 0;
 }
 
-int image_pull_chkput(struct obex_session *os, void *user_data) {
+int image_pull_chkput(struct obex_session *os, void *user_data)
+{
 	printf("IMAGE PULL CHKPUT\n");
 
 	if (obex_get_size(os) == OBJECT_SIZE_DELETE)

@@ -31,8 +31,9 @@ struct aa_aparam {
 struct archive_session {
     struct obex_session *os;
     struct aa_aparam *aparam;
-    gboolean called;
+    int err;
     char *address;
+    char *path;
 };
 
 void *image_arch_connect(struct obex_session *os, int *err);
