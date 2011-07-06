@@ -74,17 +74,15 @@ uint8_t *encode_img_descriptor(const char *data, unsigned int length, unsigned i
 }
 
 char *decode_img_descriptor(const uint8_t *data, unsigned int length, unsigned int *newsize) {
-	uint16_t len = length;
 	char *buf;
-	printf("%u\n", len);
-	len = GUINT16_FROM_BE(len);
-	buf = g_try_malloc(len-2);
+	printf("%u\n", length);
+	buf = g_try_malloc(length-2);
 
 	if (buf == NULL)
 		return NULL;
 
-	g_memmove(buf, data+2, len);
-	*newsize = len;
+	g_memmove(buf, data+2, length-2);
+	*newsize = length-2;
 	return buf;
 }
 
@@ -356,7 +354,7 @@ failed:
 	return FALSE;
 }
 
-int get_handle(char *data, unsigned int length)
+int get_handle(const char *data, unsigned int length)
 {
 	int handle, ret;
 	if (data == NULL)
