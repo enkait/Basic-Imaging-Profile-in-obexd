@@ -75,8 +75,6 @@ static DBusConnection *connect_to_client(void) {
 	return obex_dbus_get_connection();
 }
 
-
-
 static void get_aos_interface_callback(DBusPendingCall *call, void *user_data) {
 	struct archive_session *session = user_data;
 	DBusMessage *msg = dbus_pending_call_steal_reply(call);
@@ -92,8 +90,6 @@ static void get_aos_interface_callback(DBusPendingCall *call, void *user_data) {
 	session->path = path;
 
 	printf("got path: %s\n", session->path);
-
-
 
 	printf("callback\n");
 failed:

@@ -98,38 +98,25 @@ def parse_options():
     return parser.parse_args()
 
 def images_listing(session):
-    print session.GetImagesListingRange(1,1)
-    print session.GetImagesListingRange(2,2)
-    print session.GetImagesListingRange(3,3)
+    print "listing\n"
+    print session.GetImagesListing({"count" : 1, "offset" : 1})
+    print session.GetImagesListing({"count" : 2, "offset" : 2})
+    print session.GetImagesListing({"count" : 3, "offset" : 3})
     print "pixel 100*200-400*400"
-    print session.GetImagesListingRangeFilter(65535,0,{
-        "pixel" : "100*200-400*400"
-        })
+    print session.GetImagesListing({"pixel" : "100*200-400*400"})
     print "pixel 100*200-1600*1600"
-    print session.GetImagesListingRangeFilter(65535,0,{
-        "pixel" : "100*200-1600*1600"
-        })
+    print session.GetImagesListing({"pixel" : "100*200-1600*1600"})
     print "pixel 1680*1050"
-    print session.GetImagesListingRangeFilter(65535,0,{
-        "pixel" : "1680*1050"
-        })
+    print session.GetImagesListing({"pixel" : "1680*1050"})
     print "pixel 168**-3360*2100"
-    print session.GetImagesListingRangeFilter(65535,0,{
-        "pixel" : "168**-3360*2100"
-        })
+    print session.GetImagesListing({"pixel" : "168**-3360*2100"})
     print "encoding BMP"
-    print session.GetImagesListingRangeFilter(65535,0,{
-        "encoding" : "BMP"
-        })
+    print session.GetImagesListing({"encoding" : "BMP"})
     print "created: 20110621T184115Z-20110621T184115Z"
-    print session.GetImagesListingRangeFilter(65535,0,{
-        "created" : "20110621T184115Z-20110621T184115Z"
-        })
+    print session.GetImagesListing({"created" : "20110621T184115Z-20110621T184115Z"})
     print "created: 20110621T184116Z-20110621T184116Z"
-    print session.GetImagesListingRangeFilter(65535,0,{
-        "created" : "20110621T184116Z-20110621T184116Z"
-        })
-    print session.GetImagesListing()
+    print session.GetImagesListing({"created" : "20110621T184116Z-20110621T184116Z"})
+    print session.GetImagesListing({})
 
 def imaging_capabilities(session):
     print "omg"

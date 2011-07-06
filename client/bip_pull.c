@@ -49,6 +49,8 @@ static char *get_null_terminated(char *buffer, int len) {
 	return newbuffer;
 }
 
+
+
 static void get_images_listing_callback(
 		struct session_data *session, GError *err,
 		void *user_data)
@@ -93,7 +95,8 @@ done:
 	return;
 }
 
-static struct images_listing_aparam *new_images_listing_aparam(uint16_t nb, uint16_t ls, uint8_t lc) {
+static struct images_listing_aparam *new_images_listing_aparam(uint16_t nb, uint16_t ls, gboolean latest)
+{
 	struct images_listing_aparam *aparam = g_try_malloc(sizeof(struct images_listing_aparam));
 	aparam->nbtag = NBRETURNEDHANDLES_TAG;
 	aparam->nblen = NBRETURNEDHANDLES_LEN;
@@ -103,31 +106,11 @@ static struct images_listing_aparam *new_images_listing_aparam(uint16_t nb, uint
 	aparam->ls = GUINT16_TO_BE(ls);
 	aparam->lctag = LATESTCAPTUREDIMAGES_TAG;
 	aparam->lclen = LATESTCAPTUREDIMAGES_LEN;
-	aparam->lc = lc;
+	if (latest)
+		aparam->lc = 1;
+	else
+		aparam->lc = 0;
 	return aparam;
-}
-
-static DBusMessage *get_images_listing_all(DBusConnection *connection,
-		DBusMessage *message, void *user_data)
-{
-	struct session_data *session = user_data;
-	struct images_listing_aparam *aparam;
-	int err;
-
-	printf("requested get images listing for all\n");
-
-	aparam = new_images_listing_aparam(GETALLIMAGES, 0, 0);
-
-	if ((err=session_get(session, "x-bt/img-listing", NULL, NULL, (const guint8 *)aparam,
-					sizeof(struct images_listing_aparam), get_images_listing_callback)) < 0) {
-		return g_dbus_create_error(message,
-				"org.openobex.Error.Failed",
-				"334Failed");
-	}
-
-	session->msg = dbus_message_ref(message);
-
-	return NULL;
 }
 
 static struct a_header *create_handle(const char *handle) {
@@ -221,39 +204,65 @@ static DBusMessage *delete_image(DBusConnection *connection,
 	return reply;
 }
 
-static int parse_filter_dict(DBusMessageIter *iter,
+static gboolean parse_filter_dict(DBusMessageIter *iter,
+		uint16_t *count, uint16_t *start, gboolean *latest,
 		char **created, char **modified, char **encoding,
-		char **pixel) {
+		char **pixel)
+{
+	*count = 65535;
+	*start = 0;
+	*latest = FALSE;
+	*created = NULL;
+	*modified = NULL;
+	*encoding = NULL;
+	*pixel = NULL;
+
 	while (dbus_message_iter_get_arg_type(iter) == DBUS_TYPE_DICT_ENTRY) {
-		DBusMessageIter entry;
-		const char *key, *value;
+		DBusMessageIter entry, value;
+		const char *key, *val;
 
 		dbus_message_iter_recurse(iter, &entry);
 		dbus_message_iter_get_basic(&entry, &key);
 
 		dbus_message_iter_next(&entry);
-		dbus_message_iter_get_basic(&entry, &value);
-
-		if (g_str_equal(key, "created") == TRUE)
-			*created = g_strdup(value);
-		else if (g_str_equal(key, "modified") == TRUE)
-			*modified = g_strdup(value);
-		else if (g_str_equal(key, "encoding") == TRUE)
-			*encoding = g_strdup(value);
-		else if (g_str_equal(key, "pixel") == TRUE)
-			*pixel = g_strdup(value);
-
+		dbus_message_iter_recurse(iter, &value);
+		
+		switch (dbus_message_iter_get_arg_type(&value)) {
+		case DBUS_TYPE_STRING:
+			dbus_message_iter_get_basic(&entry, &val);
+			if (g_str_equal(key, "created"))
+				*created = g_strdup(val);
+			else if (g_str_equal(key, "modified"))
+				*modified = g_strdup(val);
+			else if (g_str_equal(key, "encoding"))
+				*encoding = g_strdup(val);
+			else if (g_str_equal(key, "pixel"))
+				*pixel = g_strdup(val);
+			else if (g_str_equal(key, "pixel"))
+				*pixel = g_strdup(val);
+			break;
+		case DBUS_TYPE_UINT16:
+			if (g_str_equal(key, "count"))
+				dbus_message_iter_get_basic(&entry, count);
+			else if (g_str_equal(key, "offset"))
+				dbus_message_iter_get_basic(&entry, start);
+			break;
+		case DBUS_TYPE_BOOLEAN:
+			if (g_str_equal(key, "latest"))
+				dbus_message_iter_get_basic(&entry, latest);
+		}
 		dbus_message_iter_next(iter);
 	}
 
-	printf("c: %s\nm: %s\ne: %s\np: %s\n",
+	printf("c: %s\nm: %s\ne: %s\np: %s\nc: %u\no: %u\nl: %u\n",
 			(*created)?(*created):(""),
 			(*modified)?(*modified):(""),
 			(*encoding)?(*encoding):(""),
-			(*pixel)?(*pixel):("")
+			(*pixel)?(*pixel):(""),
+			*count, *start, *latest
 	      );
 
-	return 0;
+	return TRUE;
 }
 
 static struct a_header *create_filtering_descriptor(char *created, char *modified,
@@ -287,8 +296,8 @@ static struct a_header *create_filtering_descriptor(char *created, char *modifie
 	return ah;
 }
 
-static DBusMessage *get_images_listing_range_filter(DBusConnection *connection,
-		DBusMessage *message, void *user_data)
+static DBusMessage *get_images_listing(DBusConnection *connection,
+					DBusMessage *message, void *user_data)
 {
 	struct session_data *session = user_data;
 	DBusMessageIter iter, dict;
@@ -297,32 +306,20 @@ static DBusMessage *get_images_listing_range_filter(DBusConnection *connection,
 	     *encoding = NULL, *pixel = NULL;
 	struct a_header *handles_desc;
 	uint16_t count, begin;
+	gboolean latest;
 	GSList *aheaders;
 	int err;
 
 	printf("requested get images listing with range and filtering\n");
 
-	if (dbus_message_get_args(message, NULL,
-				DBUS_TYPE_UINT16, &count,
-				DBUS_TYPE_UINT16, &begin,
-				DBUS_TYPE_INVALID) == FALSE)
-		return g_dbus_create_error(message,
-				"org.openobex.Error.InvalidArguments", NULL);
-
-	if (count==0)
-		return g_dbus_create_error(message,
-				"org.openobex.Error.InvalidArguments", NULL);
-
 	dbus_message_iter_init(message, &iter);
-	dbus_message_iter_next(&iter);
-	dbus_message_iter_next(&iter);
 	dbus_message_iter_recurse(&iter, &dict);
-
-	parse_filter_dict(&dict, &created, &modified, &encoding, &pixel);
+	parse_filter_dict(&dict, &count, &begin, &latest, &created, &modified, &encoding, &pixel);
+	
 	handles_desc = create_filtering_descriptor(created, modified, encoding, pixel);
 	aheaders = g_slist_append(NULL, handles_desc);
 
-	aparam = new_images_listing_aparam(count, begin, 0);
+	aparam = new_images_listing_aparam(count, begin, latest);
 
 	printf("rozmiar aparam: %u\n", sizeof(struct images_listing_aparam));
 
@@ -336,43 +333,6 @@ static DBusMessage *get_images_listing_range_filter(DBusConnection *connection,
 
 	g_slist_free(aheaders);
 	a_header_free(handles_desc);
-
-	session->msg = dbus_message_ref(message);
-
-	return NULL;
-}
-
-static DBusMessage *get_images_listing_range(DBusConnection *connection,
-		DBusMessage *message, void *user_data)
-{
-	struct session_data *session = user_data;
-	struct images_listing_aparam *aparam;
-	uint16_t count, begin;
-	int err;
-
-	printf("requested get images listing with range\n");
-
-	if (dbus_message_get_args(message, NULL,
-				DBUS_TYPE_UINT16, &count,
-				DBUS_TYPE_UINT16, &begin,
-				DBUS_TYPE_INVALID) == FALSE)
-		return g_dbus_create_error(message,
-				"org.openobex.Error.InvalidArguments", NULL);
-
-	if (count==0)
-		return g_dbus_create_error(message,
-				"org.openobex.Error.InvalidArguments", NULL);
-
-	aparam = new_images_listing_aparam(count, begin, 0);
-
-	printf("rozmiar aparam: %u\n", sizeof(struct images_listing_aparam));
-
-	if ((err=session_get(session, "x-bt/img-listing", NULL, NULL, (const guint8 *)aparam,
-					sizeof(struct images_listing_aparam), get_images_listing_callback)) < 0) {
-		return g_dbus_create_error(message,
-				"org.openobex.Error.Failed",
-				"334Failed");
-	}
 
 	session->msg = dbus_message_ref(message);
 
@@ -592,11 +552,7 @@ GDBusMethodTable image_pull_methods[] = {
 	{ "GetImage",	"sssss", "", get_image },
 	{ "GetImageThumbnail",	"ss", "", get_image_thumbnail },
 	{ "GetImageAttachment",	"sss", "", get_image_attachment },
-	{ "GetImagesListing",	"", "s", get_images_listing_all,
-		G_DBUS_METHOD_FLAG_ASYNC },
-	{ "GetImagesListingRange",	"qq", "s", get_images_listing_range,
-		G_DBUS_METHOD_FLAG_ASYNC },
-	{ "GetImagesListingRangeFilter",	"qqa{ss}", "s", get_images_listing_range_filter,
+	{ "GetImagesListing",	"a{sv}", "s", get_images_listing,
 		G_DBUS_METHOD_FLAG_ASYNC },
 	{ "GetImageProperties",	"s", "s", get_image_properties },
 	{ "DeleteImage", "s", "", delete_image },

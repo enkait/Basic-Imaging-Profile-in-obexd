@@ -286,18 +286,20 @@ static struct img_hdesc *parse_handles_desc(char *data,
 						unsigned int length, int *err)
 {
 	struct img_hdesc *desc = get_hdesc();
-	gboolean status;
-	GMarkupParseContext *ctxt = g_markup_parse_context_new(
-					&handles_desc_parser, 0, desc, NULL);
-	if (err != NULL)
-		*err = 0;
-	status = g_markup_parse_context_parse(ctxt, data, length, NULL);
-	g_markup_parse_context_free(ctxt);
-	if (!status) {
+	if (length > 0) {
+		gboolean status;
+		GMarkupParseContext *ctxt = g_markup_parse_context_new(
+				&handles_desc_parser, 0, desc, NULL);
 		if (err != NULL)
-			*err = -EINVAL;
-		free_img_hdesc(desc);
-		desc = NULL;
+			*err = 0;
+		status = g_markup_parse_context_parse(ctxt, data, length, NULL);
+		g_markup_parse_context_free(ctxt);
+		if (!status) {
+			if (err != NULL)
+				*err = -EINVAL;
+			free_img_hdesc(desc);
+			desc = NULL;
+		}
 	}
 	return desc;
 }
@@ -309,9 +311,9 @@ struct imglisting_aparam_header {
 } __attribute__ ((packed));
 
 struct imglisting_aparam {
-    uint16_t nbreturnedhandles;
-    uint16_t liststartoffset;
-    uint8_t latestcapturedimages;
+	uint16_t nbreturnedhandles;
+	uint16_t liststartoffset;
+	uint8_t latestcapturedimages;
 };
 
 static struct imglisting_aparam *parse_aparam(const uint8_t *buffer, uint32_t hlen, int *err)
@@ -331,36 +333,36 @@ static struct imglisting_aparam *parse_aparam(const uint8_t *buffer, uint32_t hl
 		hdr = (void *) buffer + len;
 
 		switch (hdr->tag) {
-		case NBRETURNEDHANDLES_TAG:
-			if (hdr->len != NBRETURNEDHANDLES_LEN)
-				goto failed;
-			memcpy(&val16, hdr->val, sizeof(val16));
-			param->nbreturnedhandles = GUINT16_FROM_BE(val16);
-			fields[0] = TRUE;
-			break;
+			case NBRETURNEDHANDLES_TAG:
+				if (hdr->len != NBRETURNEDHANDLES_LEN)
+					goto failed;
+				memcpy(&val16, hdr->val, sizeof(val16));
+				param->nbreturnedhandles = GUINT16_FROM_BE(val16);
+				fields[0] = TRUE;
+				break;
 
-		case LISTSTARTOFFSET_TAG:
-			if (hdr->len != LISTSTARTOFFSET_LEN)
-				goto failed;
-			memcpy(&val16, hdr->val, sizeof(val16));
-			param->liststartoffset = GUINT16_FROM_BE(val16);
-			fields[1] = TRUE;
-			break;
+			case LISTSTARTOFFSET_TAG:
+				if (hdr->len != LISTSTARTOFFSET_LEN)
+					goto failed;
+				memcpy(&val16, hdr->val, sizeof(val16));
+				param->liststartoffset = GUINT16_FROM_BE(val16);
+				fields[1] = TRUE;
+				break;
 
-		case LATESTCAPTUREDIMAGES_TAG:
-			if (hdr->len != LATESTCAPTUREDIMAGES_LEN)
-				goto failed;
-			param->latestcapturedimages = hdr->val[0];
-			fields[2] = TRUE;
-			break;
+			case LATESTCAPTUREDIMAGES_TAG:
+				if (hdr->len != LATESTCAPTUREDIMAGES_LEN)
+					goto failed;
+				param->latestcapturedimages = hdr->val[0];
+				fields[2] = TRUE;
+				break;
 
-		default:
-			goto failed;
+			default:
+				goto failed;
 		}
 
 		len += hdr->len + sizeof(struct imglisting_aparam_header);
 	}
-	
+
 	for (i = 0; i < 3; i++)
 		if (!fields[i])
 			goto failed;
@@ -414,7 +416,7 @@ static void *imglisting_open(const char *name, int oflag, mode_t mode,
 	struct img_hdesc *desc;
 	struct imglisting_aparam *aparam;
 	struct imglist_resp *resp;
-	
+
 	if (err != NULL)
 		*err = 0;
 
@@ -425,7 +427,7 @@ static void *imglisting_open(const char *name, int oflag, mode_t mode,
 	}
 
 	aparam = parse_aparam(session->aparam_data, session->aparam_data_len,
-									err);
+			err);
 
 	if (aparam == NULL)
 		return NULL;
@@ -436,7 +438,7 @@ static void *imglisting_open(const char *name, int oflag, mode_t mode,
 	printf("object: %s\n", session->desc_hdr);
 
 	desc = parse_handles_desc(session->desc_hdr, session->desc_hdr_len,
-									err);
+			err);
 
 	if (desc == NULL) {
 		g_free(aparam);
@@ -450,12 +452,12 @@ static void *imglisting_open(const char *name, int oflag, mode_t mode,
 
 	resp = g_new0(struct imglist_resp, 1);
 	resp->body = create_images_listing(session, count, offset, &res_count,
-									desc);
+			desc);
 	resp->aparam = cr_imglist_aparam_r(res_count);
 	resp->hdesc = create_hdesc_hdr(session->desc_hdr, session->desc_hdr_len);
 
 	printf("response: %u %u %u\n", resp->body->len, resp->aparam->len,
-							resp->hdesc->len);
+			resp->hdesc->len);
 
 	free_img_hdesc(desc);
 	g_free(aparam);
