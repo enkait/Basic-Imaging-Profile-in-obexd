@@ -99,9 +99,9 @@ def parse_options():
 
 def images_listing(session):
     print "listing\n"
-    print session.GetImagesListing({"count" : 1, "offset" : 1})
-    print session.GetImagesListing({"count" : 2, "offset" : 2})
-    print session.GetImagesListing({"count" : 3, "offset" : 3})
+    print session.GetImagesListing({"count" : dbus.UInt16(1), "offset" : dbus.UInt16(1)})
+    print session.GetImagesListing({"count" : dbus.UInt16(2), "offset" : dbus.UInt16(2)})
+    print session.GetImagesListing({"count" : dbus.UInt16(3), "offset" : dbus.UInt16(3)})
     print "pixel 100*200-400*400"
     print session.GetImagesListing({"pixel" : "100*200-400*400"})
     print "pixel 100*200-1600*1600"
@@ -116,7 +116,7 @@ def images_listing(session):
     print session.GetImagesListing({"created" : "20110621T184115Z-20110621T184115Z"})
     print "created: 20110621T184116Z-20110621T184116Z"
     print session.GetImagesListing({"created" : "20110621T184116Z-20110621T184116Z"})
-    print session.GetImagesListing({})
+    print session.GetImagesListing({"latest" : True})
 
 def imaging_capabilities(session):
     print "omg"

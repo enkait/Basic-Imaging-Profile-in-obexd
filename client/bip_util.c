@@ -354,7 +354,7 @@ failed:
 	return FALSE;
 }
 
-int get_handle(char *data, unsigned int length)
+int get_handle(const char *data, unsigned int length)
 {
 	int handle, ret;
 	if (data == NULL)

@@ -152,9 +152,9 @@ static struct aa_aparam *parse_aparam(const uint8_t *buffer, uint32_t hlen)
 
 		len += hdr->len + sizeof(struct sa_aparam_header);
 	}
-			for(i=0;i<16;i++) {
-				printf("%x\n", (char) param->serviceid[i]);
-			}
+	for(i=0;i<16;i++) {
+		printf("%x\n", (char) param->serviceid[i]);
+	}
 
 	return param;
 

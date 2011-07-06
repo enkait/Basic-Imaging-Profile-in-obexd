@@ -35,9 +35,11 @@
 
 #define BIP_TEMP_FOLDER /tmp/bip/
 
-static char *get_null_terminated(char *buffer, int len) {
+static char *get_null_terminated(char *buffer, unsigned int len, unsigned int *newlen) {
 	char *newbuffer;
-	if (buffer[len-1] != '\0') {
+	while (len > 0 && buffer[len - 1] == '\0')
+		len--;
+	if (buffer[len - 1] != '\0') {
 		newbuffer = g_try_malloc(len + 1);
 		g_memmove(newbuffer, buffer, len);
 		newbuffer[len]='\0';
@@ -46,45 +48,221 @@ static char *get_null_terminated(char *buffer, int len) {
 	else {
 		newbuffer = g_memdup(buffer, len);
 	}
+	*newlen = len;
 	return newbuffer;
 }
 
+struct listing_object {
+	char *handle, *ctime, *mtime;
+};
 
+static void free_listing_object(struct listing_object *object) {
+	g_free(object->handle);
+	g_free(object->ctime);
+	g_free(object->mtime);
+	g_free(object);
+}
+
+static gboolean listing_parse_attr(struct listing_object *object, const gchar *key,
+					const gchar *value, GError **gerr)
+{
+	printf("key: %s\n", key);
+	if (g_str_equal(key, "handle")) {
+		if (value == NULL)
+			goto invalid;
+		if (get_handle(value, strlen(value)) < 0)
+			goto invalid;
+		object->handle = g_strdup(value);
+		printf("handle: %s\n", object->handle);
+	}
+	else if (g_str_equal(key, "created")) {
+		if (parse_iso8601_bip(value, strlen(value)) == -1)
+			goto invalid;
+		object->ctime = g_strdup(value);
+	}
+	else if (g_str_equal(key, "modified")) {
+		if (parse_iso8601_bip(value, strlen(value)) == -1)
+			goto invalid;
+		object->mtime = g_strdup(value);
+	}
+	else {
+		g_set_error(gerr, G_MARKUP_ERROR,
+				G_MARKUP_ERROR_UNKNOWN_ATTRIBUTE, NULL);
+		return FALSE;
+	}
+	printf("ok\n");
+	return TRUE;
+invalid:
+	g_set_error(gerr, G_MARKUP_ERROR, G_MARKUP_ERROR_INVALID_CONTENT, NULL);
+	return FALSE;
+}
+
+
+static void listing_element(GMarkupParseContext *ctxt,
+		const gchar *element,
+		const gchar **names,
+		const gchar **values,
+		gpointer user_data,
+		GError **gerr)
+{
+	GSList **listing = user_data;
+	struct listing_object *obj;
+	gchar **key;
+
+	printf("element: %s\n", element);
+	printf("names\n");
+
+	if (g_str_equal(element, "image") != TRUE) {
+		return;
+	}
+	
+	obj = g_new0(struct listing_object, 1);
+
+	printf("names: %p\n", names);
+	for (key = (gchar **) names; *key; key++, values++) {
+		if (!listing_parse_attr(obj, *key, *values, gerr)) {
+			free_listing_object(obj);
+			return;
+		}
+	}
+	*listing = g_slist_append(*listing, obj);
+	printf("%p\n", *listing);
+}
+
+static const GMarkupParser images_listing_parser = {
+	listing_element,
+	NULL,
+	NULL,
+	NULL,
+	NULL
+};
+
+static GSList *parse_images_listing(char *data,
+						unsigned int length, int *err)
+{
+	GSList *listing = NULL;
+	gboolean status;
+	GError *gerr = NULL;
+	GMarkupParseContext *ctxt = g_markup_parse_context_new(
+					&images_listing_parser, 0, &listing, NULL);
+	if (err != NULL)
+		*err = 0;
+	status = g_markup_parse_context_parse(ctxt, data, length, &gerr);
+	g_markup_parse_context_free(ctxt);
+	printf("%d %p\n", status, listing);
+	if (!status) {
+		printf("%s\n", gerr->message);
+		if (err != NULL)
+			*err = -EINVAL;
+		while (listing != NULL) {
+			struct listing_object *obj = listing->data;
+			listing = g_slist_remove(listing, obj);
+			free_listing_object(obj);
+		}
+	}
+	return listing;
+}
+
+static gboolean append_sv_dict_entry(DBusMessageIter *dict, const char *key,
+							int type, void *val)
+{
+	DBusMessageIter entry, value;
+	if (!dbus_message_iter_open_container(dict, DBUS_TYPE_DICT_ENTRY, NULL,
+								&entry))
+		return FALSE;
+
+	if (!dbus_message_iter_append_basic(&entry, DBUS_TYPE_STRING, &key))
+		return FALSE;
+
+	if (!dbus_message_iter_open_container(&entry, DBUS_TYPE_VARIANT, "s",
+									&value))
+		return FALSE;
+
+	if (!dbus_message_iter_append_basic(&value, type, val))
+		return FALSE;
+
+	if (!dbus_message_iter_close_container(&entry, &value))
+		return FALSE;
+
+	if (!dbus_message_iter_close_container(dict, &entry))
+		return FALSE;
+
+	return TRUE;
+}
+
+static gboolean append_listing_dict(DBusMessageIter *args,
+							const GSList *listing)
+{
+	DBusMessageIter dict;
+	if (!dbus_message_iter_open_container(args, DBUS_TYPE_ARRAY, "a{sv}",
+									&dict))
+		return FALSE;
+
+	while (listing != NULL) {
+		DBusMessageIter image;
+		struct listing_object *obj = listing->data;
+		
+		if (!dbus_message_iter_open_container(&dict, DBUS_TYPE_ARRAY,
+								"{sv}", &image))
+			return FALSE;
+
+		if (obj->handle != NULL && !append_sv_dict_entry(&image,
+				"handle", DBUS_TYPE_STRING, &obj->handle))
+			return FALSE;
+		
+		if (obj->ctime != NULL && !append_sv_dict_entry(&image,
+				"created", DBUS_TYPE_STRING, &obj->ctime))
+			return FALSE;
+
+		if (obj->mtime != NULL && !append_sv_dict_entry(&image,
+				"modified", DBUS_TYPE_STRING, &obj->mtime))
+			return FALSE;
+
+		if (!dbus_message_iter_close_container(&dict, &image))
+			return FALSE;
+
+		listing = g_slist_next(listing);
+	}
+
+	if (!dbus_message_iter_close_container(args, &dict))
+		return FALSE;
+	return TRUE;
+}
 
 static void get_images_listing_callback(
-		struct session_data *session, GError *err,
+		struct session_data *session, GError *gerr,
 		void *user_data)
 {
 	DBusMessage *reply;
 	DBusMessageIter iter;
-	char *listing;
-	int i;
+	int err;
 	struct transfer_data *transfer = session->pending->data;
+	GSList *listing;
 	printf("get_images_listing_callback called\n");
-	if(err) {
-		reply = g_dbus_create_error(session->msg,
-				"org.openobex.Error", "%s", err->message);
+	if (gerr != NULL) {
+		reply = g_dbus_create_error(session->msg, "org.openobex.Error",
+							"%s", gerr->message);
 		goto done;
 	}
 
+	listing = parse_images_listing(transfer->buffer, transfer->filled, &err);
+
+	printf("%p\n", listing);
+
+	if (err < 0) {
+		reply = g_dbus_create_error(session->msg, "org.openobex.Error",
+									NULL);
+		goto done;
+	}
+	
 	reply = dbus_message_new_method_return(session->msg);
-
-	if (transfer->filled == 0)
-		goto done;
-
-	for (i = transfer->filled - 1; i > 0; i--) {
-		if (transfer->buffer[i] != '\0')
-			break;
-
-		transfer->filled--;
-	}
-
-	listing = get_null_terminated(transfer->buffer, transfer->filled);
-
 	dbus_message_iter_init_append(reply, &iter);
-	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING,
-			&listing);
-	g_free(listing);
+	append_listing_dict(&iter, listing);
+	while (listing != NULL) {
+		struct listing_object *obj = listing->data;
+		listing = g_slist_remove(listing, obj);
+		free_listing_object(obj);
+	}
 
 done:
 	g_dbus_send_message(session->conn, reply);
@@ -130,6 +308,7 @@ static DBusMessage *get_image_properties(DBusConnection *connection,
 	struct a_header *hdesc;
 	GSList *aheaders;
 	int err, length;
+	unsigned newlen;
 
 	printf("requested get image properties\n");
 	
@@ -155,7 +334,7 @@ static DBusMessage *get_image_properties(DBusConnection *connection,
 				"334Failed");
 	}
 	
-	object = get_null_terminated(buffer, length);
+	object = get_null_terminated(buffer, length, &newlen);
 	reply = dbus_message_new_method_return(message);
 	
 	dbus_message_iter_init_append(reply, &iter);
@@ -222,14 +401,17 @@ static gboolean parse_filter_dict(DBusMessageIter *iter,
 		const char *key, *val;
 
 		dbus_message_iter_recurse(iter, &entry);
+		printf("get basic\n");
 		dbus_message_iter_get_basic(&entry, &key);
 
 		dbus_message_iter_next(&entry);
-		dbus_message_iter_recurse(iter, &value);
+		printf("recurse\n");
+		dbus_message_iter_recurse(&entry, &value);
 		
 		switch (dbus_message_iter_get_arg_type(&value)) {
 		case DBUS_TYPE_STRING:
-			dbus_message_iter_get_basic(&entry, &val);
+			dbus_message_iter_get_basic(&value, &val);
+			printf("val: %s\n", val);
 			if (g_str_equal(key, "created"))
 				*created = g_strdup(val);
 			else if (g_str_equal(key, "modified"))
@@ -238,18 +420,18 @@ static gboolean parse_filter_dict(DBusMessageIter *iter,
 				*encoding = g_strdup(val);
 			else if (g_str_equal(key, "pixel"))
 				*pixel = g_strdup(val);
-			else if (g_str_equal(key, "pixel"))
-				*pixel = g_strdup(val);
 			break;
 		case DBUS_TYPE_UINT16:
+			printf("val2 %s\n", key);
 			if (g_str_equal(key, "count"))
-				dbus_message_iter_get_basic(&entry, count);
+				dbus_message_iter_get_basic(&value, count);
 			else if (g_str_equal(key, "offset"))
-				dbus_message_iter_get_basic(&entry, start);
+				dbus_message_iter_get_basic(&value, start);
 			break;
 		case DBUS_TYPE_BOOLEAN:
+			printf("val3 %s\n", key);
 			if (g_str_equal(key, "latest"))
-				dbus_message_iter_get_basic(&entry, latest);
+				dbus_message_iter_get_basic(&value, latest);
 		}
 		dbus_message_iter_next(iter);
 	}
@@ -552,7 +734,7 @@ GDBusMethodTable image_pull_methods[] = {
 	{ "GetImage",	"sssss", "", get_image },
 	{ "GetImageThumbnail",	"ss", "", get_image_thumbnail },
 	{ "GetImageAttachment",	"sss", "", get_image_attachment },
-	{ "GetImagesListing",	"a{sv}", "s", get_images_listing,
+	{ "GetImagesListing",	"a{sv}", "aa{sv}", get_images_listing,
 		G_DBUS_METHOD_FLAG_ASYNC },
 	{ "GetImageProperties",	"s", "s", get_image_properties },
 	{ "DeleteImage", "s", "", delete_image },
