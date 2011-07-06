@@ -25,13 +25,13 @@
 #define IMG_DESC_END "</image-descriptor>" EOL_CHARS
 
 #define IMG_HANDLES_DESC "<image-handles-descriptor version=\"1.0\">" EOL_CHARS \
-	"<filtering-parameters%s/>" EOL_CHARS \
+	"<filtering-parameters %s/>" EOL_CHARS \
 	"</image-handles-descriptor>" EOL_CHARS
 
-#define FILTERING_CREATED " created=\"%s\""
-#define FILTERING_MODIFIED " modified=\"%s\""
-#define FILTERING_ENCODING " encoding=\"%s\""
-#define FILTERING_PIXEL " pixel=\"%s\""
+#define FILTERING_CREATED "created=\"%s\" "
+#define FILTERING_MODIFIED "modified=\"%s\" "
+#define FILTERING_ENCODING "encoding=\"%s\" "
+#define FILTERING_PIXEL "pixel=\"%s\" "
 
 #define BIP_TEMP_FOLDER /tmp/bip/
 
