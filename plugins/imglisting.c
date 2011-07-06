@@ -262,16 +262,17 @@ static void handles_listing_element(GMarkupParseContext *ctxt,
 	printf("element: %s\n", element);
 	printf("names\n");
 
-	if (g_str_equal(element, "filtering-parameters") != TRUE) {
-		g_set_error(gerr, G_MARKUP_ERROR,
-					G_MARKUP_ERROR_UNKNOWN_ELEMENT, NULL);
+	if (!g_str_equal(element, "filtering-parameters")) {
 		return;
 	}
 
 	printf("names: %p\n", names);
-	for (key = (gchar **) names; *key; key++, values++)
+	for (key = (gchar **) names; *key; key++, values++) {
+		printf("key: %s\n", *key);
 		if (!parse_attr(desc, *key, *values, gerr))
 			return;
+	}
+	printf("ok\n");
 }
 
 static const GMarkupParser handles_desc_parser = {
@@ -293,6 +294,7 @@ static struct img_hdesc *parse_handles_desc(char *data,
 		if (err != NULL)
 			*err = 0;
 		status = g_markup_parse_context_parse(ctxt, data, length, NULL);
+		printf("status: %d\n", status);
 		g_markup_parse_context_free(ctxt);
 		if (!status) {
 			if (err != NULL)
@@ -416,6 +418,7 @@ static void *imglisting_open(const char *name, int oflag, mode_t mode,
 	struct img_hdesc *desc;
 	struct imglisting_aparam *aparam;
 	struct imglist_resp *resp;
+	int i;
 
 	if (err != NULL)
 		*err = 0;
@@ -435,10 +438,14 @@ static void *imglisting_open(const char *name, int oflag, mode_t mode,
 	count = aparam->nbreturnedhandles;
 	offset = aparam->liststartoffset;
 
-	printf("object: %s\n", session->desc_hdr);
+	printf("object len: %u\n", session->desc_hdr_len);
+	for (i = 0; i < (signed int)session->desc_hdr_len; i++)
+		printf("%d: %c\n", i, session->desc_hdr[i]);
 
 	desc = parse_handles_desc(session->desc_hdr, session->desc_hdr_len,
 			err);
+
+	printf("%p\n", desc);
 
 	if (desc == NULL) {
 		g_free(aparam);
@@ -473,15 +480,15 @@ static ssize_t imglisting_read(void *object, void *buf, size_t count,
 		data = resp->aparam;
 		*hi = OBEX_HDR_APPARAM;
 	}
-	else if (resp->hdesc->len > 0) {
+	/*if (resp->hdesc->len > 0) {
 		data = resp->hdesc;
 		*hi = IMG_DESC_HDR;
-	}
+	}*/
 	else {
 		data = resp->body;
 		*hi = OBEX_HDR_BODY;
 	}
-	printf("imglisting_read\n");
+	printf("imglisting_read %u\n", data->len);
 	return string_read(data, buf, count);
 }
 
