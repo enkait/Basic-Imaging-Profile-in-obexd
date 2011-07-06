@@ -262,16 +262,17 @@ static void handles_listing_element(GMarkupParseContext *ctxt,
 	printf("element: %s\n", element);
 	printf("names\n");
 
-	if (g_str_equal(element, "filtering-parameters") != TRUE) {
-		g_set_error(gerr, G_MARKUP_ERROR,
-					G_MARKUP_ERROR_UNKNOWN_ELEMENT, NULL);
+	if (!g_str_equal(element, "filtering-parameters")) {
 		return;
 	}
 
 	printf("names: %p\n", names);
-	for (key = (gchar **) names; *key; key++, values++)
+	for (key = (gchar **) names; *key; key++, values++) {
+		printf("key: %s\n", *key);
 		if (!parse_attr(desc, *key, *values, gerr))
 			return;
+	}
+	printf("ok\n");
 }
 
 static const GMarkupParser handles_desc_parser = {
@@ -288,13 +289,16 @@ static struct img_hdesc *parse_handles_desc(char *data,
 	struct img_hdesc *desc = get_hdesc();
 	if (length > 0) {
 		gboolean status;
+		GError *gerr;
 		GMarkupParseContext *ctxt = g_markup_parse_context_new(
 				&handles_desc_parser, 0, desc, NULL);
 		if (err != NULL)
 			*err = 0;
-		status = g_markup_parse_context_parse(ctxt, data, length, NULL);
+		status = g_markup_parse_context_parse(ctxt, data, length, &gerr);
+		printf("status: %d\n", status);
 		g_markup_parse_context_free(ctxt);
 		if (!status) {
+			printf("error: %s\n", gerr->message);
 			if (err != NULL)
 				*err = -EINVAL;
 			free_img_hdesc(desc);
@@ -416,6 +420,7 @@ static void *imglisting_open(const char *name, int oflag, mode_t mode,
 	struct img_hdesc *desc;
 	struct imglisting_aparam *aparam;
 	struct imglist_resp *resp;
+	//int i;
 
 	if (err != NULL)
 		*err = 0;
@@ -435,10 +440,14 @@ static void *imglisting_open(const char *name, int oflag, mode_t mode,
 	count = aparam->nbreturnedhandles;
 	offset = aparam->liststartoffset;
 
-	printf("object: %s\n", session->desc_hdr);
+	printf("object len: %u\n", session->desc_hdr_len);
+	//for (i = 0; i < (signed int)session->desc_hdr_len; i++)
+	//	printf("%d: %c\n", i, session->desc_hdr[i]);
 
 	desc = parse_handles_desc(session->desc_hdr, session->desc_hdr_len,
 			err);
+
+	printf("%p\n", desc);
 
 	if (desc == NULL) {
 		g_free(aparam);
