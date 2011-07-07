@@ -387,7 +387,7 @@ static DBusMessage *get_imaging_capabilities(DBusConnection *connection,
 	if ((err=session_get(session, "x-bt/img-capabilities", NULL, NULL, NULL, 0, get_imaging_capabilities_callback)) < 0) {
 		return g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
-				"334Failed");
+				"Failed");
 	}
 
 	session->msg = dbus_message_ref(message);

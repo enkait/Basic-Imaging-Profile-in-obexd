@@ -99,6 +99,9 @@ def parse_options():
 
 def images_listing(session):
     print "listing\n"
+    for o in session.GetImagesListing({"latest" : True}):
+            print o
+    return
     print session.GetImagesListing({"count" : dbus.UInt16(1), "offset" : dbus.UInt16(1)})
     print session.GetImagesListing({"count" : dbus.UInt16(2), "offset" : dbus.UInt16(2)})
     print session.GetImagesListing({"count" : dbus.UInt16(3), "offset" : dbus.UInt16(3)})
@@ -123,7 +126,13 @@ def imaging_capabilities(session):
     print session.GetImagingCapabilities()
 
 def get_image_properties(session, handle):
-    print session.GetImageProperties(handle)
+    for o in session.GetImageProperties(handle):
+            if 'type' in o:
+                    print
+                    print o['type']
+                    print o
+            else:
+                    print o
     print "get image properties"
 
 def delete_image(session, handle):
