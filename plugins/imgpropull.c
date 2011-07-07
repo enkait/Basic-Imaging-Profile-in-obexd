@@ -82,7 +82,7 @@ static GString *append_attachments(GString *object, char *image_path) {
 		char *path = g_build_filename(att_dir_path, file->d_name,
 									NULL);
 		printf("path: %s\n", path);
-		if (!lstat(path, &file_stat) || !S_ISREG(file_stat.st_mode)) {
+		if (lstat(path, &file_stat) < 0 || !S_ISREG(file_stat.st_mode)) {
 			printf("nie baldzo: %s\n", path);
 			g_free(path);
 			continue;
