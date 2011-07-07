@@ -40,6 +40,8 @@ struct listing_object {
 };
 
 static void free_listing_object(struct listing_object *object) {
+	if (object == NULL)
+		return;
 	g_free(object->handle);
 	g_free(object->ctime);
 	g_free(object->mtime);
