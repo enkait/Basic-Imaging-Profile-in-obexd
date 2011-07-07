@@ -45,7 +45,7 @@ static DBusMessage *start_archive(DBusConnection *connection,
 						NULL, NULL, 0, -1, &err)) {
 		return g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
-				"334Failed");
+				"Failed");
 	}
 
 	if (session->obex && session->obex->xfer && session->obex->xfer->aheaders) {
