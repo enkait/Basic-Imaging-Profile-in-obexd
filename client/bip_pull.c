@@ -35,23 +35,6 @@
 
 #define BIP_TEMP_FOLDER /tmp/bip/
 
-static char *get_null_terminated(char *buffer, unsigned int len, unsigned int *newlen) {
-	char *newbuffer;
-	while (len > 0 && buffer[len - 1] == '\0')
-		len--;
-	if (buffer[len - 1] != '\0') {
-		newbuffer = g_try_malloc(len + 1);
-		g_memmove(newbuffer, buffer, len);
-		newbuffer[len]='\0';
-		printf("null terminating\n");
-	}
-	else {
-		newbuffer = g_memdup(buffer, len);
-	}
-	*newlen = len;
-	return newbuffer;
-}
-
 struct listing_object {
 	char *handle, *ctime, *mtime;
 };
@@ -163,10 +146,13 @@ static GSList *parse_images_listing(char *data,
 	return listing;
 }
 
-static gboolean append_sv_dict_entry(DBusMessageIter *dict, const char *key,
-							int type, void *val)
+static gboolean append_ss_dict_entry(DBusMessageIter *dict, const char *key,
+								const char *val)
 {
-	DBusMessageIter entry, value;
+	DBusMessageIter entry;
+	if (val == NULL)
+		return TRUE;
+
 	if (!dbus_message_iter_open_container(dict, DBUS_TYPE_DICT_ENTRY, NULL,
 								&entry))
 		return FALSE;
@@ -174,14 +160,7 @@ static gboolean append_sv_dict_entry(DBusMessageIter *dict, const char *key,
 	if (!dbus_message_iter_append_basic(&entry, DBUS_TYPE_STRING, &key))
 		return FALSE;
 
-	if (!dbus_message_iter_open_container(&entry, DBUS_TYPE_VARIANT, "s",
-									&value))
-		return FALSE;
-
-	if (!dbus_message_iter_append_basic(&value, type, val))
-		return FALSE;
-
-	if (!dbus_message_iter_close_container(&entry, &value))
+	if (!dbus_message_iter_append_basic(&entry, DBUS_TYPE_STRING, &val))
 		return FALSE;
 
 	if (!dbus_message_iter_close_container(dict, &entry))
@@ -194,7 +173,7 @@ static gboolean append_listing_dict(DBusMessageIter *args,
 							const GSList *listing)
 {
 	DBusMessageIter dict;
-	if (!dbus_message_iter_open_container(args, DBUS_TYPE_ARRAY, "a{sv}",
+	if (!dbus_message_iter_open_container(args, DBUS_TYPE_ARRAY, "a{ss}",
 									&dict))
 		return FALSE;
 
@@ -203,19 +182,19 @@ static gboolean append_listing_dict(DBusMessageIter *args,
 		struct listing_object *obj = listing->data;
 		
 		if (!dbus_message_iter_open_container(&dict, DBUS_TYPE_ARRAY,
-								"{sv}", &image))
+							"{ss}", &image))
 			return FALSE;
 
-		if (obj->handle != NULL && !append_sv_dict_entry(&image,
-				"handle", DBUS_TYPE_STRING, &obj->handle))
+		if (obj->handle != NULL && !append_ss_dict_entry(&image,
+						"handle", obj->handle))
 			return FALSE;
 		
-		if (obj->ctime != NULL && !append_sv_dict_entry(&image,
-				"created", DBUS_TYPE_STRING, &obj->ctime))
+		if (obj->ctime != NULL && !append_ss_dict_entry(&image,
+						"created", obj->ctime))
 			return FALSE;
 
-		if (obj->mtime != NULL && !append_sv_dict_entry(&image,
-				"modified", DBUS_TYPE_STRING, &obj->mtime))
+		if (obj->mtime != NULL && !append_ss_dict_entry(&image,
+						"modified", obj->mtime))
 			return FALSE;
 
 		if (!dbus_message_iter_close_container(&dict, &image))
@@ -298,17 +277,476 @@ static struct a_header *create_handle(const char *handle) {
 	return ah;
 }
 
+struct native_prop {
+	char *encoding, *pixel, *size;
+};
+
+struct variant_prop {
+	char *encoding, *pixel, *maxsize, *transform;
+};
+
+struct att_prop {
+	char *content_type, *charset, *name, *size, *ctime, *mtime;
+};
+
+struct prop_object {
+	char *handle, *name;
+	GSList *native, *variant, *att;
+};
+
+static void free_native_prop(struct native_prop *prop) {
+	if (prop == NULL)
+		return;
+	g_free(prop->encoding);
+	g_free(prop->pixel);
+	g_free(prop->size);
+	g_free(prop);
+}
+
+static void free_variant_prop(struct variant_prop *prop) {
+	if (prop == NULL)
+		return;
+	g_free(prop->encoding);
+	g_free(prop->pixel);
+	g_free(prop->maxsize);
+	g_free(prop->transform);
+	g_free(prop);
+}
+
+static void free_att_prop(struct att_prop *prop) {
+	if (prop == NULL)
+		return;
+	g_free(prop->content_type);
+	g_free(prop->charset);
+	g_free(prop->name);
+	g_free(prop->size);
+	g_free(prop->ctime);
+	g_free(prop->mtime);
+	g_free(prop);
+}
+
+static void free_prop_object(struct prop_object *object) {
+	GSList *list;
+
+	if (object == NULL)
+		return;
+	for (list = object->native; list != NULL; list = g_slist_next(list))
+		free_native_prop(list->data);
+	for (list = object->variant; list != NULL; list = g_slist_next(list))
+		free_variant_prop(list->data);
+	for (list = object->att; list != NULL; list = g_slist_next(list))
+		free_att_prop(list->data);
+	g_slist_free(object->native);
+	g_slist_free(object->variant);
+	g_slist_free(object->att);
+	g_free(object->handle);
+	g_free(object->name);
+	g_free(object);
+}
+
+static gboolean parse_attrib_native(struct native_prop *prop, const gchar *key,
+					const gchar *value, GError **gerr)
+{
+	printf("key: %s\n", key);
+	if (g_str_equal(key, "encoding")) {
+		if (convBIP2IM(value) == NULL)
+			goto invalid;
+		prop->encoding = g_strdup(value);
+		printf("encoding: %s\n", prop->encoding);
+	}
+	else if (g_str_equal(key, "pixel")) {
+		/* add verification */
+		prop->pixel = g_strdup(value);
+	}
+	else if (g_str_equal(key, "size")) {
+		/* add verification */
+		prop->size = g_strdup(value);
+	}
+	else {
+		g_set_error(gerr, G_MARKUP_ERROR,
+				G_MARKUP_ERROR_UNKNOWN_ATTRIBUTE, NULL);
+		return FALSE;
+	}
+	printf("ok\n");
+	return TRUE;
+invalid:
+	g_set_error(gerr, G_MARKUP_ERROR, G_MARKUP_ERROR_INVALID_CONTENT, NULL);
+	return FALSE;
+}
+
+static gboolean parse_attrib_variant(struct variant_prop *prop, const gchar *key,
+					const gchar *value, GError **gerr)
+{
+	printf("key: %s\n", key);
+	if (g_str_equal(key, "encoding")) {
+		if (convBIP2IM(value) == NULL)
+			goto invalid;
+		prop->encoding = g_strdup(value);
+		printf("encoding: %s\n", prop->encoding);
+	}
+	else if (g_str_equal(key, "pixel")) {
+		/* add verification */
+		prop->pixel = g_strdup(value);
+	}
+	else if (g_str_equal(key, "maxsize")) {
+		/* add verification */
+		prop->maxsize = g_strdup(value);
+	}
+	else if (g_str_equal(key, "transform")) {
+		/* add verification */
+		prop->transform = g_strdup(value);
+	}
+	else {
+		g_set_error(gerr, G_MARKUP_ERROR,
+				G_MARKUP_ERROR_UNKNOWN_ATTRIBUTE, NULL);
+		return FALSE;
+	}
+	printf("ok\n");
+	return TRUE;
+invalid:
+	g_set_error(gerr, G_MARKUP_ERROR, G_MARKUP_ERROR_INVALID_CONTENT, NULL);
+	return FALSE;
+}
+
+static gboolean parse_attrib_att(struct att_prop *prop, const gchar *key,
+					const gchar *value, GError **gerr)
+{
+	printf("key: %s\n", key);
+	if (g_str_equal(key, "content-type")) {
+		/* add verification */
+		prop->content_type = g_strdup(value);
+	}
+	else if (g_str_equal(key, "charset")) {
+		/* add verification */
+		prop->charset = g_strdup(value);
+	}
+	else if (g_str_equal(key, "name")) {
+		prop->name = g_strdup(value);
+	}
+	else if (g_str_equal(key, "size")) {
+		/* add verification */
+		prop->size = g_strdup(value);
+	}
+	else if (g_str_equal(key, "created")) {
+		/* add verification */
+		prop->ctime = g_strdup(value);
+	}
+	else if (g_str_equal(key, "modified")) {
+		/* add verification */
+		prop->mtime = g_strdup(value);
+	}
+	else {
+		g_set_error(gerr, G_MARKUP_ERROR,
+				G_MARKUP_ERROR_UNKNOWN_ATTRIBUTE, NULL);
+		return FALSE;
+	}
+	printf("ok\n");
+	return TRUE;
+/*invalid:
+	g_set_error(gerr, G_MARKUP_ERROR, G_MARKUP_ERROR_INVALID_CONTENT, NULL);
+	return FALSE;*/
+}
+
+static struct att_prop *parse_elem_att(const gchar **names,
+					const gchar **values, GError **gerr)
+{
+	gchar **key;
+	struct att_prop *prop = g_new0(struct att_prop, 1);
+	for (key = (gchar **) names; *key; key++, values++) {
+		if (!parse_attrib_att(prop, *key, *values, gerr)) {
+			free_att_prop(prop);
+			return NULL;
+		}
+	}
+	return prop;
+}
+
+static struct variant_prop *parse_elem_variant(const gchar **names,
+					const gchar **values, GError **gerr)
+{
+	gchar **key;
+	struct variant_prop *prop = g_new0(struct variant_prop, 1);
+	for (key = (gchar **) names; *key; key++, values++) {
+		if (!parse_attrib_variant(prop, *key, *values, gerr)) {
+			free_variant_prop(prop);
+			return NULL;
+		}
+	}
+	if (prop->transform == NULL)
+		prop->transform = g_strdup("stretch crop fill");
+	return prop;
+}
+
+static struct native_prop *parse_elem_native(const gchar **names,
+					const gchar **values, GError **gerr)
+{
+	gchar **key;
+	struct native_prop *prop = g_new0(struct native_prop, 1);
+	for (key = (gchar **) names; *key; key++, values++) {
+		if (!parse_attrib_native(prop, *key, *values, gerr)) {
+			free_native_prop(prop);
+			return NULL;
+		}
+	}
+	return prop;
+}
+
+static gboolean parse_attrib_prop(struct prop_object *prop, const gchar *key,
+					const gchar *value, GError **gerr)
+{
+	printf("key: %s\n", key);
+	if (g_str_equal(key, "handle")) {
+		if (get_handle(value, strlen(value)) < 0)
+			goto invalid;
+		prop->handle = g_strdup(value);
+	}
+	else if (g_str_equal(key, "friendly-name")) {
+		prop->name = g_strdup(value);
+	}
+	else if (g_str_equal(key, "version")) {
+	}
+	else {
+		g_set_error(gerr, G_MARKUP_ERROR,
+				G_MARKUP_ERROR_UNKNOWN_ATTRIBUTE, NULL);
+		return FALSE;
+	}
+	return TRUE;
+invalid:
+	g_set_error(gerr, G_MARKUP_ERROR, G_MARKUP_ERROR_INVALID_CONTENT, NULL);
+	return FALSE;
+}
+
+static struct prop_object *parse_elem_prop(const gchar **names,
+					const gchar **values, GError **gerr)
+{
+	gchar **key;
+	struct prop_object *prop = g_new0(struct prop_object, 1);
+	for (key = (gchar **) names; *key; key++, values++) {
+		if (!parse_attrib_prop(prop, *key, *values, gerr)) {
+			free_prop_object(prop);
+			return NULL;
+		}
+	}
+	return prop;
+}
+
+static void prop_element(GMarkupParseContext *ctxt,
+		const gchar *element,
+		const gchar **names,
+		const gchar **values,
+		gpointer user_data,
+		GError **gerr)
+{
+	struct prop_object **obj = user_data;
+
+	printf("element: %s %d\n", element, g_str_equal(element, "image-properties"));
+
+	if (g_str_equal(element, "image-properties")) {
+		printf("object: %p\n", *obj);
+		if (*obj != NULL) {
+			free_prop_object(*obj);
+			*obj = NULL;
+			goto invalid;
+		}
+		*obj = parse_elem_prop(names, values, gerr);
+		printf("object: %p\n", *obj);
+	}
+	else if (g_str_equal(element, "native")) {
+		struct native_prop *prop;
+		if (*obj == NULL) {
+			goto invalid;
+		}
+		prop = parse_elem_native(names, values, gerr);
+		(*obj)->native = g_slist_append((*obj)->native, prop);
+	}
+	else if (g_str_equal(element, "variant")) {
+		struct variant_prop *prop;
+		if (*obj == NULL) {
+			goto invalid;
+		}
+		prop = parse_elem_variant(names, values, gerr);
+		(*obj)->variant = g_slist_append((*obj)->variant, prop);
+	}
+	else if (g_str_equal(element, "attachment")) {
+		struct att_prop *prop;
+		if (*obj == NULL) {
+			goto invalid;
+		}
+		prop = parse_elem_att(names, values, gerr);
+		(*obj)->att = g_slist_append((*obj)->att, prop);
+	}
+	else {
+		if (*obj != NULL) {
+			free_prop_object(*obj);
+			*obj = NULL;
+		}
+		goto invalid;
+	}
+	
+	return;
+invalid:
+	g_set_error(gerr, G_MARKUP_ERROR, G_MARKUP_ERROR_INVALID_CONTENT, NULL);
+}
+
+static const GMarkupParser properties_parser = {
+	prop_element,
+	NULL,
+	NULL,
+	NULL,
+	NULL
+};
+
+static struct prop_object *parse_properties(char *data, unsigned int length, int *err)
+{
+	struct prop_object *prop = NULL;
+	gboolean status;
+	GError *gerr = NULL;
+	GMarkupParseContext *ctxt = g_markup_parse_context_new(
+					&properties_parser, 0, &prop, NULL);
+	if (err != NULL)
+		*err = 0;
+	status = g_markup_parse_context_parse(ctxt, data, length, &gerr);
+	g_markup_parse_context_free(ctxt);
+	printf("omg? %d %p\n", status, prop);
+	if (!status) {
+		printf("%s\n", gerr->message);
+		if (err != NULL)
+			*err = -EINVAL;
+		free_prop_object(prop);
+		prop = NULL;
+	}
+	return prop;
+}
+
+static gboolean append_prop(DBusMessageIter *args,
+						struct prop_object *obj)
+{
+	DBusMessageIter dict, iter;
+	GSList *list;
+	printf("append_prop\n");
+	if (!dbus_message_iter_open_container(args, DBUS_TYPE_ARRAY, "a{ss}",
+									&dict))
+		return FALSE;
+	
+	if (!dbus_message_iter_open_container(&dict, DBUS_TYPE_ARRAY,
+							"{ss}", &iter))
+		return FALSE;
+
+	if (obj->handle == NULL || !append_ss_dict_entry(&iter, "handle",
+								obj->handle))
+		return FALSE;
+	
+	if (!append_ss_dict_entry(&iter, "name", obj->name))
+		return FALSE;
+
+	if (!dbus_message_iter_close_container(&dict, &iter))
+		return FALSE;
+
+	for (list = obj->native; list != NULL; list = g_slist_next(list)) {
+		struct native_prop *prop = list->data;
+		
+		if (!dbus_message_iter_open_container(&dict, DBUS_TYPE_ARRAY,
+							"{ss}", &iter))
+			return FALSE;
+		
+		if (!append_ss_dict_entry(&iter, "type", "native"))
+			return FALSE;
+
+		if (prop->encoding == NULL || !append_ss_dict_entry(&iter,
+						"encoding", prop->encoding))
+			return FALSE;
+		
+		if (prop->pixel == NULL || !append_ss_dict_entry(&iter,
+						"pixel", prop->pixel))
+			return FALSE;
+		
+		if (!append_ss_dict_entry(&iter, "size", prop->size))
+			return FALSE;
+		
+		if (!dbus_message_iter_close_container(&dict, &iter))
+			return FALSE;
+	}
+
+	for (list = obj->variant; list != NULL; list = g_slist_next(list)) {
+		struct variant_prop *prop = list->data;
+		
+		if (!dbus_message_iter_open_container(&dict, DBUS_TYPE_ARRAY,
+							"{ss}", &iter))
+			return FALSE;
+
+		if (!append_ss_dict_entry(&iter, "type", "variant"))
+			return FALSE;
+
+		if (prop->encoding == NULL || !append_ss_dict_entry(&iter,
+						"encoding", prop->encoding))
+			return FALSE;
+		
+		if (prop->pixel == NULL || !append_ss_dict_entry(&iter,
+						"pixel", prop->pixel))
+			return FALSE;
+		
+		if (!append_ss_dict_entry(&iter, "maxsize", prop->maxsize))
+			return FALSE;
+		
+		if (!append_ss_dict_entry(&iter, "transformation",
+							prop->transform))
+			return FALSE;
+		
+		if (!dbus_message_iter_close_container(&dict, &iter))
+			return FALSE;
+	}
+
+	for (list = obj->att; list != NULL; list = g_slist_next(list)) {
+		struct att_prop *prop = list->data;
+		
+		if (!dbus_message_iter_open_container(&dict, DBUS_TYPE_ARRAY,
+							"{ss}", &iter))
+			return FALSE;
+
+		if (!append_ss_dict_entry(&iter, "type", "attachment"))
+			return FALSE;
+
+		if (prop->content_type == NULL || !append_ss_dict_entry(&iter,
+					"content-type", prop->content_type))
+			return FALSE;
+
+		if (!append_ss_dict_entry(&iter, "charset", prop->charset))
+			return FALSE;
+
+		if (prop->name == NULL || !append_ss_dict_entry(&iter,
+						"name", prop->name))
+			return FALSE;
+
+		if (!append_ss_dict_entry(&iter, "size", prop->size))
+			return FALSE;
+		
+		if (!append_ss_dict_entry(&iter, "created", prop->ctime))
+			return FALSE;
+		
+		if (!append_ss_dict_entry(&iter, "modified", prop->mtime))
+			return FALSE;
+		
+		if (!dbus_message_iter_close_container(&dict, &iter))
+			return FALSE;
+	}
+
+	if (!dbus_message_iter_close_container(args, &dict))
+		return FALSE;
+	return TRUE;
+}
+
+
 static DBusMessage *get_image_properties(DBusConnection *connection,
 		DBusMessage *message, void *user_data)
 {
 	struct session_data *session = user_data;
 	DBusMessage *reply;
 	DBusMessageIter iter;
-	char *handle, *buffer, *object;
+	char *handle, *buffer;
 	struct a_header *hdesc;
 	GSList *aheaders;
 	int err, length;
-	unsigned newlen;
+	struct prop_object *prop;
 
 	printf("requested get image properties\n");
 	
@@ -331,15 +769,21 @@ static DBusMessage *get_image_properties(DBusConnection *connection,
 					&buffer, &length, &err)) {
 		return g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
-				"334Failed");
+				"Failed");
 	}
 	
-	object = get_null_terminated(buffer, length, &newlen);
+	prop = parse_properties(buffer, length, &err);
+
+	if (prop == NULL) {
+		return g_dbus_create_error(message,
+				"org.openobex.Error.Failed",
+				"Failed");
+	}
+
 	reply = dbus_message_new_method_return(message);
 	
 	dbus_message_iter_init_append(reply, &iter);
-	dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &object);
-	g_free(object);
+	append_prop(&iter, prop);
 	g_free(buffer);
 
 	return reply;
@@ -376,7 +820,7 @@ static DBusMessage *delete_image(DBusConnection *connection,
 					NULL, 0, -1, &err)) {
 		return g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
-				"334Failed");
+				"Failed");
 	}
 	
 	reply = dbus_message_new_method_return(message);
@@ -510,7 +954,7 @@ static DBusMessage *get_images_listing(DBusConnection *connection,
 					aheaders, get_images_listing_callback)) < 0) {
 		return g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
-				"334Failed");
+				"Failed");
 	}
 
 	g_slist_free(aheaders);
@@ -634,7 +1078,7 @@ static DBusMessage *get_image_thumbnail(DBusConnection *connection,
 						get_image_thumbnail_callback)) < 0) {
 		return g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
-				"334Failed");
+				"Failed");
 	}
 
 	session->msg = dbus_message_ref(message);
@@ -674,7 +1118,7 @@ static DBusMessage *get_image_attachment(DBusConnection *connection,
 						get_image_attachment_callback)) < 0) {
 		return g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
-				"334Failed");
+				"Failed");
 	}
 
 	session->msg = dbus_message_ref(message);
@@ -722,7 +1166,7 @@ static DBusMessage *get_image(DBusConnection *connection,
 						get_image_callback)) < 0) {
 		return g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
-				"334Failed");
+				"Failed");
 	}
 
 	session->msg = dbus_message_ref(message);
@@ -734,9 +1178,9 @@ GDBusMethodTable image_pull_methods[] = {
 	{ "GetImage",	"sssss", "", get_image },
 	{ "GetImageThumbnail",	"ss", "", get_image_thumbnail },
 	{ "GetImageAttachment",	"sss", "", get_image_attachment },
-	{ "GetImagesListing",	"a{sv}", "aa{sv}", get_images_listing,
+	{ "GetImagesListing",	"a{sv}", "aa{ss}", get_images_listing,
 		G_DBUS_METHOD_FLAG_ASYNC },
-	{ "GetImageProperties",	"s", "s", get_image_properties },
+	{ "GetImageProperties",	"s", "aa{ss}", get_image_properties },
 	{ "DeleteImage", "s", "", delete_image },
 	{ }
 };
