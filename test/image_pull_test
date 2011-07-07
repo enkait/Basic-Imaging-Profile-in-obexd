@@ -77,22 +77,22 @@ def parse_options():
                       help="Get imaging capabilities")
     parser.add_option("-l", "--listing", action="store_true",
                       dest="listing",
-                      help="Get image")
+                      help="Get images listing\nExample: -l")
     parser.add_option("-g", "--getimage", type="string", action="callback",
                       callback=get_image_callback,
-                      help="Get images listing")
+                      help="Get image\nExample: -g [where to put the image],[handle],[encoding],[width],[height],[transform]")
     parser.add_option("-t", "--getimagethumbnail", type="string", action="callback",
                       callback=get_image_thumbnail_callback,
-                      help="Get image thumbnail")
+                      help="Get image thumbnail\nExample: -t [where to put the image],[handle]")
     parser.add_option("-a", "--getimageattachment", type="string", action="callback",
                       callback=get_image_attachment_callback,
-                      help="Get image attachment")
+                      help="Get image attachment\nExample: -a [where to put the file],[handle],[name]")
     parser.add_option("-p", "--getimageproperties", type="string", action="callback",
                       callback=get_image_properties_callback,
-                      help="Get image properties")
+                      help="Get image properties\nExample: -p [handle]")
     parser.add_option("-e", "--deleteimage", type="string", action="callback",
                       callback=delete_image_callback,
-                      help="Delete image")
+                      help="Delete image\nExample: -e [handle]")
     parser.add_option("-v", "--verbose", action="store_true", dest="verbose")
 
     return parser.parse_args()
