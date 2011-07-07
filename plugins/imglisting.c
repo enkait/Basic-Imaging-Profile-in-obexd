@@ -289,16 +289,14 @@ static struct img_hdesc *parse_handles_desc(char *data,
 	struct img_hdesc *desc = get_hdesc();
 	if (length > 0) {
 		gboolean status;
-		GError *gerr;
 		GMarkupParseContext *ctxt = g_markup_parse_context_new(
 				&handles_desc_parser, 0, desc, NULL);
 		if (err != NULL)
 			*err = 0;
-		status = g_markup_parse_context_parse(ctxt, data, length, &gerr);
+		status = g_markup_parse_context_parse(ctxt, data, length, NULL);
 		printf("status: %d\n", status);
 		g_markup_parse_context_free(ctxt);
 		if (!status) {
-			printf("error: %s\n", gerr->message);
 			if (err != NULL)
 				*err = -EINVAL;
 			free_img_hdesc(desc);
@@ -420,7 +418,7 @@ static void *imglisting_open(const char *name, int oflag, mode_t mode,
 	struct img_hdesc *desc;
 	struct imglisting_aparam *aparam;
 	struct imglist_resp *resp;
-	//int i;
+	int i;
 
 	if (err != NULL)
 		*err = 0;
@@ -441,8 +439,8 @@ static void *imglisting_open(const char *name, int oflag, mode_t mode,
 	offset = aparam->liststartoffset;
 
 	printf("object len: %u\n", session->desc_hdr_len);
-	//for (i = 0; i < (signed int)session->desc_hdr_len; i++)
-	//	printf("%d: %c\n", i, session->desc_hdr[i]);
+	for (i = 0; i < (signed int)session->desc_hdr_len; i++)
+		printf("%d: %c\n", i, session->desc_hdr[i]);
 
 	desc = parse_handles_desc(session->desc_hdr, session->desc_hdr_len,
 			err);
@@ -482,15 +480,15 @@ static ssize_t imglisting_read(void *object, void *buf, size_t count,
 		data = resp->aparam;
 		*hi = OBEX_HDR_APPARAM;
 	}
-	else if (resp->hdesc->len > 0) {
+	/*if (resp->hdesc->len > 0) {
 		data = resp->hdesc;
 		*hi = IMG_DESC_HDR;
-	}
+	}*/
 	else {
 		data = resp->body;
 		*hi = OBEX_HDR_BODY;
 	}
-	printf("imglisting_read\n");
+	printf("imglisting_read %u\n", data->len);
 	return string_read(data, buf, count);
 }
 
