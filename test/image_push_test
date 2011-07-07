@@ -59,10 +59,10 @@ def parse_options():
                       help="Device to connect", metavar="DEVICE")
     parser.add_option("-a", "--att", type="string", action="callback",
                       callback=put_image_attachment_callback,
-                      help="Push image attachment")
+                      help="Push image attachment\nExample: -a [path to file],[handle]")
     parser.add_option("-p", "--push", type="string", action="callback",
                       callback=put_image_callback,
-                      help="Push image")
+                      help="Push image\nExample: -p [path to file]")
     parser.add_option("-c", "--capabilities", action="store_true",
                       dest="capabilities",
                       help="Get imaging capabilities")
