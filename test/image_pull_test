@@ -80,7 +80,7 @@ def parse_options():
                       help="Get images listing\nExample: -l")
     parser.add_option("-g", "--getimage", type="string", action="callback",
                       callback=get_image_callback,
-                      help="Get image\nExample: -g [where to put the image],[handle],[encoding],[width],[height],[transform]")
+                      help="Get image\nExample: -g [where to put the image],[handle],[encoding],[acceptable width*height],[maxsize],[transform]")
     parser.add_option("-t", "--getimagethumbnail", type="string", action="callback",
                       callback=get_image_thumbnail_callback,
                       help="Get image thumbnail\nExample: -t [where to put the image],[handle]")
@@ -138,8 +138,18 @@ def get_image_properties(session, handle):
 def delete_image(session, handle):
         print session.DeleteImage(handle)
 
-def get_image(session, path, handle, encoding, width, height, transform):
-        session.GetImage(path, handle, encoding, width+"*"+height, transform)
+def get_image(session, path, handle, encoding, pixel, maxsize, transform):
+        D = {}
+        if encoding != "":
+                D["encoding"] = encoding
+        if pixel != "":
+                D["pixel"] = pixel
+        if maxsize != "":
+                D["maxsize"] = maxsize
+        if transform != "":
+                print transform
+                D["transformation"] = transform
+        session.GetImage(path, handle, D)
         print "GetImage returned"
 
 def get_image_thumbnail(session, path, handle):
@@ -230,10 +240,10 @@ if  __name__ == '__main__':
        path = options.get_settings[0]
        handle = options.get_settings[1]
        encoding = options.get_settings[2]
-       width = options.get_settings[3]
-       height = options.get_settings[4]
+       pixel = options.get_settings[3]
+       maxsize = options.get_settings[4]
        transform = options.get_settings[5]
-       get_image(bip, path, handle, encoding, width, height, transform)
+       get_image(bip, path, handle, encoding, pixel, maxsize, transform)
     if hasattr(options, 'get_thumbnail'):
        path = options.get_settings[0]
        handle = options.get_settings[1]

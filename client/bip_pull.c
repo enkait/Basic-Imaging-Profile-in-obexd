@@ -122,8 +122,7 @@ static const GMarkupParser images_listing_parser = {
 	NULL
 };
 
-static GSList *parse_images_listing(char *data,
-						unsigned int length, int *err)
+static GSList *parse_images_listing(char *data,	unsigned int length, int *err)
 {
 	GSList *listing = NULL;
 	gboolean status;
@@ -1132,28 +1131,99 @@ static DBusMessage *get_image_attachment(DBusConnection *connection,
 	return dbus_message_new_method_return(message);
 }
 
+static gboolean parse_get_image_dict(DBusMessage *msg, char **path,
+					char **handle, char **pixel,
+					char **encoding, char **maxsize,
+							char **transform)
+{
+	DBusMessageIter iter, array;
+	
+	*path = NULL;
+	*handle = NULL;
+	*pixel = NULL;
+	*encoding = NULL;
+	*maxsize = NULL;
+	*transform = NULL;
+	
+	dbus_message_iter_init(msg, &iter);
+
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_STRING)
+		goto failed;
+	dbus_message_iter_get_basic(&iter, path);
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_STRING)
+		goto failed;
+	dbus_message_iter_next(&iter);
+	dbus_message_iter_get_basic(&iter, handle);
+	dbus_message_iter_next(&iter);
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_ARRAY)
+		goto failed;
+	
+	dbus_message_iter_recurse(&iter, &array);
+
+	printf("omg wtf\n");
+
+	while (dbus_message_iter_get_arg_type(&array) == DBUS_TYPE_DICT_ENTRY) {
+		DBusMessageIter entry;
+		const char *key, *val;
+
+		dbus_message_iter_recurse(&array, &entry);
+		printf("get basic\n");
+		if (dbus_message_iter_get_arg_type(&entry) != DBUS_TYPE_STRING)
+			return FALSE;
+		dbus_message_iter_get_basic(&entry, &key);
+		dbus_message_iter_next(&entry);
+		dbus_message_iter_get_basic(&entry, &val);
+		
+		printf("val: %s\n", val);
+		//verify
+		if (g_str_equal(key, "pixel"))
+			*pixel = g_strdup(val);
+		else if (g_str_equal(key, "encoding"))
+			*encoding = g_strdup(val);
+		else if (g_str_equal(key, "maxsize"))
+			*maxsize = g_strdup(val);
+		else if (g_str_equal(key, "transformation"))
+			*transform = g_strdup(val);
+		break;
+		dbus_message_iter_next(&array);
+	}
+
+	if (*pixel == NULL)
+		*pixel = strdup("");
+	if (*encoding == NULL)
+		*encoding = strdup("");
+
+	printf("p: %s\ne: %s\nm: %s\nt: %s\n",
+			(*pixel)?(*pixel):(""),
+			(*encoding)?(*encoding):(""),
+			(*maxsize)?(*maxsize):(""),
+			(*transform)?(*transform):("")
+	      );
+
+	return TRUE;
+failed:
+	g_free(*path);
+	g_free(*handle);
+	g_free(*pixel);
+	g_free(*encoding);
+	g_free(*maxsize);
+	g_free(*transform);
+	return FALSE;
+}
 
 static DBusMessage *get_image(DBusConnection *connection,
 				DBusMessage *message, void *user_data)
 {
 	struct session_data *session = user_data;
-	const char *transform, *handle, *encoding, *image_path, *pixel;
+	char *transform, *handle, *encoding, *image_path, *pixel, *maxsize;
 	GSList *aheaders = NULL;
 	struct a_header *imgdesc = NULL, *hdesc = NULL;
 	int err;
 
-	if (dbus_message_get_args(message, NULL,
-				DBUS_TYPE_STRING, &image_path,
-				DBUS_TYPE_STRING, &handle,
-				DBUS_TYPE_STRING, &encoding,
-				DBUS_TYPE_STRING, &pixel,
-				DBUS_TYPE_STRING, &transform,
-				DBUS_TYPE_INVALID) == FALSE)
-		return g_dbus_create_error(message,
-				"org.openobex.Error.InvalidArguments", NULL);
-	
-	printf("requested get image %s %s %s %s %s\n", image_path, handle,
-			encoding, transform, pixel);
+	if (!parse_get_image_dict(message, &image_path, &handle, &pixel, &encoding, &maxsize, &transform))
+
+	printf("requested get image %s %s %s %s %s %s\n", image_path, handle,
+			encoding, transform, pixel, maxsize);
 
 	imgdesc = create_img_desc(encoding, pixel, transform);
 	hdesc = create_handle(handle);
@@ -1181,7 +1251,7 @@ static DBusMessage *get_image(DBusConnection *connection,
 }
 
 GDBusMethodTable image_pull_methods[] = {
-	{ "GetImage",	"sssss", "", get_image },
+	{ "GetImage",	"ssa{ss}", "", get_image },
 	{ "GetImageThumbnail",	"ss", "", get_image_thumbnail },
 	{ "GetImageAttachment",	"sss", "", get_image_attachment },
 	{ "GetImagesListing",	"a{sv}", "aa{ss}", get_images_listing,

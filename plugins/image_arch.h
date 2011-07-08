@@ -31,10 +31,7 @@ struct aa_aparam {
 struct archive_session {
     struct obex_session *os;
     struct aa_aparam *aparam;
-    int err;
     char *address;
-    char *path;
-    DBusConnection *conn;
 };
 
 void *image_arch_connect(struct obex_session *os, int *err);
