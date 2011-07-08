@@ -72,11 +72,27 @@ static const uint8_t IMAGE_ARCH_TARGET[TARGET_SIZE] = {
 			0x94, 0x01, 0x26, 0xC0, 0x46, 0x08, 0x11, 0xD5,
 			0x84, 0x1A, 0x00, 0x02, 0xA5, 0x32, 0x5B, 0x4E };
 
-typedef void (*listing_callback) (struct archive_session *, GSList *);
+struct archive_context {
+	struct archive_session *session;
+	DBusConnection *conn;
+	char *aos_path;
+	GSList *image_list;
+	int err;
+};
+
+static void free_archive_context(struct archive_context *context) {
+	if (context == NULL)
+		return;
+	g_free(context->aos_path);
+	g_free(context);
+}
+
+typedef void (*aos_callback) (struct archive_context *);
 
 struct listing_object {
 	char *handle, *ctime, *mtime;
 };
+
 /*
 static void free_listing_object(struct listing_object *object) {
 	if (object == NULL)
@@ -119,8 +135,8 @@ static gboolean append_sv_dict_entry(DBusMessageIter *dict, const char *key,
 }
 
 struct get_listing_data {
-	struct archive_session *session;
-	listing_callback cb;
+	struct archive_context *context;
+	aos_callback cb;
 };
 
 static struct listing_object *parse_listing_dict(DBusMessageIter *dict)
@@ -149,6 +165,7 @@ static struct listing_object *parse_listing_dict(DBusMessageIter *dict)
 static void get_listing_callback(DBusPendingCall *call, void *user_data)
 {
 	struct get_listing_data *data = user_data;
+	struct archive_context *context = data->context;
 	DBusMessageIter iter, array;
 	DBusMessage *msg = dbus_pending_call_steal_reply(call);
 	GSList *list = NULL;
@@ -175,18 +192,61 @@ static void get_listing_callback(DBusPendingCall *call, void *user_data)
 		dbus_message_iter_next(&array);
 	}
 
+	context->image_list = list;
+
 	if (data->cb != NULL)
-		data->cb(data->session, list);
+		data->cb(data->context);
 }
 
-static gboolean get_listing(struct archive_session *session, listing_callback cb)
+static gboolean get_listing(struct archive_context *context, aos_callback cb)
 {
 	DBusMessageIter args, dict;
 	DBusPendingCall *result;
 	struct get_listing_data *data;
 	gboolean truth = TRUE;
-	DBusMessage *msg = dbus_message_new_method_call(CLIENT_ADDRESS, session->path,
+	DBusMessage *msg = dbus_message_new_method_call(CLIENT_ADDRESS, context->aos_path,
 					AOS_INTERFACE, "GetImagesListing");
+
+	if (msg == NULL)
+		return FALSE;
+
+	dbus_message_iter_init_append(msg, &args);
+
+	if (!dbus_message_iter_open_container(&args, DBUS_TYPE_ARRAY, "{sv}",
+									&dict))
+		return FALSE;
+
+	if (!append_sv_dict_entry(&dict, "latest", DBUS_TYPE_BOOLEAN,
+					DBUS_TYPE_BOOLEAN_AS_STRING, &truth))
+		return FALSE;
+
+	if (!dbus_message_iter_close_container(&args, &dict))
+		return FALSE;
+	
+	if (!dbus_connection_send_with_reply(context->conn, msg, &result, -1))
+		return FALSE;
+
+	data = g_new0(struct get_listing_data, 1);
+	data->context = context;
+	data->cb = cb;
+
+	if (!dbus_pending_call_set_notify(result, get_listing_callback,
+								data, NULL))
+		return FALSE;
+
+	dbus_message_unref(msg);
+	dbus_pending_call_unref(result);
+
+	return TRUE;
+}
+/*
+static gboolean get_image(struct archive_context *context, char * path, aos_callback cb)
+{
+	DBusMessageIter args, dict;
+	DBusPendingCall *result;
+	struct get_listing_data *data;
+	DBusMessage *msg = dbus_message_new_method_call(CLIENT_ADDRESS, context->aos_path,
+					AOS_INTERFACE, "GetImage");
 
 	if (msg == NULL)
 		return FALSE;
@@ -220,47 +280,54 @@ static gboolean get_listing(struct archive_session *session, listing_callback cb
 
 	return TRUE;
 }
+*/
 
-static void get_listing_finished(struct archive_session *session, GSList *list) {
+static void get_listing_finished(struct archive_context *context) {
+	GSList *l;
 	printf("get_listing_finished\n");
-	while (list != NULL) {
-		struct listing_object * obj = list->data;
-		printf("handle: %s, created: %s, modified: %s\n", obj->handle, obj->ctime, obj->mtime);
-		list = g_slist_next(list);
+	for (l = context->image_list; l != NULL; l = g_slist_next(l)) {
+		struct listing_object * obj = l->data;
+		printf("handle: %s, created: %s, modified: %s\n", obj->handle,
+						obj->ctime, obj->mtime);
 	}
+	/*
+	context->reply_watch = g_dbus_add_signal_watch(conn, NULL, path,
+						SYNCE_CONN_INTERFACE, "Reply",
+						reply_signal, context, NULL);
+						*/
 }
 
-static void get_aos_interface_callback(DBusPendingCall *call, void *user_data) {
-	struct archive_session *session = user_data;
+static void get_aos_interface_callback(DBusPendingCall *call, void *user_data)
+{
+	struct archive_context *context = user_data;
 	DBusMessage *msg = dbus_pending_call_steal_reply(call);
 	char *path;
 
 	if (msg == NULL) {
-		session->err = -EBADR;
+		context->err = -EBADR;
 		goto failed;
 	}
 
 	if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_OBJECT_PATH, &path,
 						DBUS_TYPE_INVALID)) {
-		session->err = -EBADR;
+		context->err = -EBADR;
 		goto failed;
 	}
 
-	session->path = path;
+	context->aos_path = path;
 
-	get_listing(session, get_listing_finished);
+	get_listing(context, get_listing_finished);
 
-	printf("got path: %s\n", session->path);
+	printf("got path: %s\n", context->aos_path);
 
 	printf("callback\n");
 
 failed:
 	printf("failed\n");
-	obex_object_set_io_flags(session, G_IO_OUT, 0);
+	obex_object_set_io_flags(context, G_IO_OUT, 0);
 }
 
-static gboolean get_aos_interface(struct archive_session *session,
-							DBusConnection *conn)
+static gboolean get_aos_interface(struct archive_context *context)
 {
 	DBusMessage *msg;
 	DBusMessageIter args, dict;
@@ -278,7 +345,7 @@ static gboolean get_aos_interface(struct archive_session *session,
 		return FALSE;
 
 	if (!append_sv_dict_entry(&dict, "Destination", DBUS_TYPE_STRING,
-				DBUS_TYPE_STRING_AS_STRING, &session->address))
+				DBUS_TYPE_STRING_AS_STRING, &context->session->address))
 		return FALSE;
 
 	if (!append_sv_dict_entry(&dict, "Target", DBUS_TYPE_STRING,
@@ -289,13 +356,13 @@ static gboolean get_aos_interface(struct archive_session *session,
 		return FALSE;
 	
 	dbus_error_init(&err);
-	if (!dbus_connection_send_with_reply(conn, msg, &result, -1)) {
+	if (!dbus_connection_send_with_reply(context->conn, msg, &result, -1)) {
 		fprintf(stderr, "Conn error: (%s)\n", err.message);
 		return FALSE;
 	}
 
 	if (!dbus_pending_call_set_notify(result, get_aos_interface_callback,
-								session, NULL))
+								context, NULL))
 		return FALSE;
 
 	printf("lawl %p\n", get_aos_interface_callback);
@@ -312,8 +379,16 @@ static void *imgarch_open(const char *name, int oflag, mode_t mode,
 		void *context, size_t *size, int *err)
 {
 	struct archive_session *session = context;
+	struct archive_context *object = g_new0(struct archive_context, 1);
+	object->session = session;
+	if ((object->conn = connect_to_client()) == NULL) {
+		free_archive_context(object);
+		if (err != NULL)
+			*err = -EBADR;
+		return NULL;
+	}
 	printf("imgarch open\n");
-	return session;
+	return object;
 }
 
 static int imgarch_close(void *object)
@@ -329,15 +404,11 @@ static ssize_t imgarch_write(void *object, const void *buf, size_t count)
 
 static ssize_t imgarch_flush(void *object)
 {
-	struct archive_session *session = object;
-	DBusConnection *conn;
-	if (session->path != NULL || session->err < 0)
-		return session->err;
+	struct archive_context *context = object;
 	printf("imgarch flush\n");
-	if ((conn = connect_to_client()) == NULL)
-		return -EBADR;
-	session->conn = conn;
-	if (!get_aos_interface(session, conn))
+	if (context->aos_path != NULL || context->err < 0)
+		return context->err;
+	if (!get_aos_interface(context))
 		return -EBADR;
 	return -EAGAIN;
 }

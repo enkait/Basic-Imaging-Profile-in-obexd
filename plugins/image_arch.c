@@ -112,7 +112,6 @@ void *image_arch_connect(struct obex_session *os, int *err) {
 
 	as = g_new0(struct archive_session, 1);
 	as->os = os;
-	as->err = 0;
 
 	if (err)
 		*err = 0;
