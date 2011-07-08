@@ -216,7 +216,7 @@ static void get_images_listing_callback(
 {
 	DBusMessage *reply;
 	DBusMessageIter iter;
-	int err;
+	int err, i;
 	struct transfer_data *transfer = session->pending->data;
 	GSList *listing;
 	printf("get_images_listing_callback called\n");
@@ -225,6 +225,10 @@ static void get_images_listing_callback(
 							"%s", gerr->message);
 		goto done;
 	}
+
+	for (i = 0;i<transfer->filled;i++)
+		printf("%c", transfer->buffer[i]);
+	printf("\n");
 
 	listing = parse_images_listing(transfer->buffer, transfer->filled, &err);
 
@@ -247,7 +251,6 @@ static void get_images_listing_callback(
 
 done:
 	g_dbus_send_message(session->conn, reply);
-	dbus_message_unref(reply);
 	dbus_message_unref(session->msg);
 
 	transfer_unregister(transfer);
@@ -963,6 +966,7 @@ static DBusMessage *get_images_listing(DBusConnection *connection,
 	a_header_free(handles_desc);
 
 	session->msg = dbus_message_ref(message);
+	printf("message pointer: %p\n", session->msg);
 
 	return NULL;
 }
