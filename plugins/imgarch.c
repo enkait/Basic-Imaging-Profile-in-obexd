@@ -92,7 +92,7 @@ static DBusConnection *connect_to_client(void) {
 }
 
 static gboolean append_sv_dict_entry(DBusMessageIter *dict, const char *key,
-							int type, void *val)
+					int type, const char *str_type, void *val)
 {
 	DBusMessageIter entry, value;
 	if (!dbus_message_iter_open_container(dict, DBUS_TYPE_DICT_ENTRY, NULL,
@@ -102,7 +102,7 @@ static gboolean append_sv_dict_entry(DBusMessageIter *dict, const char *key,
 	if (!dbus_message_iter_append_basic(&entry, DBUS_TYPE_STRING, &key))
 		return FALSE;
 
-	if (!dbus_message_iter_open_container(&entry, DBUS_TYPE_VARIANT, "s",
+	if (!dbus_message_iter_open_container(&entry, DBUS_TYPE_VARIANT, str_type,
 									&value))
 		return FALSE;
 
@@ -126,6 +126,7 @@ struct get_listing_data {
 static struct listing_object *parse_listing_dict(DBusMessageIter *dict)
 {
 	struct listing_object *obj = g_new0(struct listing_object, 1);
+	printf("parse_listing_dict\n");
 	while (dbus_message_iter_get_arg_type(dict) ==	DBUS_TYPE_DICT_ENTRY) {
 		DBusMessageIter entry;
 		char *key, *val;
@@ -140,6 +141,7 @@ static struct listing_object *parse_listing_dict(DBusMessageIter *dict)
 			obj->ctime = val;
 		if (g_str_equal(key, "modified"))
 			obj->mtime = val;
+		dbus_message_iter_next(dict);
 	}
 	return obj;
 }
@@ -150,7 +152,18 @@ static void get_listing_callback(DBusPendingCall *call, void *user_data)
 	DBusMessageIter iter, array;
 	DBusMessage *msg = dbus_pending_call_steal_reply(call);
 	GSList *list = NULL;
-	dbus_message_iter_init(msg, &iter);
+
+	printf("get_listing_callback\n");
+
+	if (msg == NULL) {
+		printf("error with reply\n");
+		return;
+	}
+
+	if (!dbus_message_iter_init(msg, &iter)) {
+		printf("error with reply\n");
+		return;
+	}
 	dbus_message_iter_recurse(&iter, &array);
 	
 	while (dbus_message_iter_get_arg_type(&array) == DBUS_TYPE_ARRAY) {
@@ -185,7 +198,7 @@ static gboolean get_listing(struct archive_session *session, listing_callback cb
 		return FALSE;
 
 	if (!append_sv_dict_entry(&dict, "latest", DBUS_TYPE_BOOLEAN,
-							&truth))
+					DBUS_TYPE_BOOLEAN_AS_STRING, &truth))
 		return FALSE;
 
 	if (!dbus_message_iter_close_container(&args, &dict))
@@ -209,6 +222,7 @@ static gboolean get_listing(struct archive_session *session, listing_callback cb
 }
 
 static void get_listing_finished(struct archive_session *session, GSList *list) {
+	printf("get_listing_finished\n");
 	while (list != NULL) {
 		struct listing_object * obj = list->data;
 		printf("handle: %s, created: %s, modified: %s\n", obj->handle, obj->ctime, obj->mtime);
@@ -241,6 +255,7 @@ static void get_aos_interface_callback(DBusPendingCall *call, void *user_data) {
 	printf("callback\n");
 
 failed:
+	printf("failed\n");
 	obex_object_set_io_flags(session, G_IO_OUT, 0);
 }
 
@@ -263,10 +278,11 @@ static gboolean get_aos_interface(struct archive_session *session,
 		return FALSE;
 
 	if (!append_sv_dict_entry(&dict, "Destination", DBUS_TYPE_STRING,
-							&session->address))
+				DBUS_TYPE_STRING_AS_STRING, &session->address))
 		return FALSE;
 
-	if (!append_sv_dict_entry(&dict, "Target", DBUS_TYPE_STRING, &bip_aos))
+	if (!append_sv_dict_entry(&dict, "Target", DBUS_TYPE_STRING,
+					DBUS_TYPE_STRING_AS_STRING, &bip_aos))
 		return FALSE;
 
 	if (!dbus_message_iter_close_container(&args, &dict))
@@ -320,6 +336,7 @@ static ssize_t imgarch_flush(void *object)
 	printf("imgarch flush\n");
 	if ((conn = connect_to_client()) == NULL)
 		return -EBADR;
+	session->conn = conn;
 	if (!get_aos_interface(session, conn))
 		return -EBADR;
 	return -EAGAIN;
