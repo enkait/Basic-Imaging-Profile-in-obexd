@@ -30,6 +30,8 @@
 #define HANDLE_MAX 10000000
 
 const char *att_suf = "_att";
+static const gchar *valid_name_chars="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+static const gchar rep_char='_';
 
 uint8_t *encode_img_handle(const char *data, unsigned int length, unsigned int *newsize) {
 	glong newlen;
@@ -414,3 +416,53 @@ char *get_att_dir(const char *image_path) {
 	att_path = g_string_append(att_path, att_suf);
 	return g_string_free(att_path, FALSE);
 }
+
+static char *filter_name(const char *name) {
+	char *new_name = g_strdup(name);
+	return g_strcanon(new_name, valid_name_chars, rep_char);
+}
+
+static char *append_number(const char *path, unsigned int number) {
+	GString *new_path;
+	if (number > 10000000)
+		return NULL;
+	new_path = g_string_new(path);
+	g_string_append_printf(new_path, "_%u", number);
+	return g_string_free(new_path, FALSE);
+}
+
+char *safe_rename(const char *name, const char *folder,
+							const char *orig_path)
+{
+	char *new_name = filter_name(name);
+	char *new_path = g_build_filename(folder, new_name, NULL);
+	char *test_path = g_strdup(new_path);
+	int lock_fd = -1, number = 1;
+	
+	printf("test_path: %s %s %s %s\n", test_path, folder, new_name, name);
+
+	while((lock_fd = open(test_path, O_CREAT | O_EXCL, 0600)) < 0 &&
+			errno == EEXIST) {
+		number++;
+		g_free(test_path);
+		test_path = append_number(new_path, number);
+		if (test_path == NULL)
+			goto cleanup;
+	}
+	if (lock_fd < 0) {
+		g_free(test_path);
+		test_path = NULL;
+		goto cleanup;
+	}
+	if (rename(orig_path, test_path) < 0) {
+		g_free(test_path);
+		test_path = NULL;
+	}
+	close(lock_fd);
+
+cleanup:
+	g_free(new_name);
+	g_free(new_path);
+	return test_path;
+}
+

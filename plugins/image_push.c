@@ -100,9 +100,6 @@ static const uint8_t IMAGE_PUSH_TARGET[TARGET_SIZE] = {
 
 static const char * bip_root="/tmp/bip/";
 
-static const gchar * valid_name_chars="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-static const gchar rep_char='_';
-
 void free_image_push_session(struct image_push_session *session) {
 	g_free(session->file_path);
 	g_free(session);
@@ -175,53 +172,6 @@ static int get_new_handle(struct image_push_session *ips) {
 		return -1;
 	}
 	return ips->next_handle++;
-}
-
-static char *filter_name(const char *name) {
-	char *new_name = g_strdup(name);
-	return g_strcanon(new_name, valid_name_chars, rep_char);
-}
-
-static char *append_number(const char *path, unsigned int number) {
-	GString *new_path;
-	if (number > 10000000)
-		return NULL;
-	new_path = g_string_new(path);
-	g_string_append_printf(new_path, "_%u", number);
-	return g_string_free(new_path, FALSE);
-}
-
-static char *safe_rename(const char *name, const char *folder, const char *orig_path) {
-	char *new_name = filter_name(name);
-	char *new_path = g_build_filename(folder, new_name, NULL);
-	char *test_path = g_strdup(new_path);
-	int lock_fd = -1, number = 1;
-	
-	printf("test_path: %s %s %s %s\n", test_path, folder, new_name, name);
-
-	while((lock_fd = open(test_path, O_CREAT | O_EXCL, 0600)) < 0 &&
-			errno == EEXIST) {
-		number++;
-		g_free(test_path);
-		test_path = append_number(new_path, number);
-		if (test_path == NULL)
-			goto cleanup;
-	}
-	if (lock_fd < 0) {
-		g_free(test_path);
-		test_path = NULL;
-		goto cleanup;
-	}
-	if (rename(orig_path, test_path) < 0) {
-		g_free(test_path);
-		test_path = NULL;
-	}
-	close(lock_fd);
-
-cleanup:
-	g_free(new_name);
-	g_free(new_path);
-	return test_path;
 }
 
 static gboolean add_reply_handle(struct obex_session *os, obex_object_t *obj, int handle) {
