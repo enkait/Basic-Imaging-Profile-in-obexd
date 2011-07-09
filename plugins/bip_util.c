@@ -287,17 +287,14 @@ gboolean make_modified_image(const char *image_path, const char *modified_path,
 		if (!MagickExtentImage(wand, attr->width, attr->height, 0, 0))
 			goto failed;
 	}
-	else if (g_strcmp0(transform, "stretch") == 0){
-		printf("stretch\n");
+	else {
+		printf("defaulted to: stretch\n");
 		if(MagickResizeImage(wand, attr->width, attr->height,
 					LanczosFilter, 1.0) == MagickFalse)
 			goto failed;
 	}
-	else {
-		goto failed;
-	}
 
-	if (!MagickSetImageFormat(wand, attr->encoding))
+	if (attr->encoding != NULL && !MagickSetImageFormat(wand, attr->encoding))
 		goto failed;
 
 	if (!MagickWriteImage(wand, modified_path))

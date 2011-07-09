@@ -89,18 +89,23 @@ static gboolean parse_attr(struct image_desc *desc, const gchar *key,
 		printf("maxsize: %u\n", desc->maxsize);
 	}
 	else if (g_str_equal(key, "encoding")) {
+		if (strlen(value) == 0)
+			goto ok;
 		desc->encoding = g_strdup(convBIP2IM(value));
 		if (desc->encoding == NULL)
 			goto invalid;
 		printf("encoding: %s\n", desc->encoding);
 	}
 	else if (g_str_equal(key, "transformation")) {
+		printf("value: %s\n", value);
 		if (!verify_transform(value))
 			goto invalid;
 		desc->transform = g_strdup(value);
 		printf("transform: %s\n", desc->transform);
 	}
 	else if (g_str_equal(key, "pixel")) {
+		if (strlen(value) == 0)
+			goto ok;
 		if (!parse_pixel_range(value, desc->lower, desc->upper,
 							&desc->fixed_ratio))
 			goto invalid;
@@ -113,6 +118,7 @@ static gboolean parse_attr(struct image_desc *desc, const gchar *key,
 				G_MARKUP_ERROR_UNKNOWN_ATTRIBUTE, NULL);
 		return FALSE;
 	}
+ok:
 	return TRUE;
 invalid:
 	g_set_error(gerr, G_MARKUP_ERROR, G_MARKUP_ERROR_INVALID_CONTENT,
@@ -185,8 +191,9 @@ static gboolean get_file_size(int fd, unsigned int *size, int *err) {
 static int get_image_fd(char *image_path, struct image_desc *desc, int *err)
 {
 	int fd;
-	struct image_attributes attr;
+	struct image_attributes *attr, *orig;
 	char *new_image_path;
+	gboolean res;
 	GError *gerr;
 
 	if ((fd = g_file_open_tmp(NULL, &new_image_path, &gerr)) < 0) {
@@ -197,11 +204,31 @@ static int get_image_fd(char *image_path, struct image_desc *desc, int *err)
 
 	printf("fd = %d\n", fd);
 	
-	attr.encoding = desc->encoding;
-	attr.width = desc->upper[0];
-	attr.height = desc->upper[1];
-	if (!make_modified_image(image_path, new_image_path, &attr,
-						desc->transform, err)) {
+	attr = g_new0(struct image_attributes, 1);
+	attr->encoding = g_strdup(desc->encoding);
+
+	orig = get_image_attributes(image_path, err);
+	if (orig == NULL) {
+		close(fd);
+		return -1;
+	}
+
+	if (orig->width >= desc->lower[0] && orig->height >= desc->lower[1] &&
+						orig->width <= desc->upper[0] &&
+						orig->height <= desc->upper[1]) {
+		attr->width = orig->width;
+		attr->height = orig->height;
+	}
+	else {
+		attr->width = desc->upper[0];
+		attr->height = desc->upper[1];
+	}
+	printf("width: %u height: %u\n", attr->width, attr->height);
+	free_image_attributes(orig);
+	res = make_modified_image(image_path, new_image_path, attr,
+						desc->transform, err);
+	free_image_attributes(attr);
+	if (!res) {
 		close(fd);
 		return -1;
 	}
