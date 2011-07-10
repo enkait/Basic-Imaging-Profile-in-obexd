@@ -20,7 +20,11 @@
 
 #define IMG_DESC_BEGIN "<image-descriptor version=\"1.0\">" EOL_CHARS
 
-#define IMG_DESC_PULL "<image encoding=\"%s\" pixel=\"%s\" transformation=\"%s\"/>" EOL_CHARS
+#define IMG_BEGIN "<image encoding=\"%s\" pixel=\"%s\""
+
+#define IMG_TRANSFORM " transformation=\"%s\""
+
+#define IMG_END "/>" EOL_CHARS
 
 #define IMG_DESC_END "</image-descriptor>" EOL_CHARS
 
@@ -952,6 +956,9 @@ static DBusMessage *get_images_listing(DBusConnection *connection,
 	aparam = new_images_listing_aparam(count, begin, latest);
 
 	printf("rozmiar aparam: %u\n", sizeof(struct images_listing_aparam));
+	
+	session->msg = dbus_message_ref(message);
+	printf("message pointer: %p\n", session->msg);
 
 	if ((err=session_get_with_aheaders(session, "x-bt/img-listing", NULL, NULL,
 					(const guint8 *)aparam, sizeof(struct images_listing_aparam),
@@ -963,10 +970,6 @@ static DBusMessage *get_images_listing(DBusConnection *connection,
 
 	g_slist_free(aheaders);
 	a_header_free(handles_desc);
-
-	session->msg = dbus_message_ref(message);
-	printf("message pointer: %p\n", session->msg);
-
 	return NULL;
 }
 
@@ -976,8 +979,10 @@ static struct a_header *create_img_desc(const char *encoding, const char *pixel,
 	guint8 *data;
 	struct a_header *ah = g_try_new(struct a_header, 1);
 	GString *descriptor = g_string_new(IMG_DESC_BEGIN);
-	g_string_append_printf(descriptor,IMG_DESC_PULL, encoding, pixel,
-				transform);
+	g_string_append_printf(descriptor,IMG_BEGIN, encoding, pixel);
+	if (transform != NULL)
+		g_string_append_printf(descriptor,IMG_TRANSFORM, transform);
+	g_string_append(descriptor,IMG_END);
 	descriptor = g_string_append(descriptor, IMG_DESC_END);
 	data = encode_img_descriptor(descriptor->str, descriptor->len, &ah->hv_size);
 	g_string_free(descriptor, TRUE);
@@ -1194,10 +1199,10 @@ static gboolean parse_get_image_dict(DBusMessage *msg, char **path,
 		*encoding = strdup("");
 
 	printf("p: %s\ne: %s\nm: %s\nt: %s\n",
-			(*pixel)?(*pixel):(""),
-			(*encoding)?(*encoding):(""),
-			(*maxsize)?(*maxsize):(""),
-			(*transform)?(*transform):("")
+			(*pixel)?(*pixel):("(null)"),
+			(*encoding)?(*encoding):("(null)"),
+			(*maxsize)?(*maxsize):("(null)"),
+			(*transform)?(*transform):("(null)")
 	      );
 
 	return TRUE;
@@ -1221,6 +1226,8 @@ static DBusMessage *get_image(DBusConnection *connection,
 	int err;
 
 	if (!parse_get_image_dict(message, &image_path, &handle, &pixel, &encoding, &maxsize, &transform))
+		return g_dbus_create_error(message,
+			"org.openobex.Error.InvalidArguments", NULL);
 
 	printf("requested get image %s %s %s %s %s %s\n", image_path, handle,
 			encoding, transform, pixel, maxsize);
