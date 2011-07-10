@@ -378,11 +378,13 @@ void parse_bip_user_headers(const struct obex_session *os,
 	
 	if (desc_hdr != NULL && desc_hdr_len != NULL) {
 		g_free(*desc_hdr);
+		*desc_hdr = NULL;
 		*desc_hdr_len = 0;
 	}
 	
 	if (handle_hdr != NULL && handle_hdr_len != NULL) {
 		g_free(*handle_hdr);
+		*handle_hdr = NULL;
 		*handle_hdr_len = 0;
 	}
 

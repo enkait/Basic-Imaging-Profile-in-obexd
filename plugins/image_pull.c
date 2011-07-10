@@ -151,7 +151,10 @@ void img_listing_free(struct img_listing *listing)
 
 static void free_image_pull_session(struct image_pull_session *session)
 {
-	GSList *image_list = session->image_list;
+	GSList *image_list;
+	if (session == NULL)
+		return;
+	image_list = session->image_list;
 	while (image_list != NULL) {
 		img_listing_free(image_list->data);
 		image_list = g_slist_next(image_list);
@@ -289,6 +292,7 @@ int image_pull_get(struct obex_session *os, obex_object_t *obj,
 
 	printf("IMAGE PULL GET\n");
 
+	printf("%p %p\n", &session->desc_hdr, session->desc_hdr);
 	printf("%p: session->aparam_data", session->aparam_data);
 	g_free(session->aparam_data);
 	session->aparam_data = NULL;
@@ -332,6 +336,8 @@ int image_pull_put(struct obex_session *os, obex_object_t *obj,
 	if (obex_get_size(os) != OBJECT_SIZE_DELETE ||
 					!g_str_equal(os->type, "x-bt/img-img"))
 		return -EBADR;
+
+	printf("%p %p\n", &session->desc_hdr, session->desc_hdr);
 
 	parse_bip_user_headers(os, obj, &session->desc_hdr,
 					&session->desc_hdr_len,
