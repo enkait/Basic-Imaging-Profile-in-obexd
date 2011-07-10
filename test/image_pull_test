@@ -126,7 +126,8 @@ def imaging_capabilities(session):
     print session.GetImagingCapabilities()
 
 def get_image_properties(session, handle):
-    for o in session.GetImageProperties(handle):
+    resp = session.GetImageProperties(handle)
+    for o in resp:
             if 'type' in o:
                     print
                     print o['type']
@@ -134,6 +135,7 @@ def get_image_properties(session, handle):
             else:
                     print o
     print "get image properties"
+    print resp
 
 def delete_image(session, handle):
         print session.DeleteImage(handle)

@@ -51,3 +51,5 @@ void parse_bip_user_headers(const struct obex_session *os, obex_object_t *obj,
 				char **handle_hdr,
 				unsigned int *handle_hdr_len);
 char *get_att_dir(const char *image_path);
+char *safe_rename(const char *name, const char *folder,
+							const char *orig_path);
