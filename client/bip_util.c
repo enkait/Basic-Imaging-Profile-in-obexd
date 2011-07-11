@@ -30,6 +30,7 @@
 #define HANDLE_MAX 10000000
 
 const char *att_suf = "_att";
+const char *default_name = "image";
 static const gchar *valid_name_chars="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 static const gchar rep_char='_';
 
@@ -422,9 +423,10 @@ char *get_att_dir(const char *image_path) {
 static char *filter_name(const char *name) {
 	char *new_name;
 	if (name == NULL)
-		new_name = g_strdup("");
+		new_name = g_strdup(default_name);
 	else
 		new_name = g_strdup(name);
+	printf("%p\n", new_name);
 	return g_strcanon(new_name, valid_name_chars, rep_char);
 }
 
