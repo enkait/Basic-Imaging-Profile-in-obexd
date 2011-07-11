@@ -254,7 +254,6 @@ int image_push_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 		printf("wtf\n");
 		if ((new_path = safe_rename(os->name, bip_root, ips->file_path))
 				== NULL) {
-			printf("lol\n");
 			return -errno;
 		}
 		printf("newpath: %s\n", new_path);
@@ -264,7 +263,6 @@ int image_push_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 		if (img->handle < 0) {
 			g_free(img);
 			g_free(new_path);
-			printf("lol2\n");
 			return -EBADR;
 		}
 		img->image = new_path;

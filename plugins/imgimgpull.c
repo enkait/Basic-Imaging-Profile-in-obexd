@@ -55,8 +55,19 @@
 #include "image_pull.h"
 #include "filesystem.h"
 #include "bip_util.h"
+#include "imgimg.h"
 
 #define EOL_CHARS "\n"
+#define CAPABILITIES_BEGIN "<imaging-capabilities version=\"1.0\">" EOL_CHARS
+
+#define IMAGE_FORMATS "<image-formats encoding=\"JPEG\" pixel=\"0*0-65535*65535\">" EOL_CHARS \
+                      "<image-formats encoding=\"GIF\" pixel=\"0*0-65535*65535\">" EOL_CHARS \
+                      "<image-formats encoding=\"WBMP\" pixel=\"0*0-65535*65535\">" EOL_CHARS \
+                      "<image-formats encoding=\"PNG\" pixel=\"0*0-65535*65535\">" EOL_CHARS \
+                      "<image-formats encoding=\"JPEG2000\" pixel=\"0*0-65535*65535\">" EOL_CHARS \
+                      "<image-formats encoding=\"BMP\" pixel=\"0*0-65535*65535\">" EOL_CHARS \
+
+#define CAPABILITIES_END "</imaging-capabilities>" EOL_CHARS
 
 struct image_desc {
 	char *encoding;
@@ -328,9 +339,32 @@ static struct obex_mime_type_driver imgimgpull_aos = {
 	.read = imgimgpull_read,
 };
 
+static struct obex_mime_type_driver img_capabilities_pull = {
+	.target = IMAGE_PULL_TARGET,
+	.target_size = TARGET_SIZE,
+	.mimetype = "x-bt/img-capabilities",
+	.open = img_capabilities_open,
+	.read = img_capabilities_read,
+};
+
+static struct obex_mime_type_driver img_capabilities_pull_aos = {
+	.target = IMAGE_AOS_TARGET,
+	.target_size = TARGET_SIZE,
+	.mimetype = "x-bt/img-capabilities",
+	.open = img_capabilities_open,
+	.read = img_capabilities_read,
+};
+
 static int imgimgpull_init(void)
 {
 	int ret;
+	if ((ret = obex_mime_type_driver_register(&img_capabilities_pull)) < 0)
+		return ret;
+
+	if ((ret = obex_mime_type_driver_register(&img_capabilities_pull_aos))
+									< 0)
+		return ret;
+
 	if ((ret = obex_mime_type_driver_register(&imgimgpull)) < 0)
 		return ret;
 
@@ -341,6 +375,8 @@ static void imgimgpull_exit(void)
 {
 	obex_mime_type_driver_unregister(&imgimgpull_aos);
 	obex_mime_type_driver_unregister(&imgimgpull);
+	obex_mime_type_driver_unregister(&img_capabilities_pull_aos);
+	obex_mime_type_driver_unregister(&img_capabilities_pull);
 }
 
 OBEX_PLUGIN_DEFINE(imgimgpull, imgimgpull_init, imgimgpull_exit)

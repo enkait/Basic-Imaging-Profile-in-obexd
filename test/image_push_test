@@ -82,7 +82,6 @@ def image_attachment_push(session, filename, handle):
     print "Push Attachment finished"
 
 def imaging_capabilities(session):
-    print "omg"
     print session.GetImagingCapabilities()
 
 def execute():

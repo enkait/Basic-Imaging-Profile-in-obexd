@@ -318,7 +318,6 @@ gboolean make_thumbnail(const char *image_path, const char *modified_path,
 	MagickWand *wand;
 	MagickWandGenesis();
 	wand = NewMagickWand();
-	printf("lol\n");
 	
 	if (err != NULL)
 		*err = 0;
@@ -344,7 +343,6 @@ gboolean make_thumbnail(const char *image_path, const char *modified_path,
 	if (!MagickWriteImage(wand, modified_path))
 		goto failed;
 	
-	printf("lol\n");
 	MagickWandTerminus();
 	return TRUE;
 failed:

@@ -339,7 +339,6 @@ static void get_imaging_capabilities_callback(
 	DBusMessage *reply;
 	DBusMessageIter iter;
 	char *capabilities;
-	int i;
 	struct transfer_data *transfer = session->pending->data;
 	printf("get_imaging_capabilities_callback called\n");
 	if(err) {
@@ -352,13 +351,6 @@ static void get_imaging_capabilities_callback(
 
 	if (transfer->filled == 0)
 		goto done;
-
-	for (i = transfer->filled - 1; i > 0; i--) {
-		if (transfer->buffer[i] != '\0')
-			break;
-
-		transfer->filled--;
-	}
 
 	capabilities = get_null_terminated(transfer->buffer, transfer->filled);
 
@@ -376,7 +368,7 @@ done:
 	return;
 }
 
-static DBusMessage *get_imaging_capabilities(DBusConnection *connection,
+DBusMessage *get_imaging_capabilities(DBusConnection *connection,
 		DBusMessage *message, void *user_data)
 {
 	struct session_data *session = user_data;

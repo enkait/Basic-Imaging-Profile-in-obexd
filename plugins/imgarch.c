@@ -556,8 +556,6 @@ static void get_image(struct archive_context *context, char *path,
 	data->context = context;
 	data->cb = cb;
 
-	printf("omfg\n");
-
 	if (!dbus_pending_call_set_notify(result, get_image_callback,
 								data, g_free)) {
 		g_free(data);
