@@ -65,6 +65,26 @@
 #define CLIENT_PATH "/"
 #define CLIENT_INTERFACE "org.openobex.Client"
 #define AOS_INTERFACE "org.openobex.ImagePull"
+
+struct archive_context {
+	struct archive_session *session;
+	DBusConnection *conn;
+	char *aos_path;
+	GSList *image_list;
+	unsigned int completed_watch, failed_watch;
+	gboolean reg_watches;
+
+	char *cur_path;
+	struct listing_object *cur_image;
+	struct properties_object *cur_prop;
+};
+
+typedef void (*aos_callback) (struct archive_context *, int err);
+
+static gboolean reg_get_image_watches(struct archive_context *context, aos_callback cb);
+static void unreg_get_image_watches(struct archive_context *context);
+static void get_next_image(struct archive_context *context, int err);
+
 const char *dest_entry = "Destination";
 const char *channel_entry = "Channel";
 const char *bip_aos = "BIP:AOS";
@@ -83,29 +103,6 @@ struct listing_object {
 	char *handle, *ctime, *mtime;
 };
 
-struct archive_context {
-	struct archive_session *session;
-	DBusConnection *conn;
-	char *aos_path;
-	GSList *image_list;
-	int err;
-	unsigned int completed_watch, failed_watch;
-	gboolean reg_watches;
-
-	char *cur_path;
-	struct listing_object *cur_image;
-	struct properties_object *cur_prop;
-};
-
-static void free_archive_context(struct archive_context *context) {
-	if (context == NULL)
-		return;
-	g_free(context->aos_path);
-	g_free(context);
-}
-
-typedef void (*aos_callback) (struct archive_context *, int err);
-
 static void free_listing_object(struct listing_object *object) {
 	if (object == NULL)
 		return;
@@ -113,6 +110,17 @@ static void free_listing_object(struct listing_object *object) {
 	g_free(object->ctime);
 	g_free(object->mtime);
 	g_free(object);
+}
+
+static void free_archive_context(struct archive_context *context) {
+	GSList *l;
+	if (context == NULL)
+		return;
+	g_free(context->aos_path);
+	for (l = context->image_list; l != NULL; l = g_slist_next(l))
+		free_listing_object(l->data);
+	g_slist_free(context->image_list);
+	g_free(context);
 }
 
 static void free_properties_object(struct properties_object *object) {
@@ -167,8 +175,14 @@ static struct listing_object *parse_listing_dict(DBusMessageIter *dict)
 		DBusMessageIter entry;
 		char *key, *val;
 		dbus_message_iter_recurse(dict, &entry);
+
+		if (dbus_message_iter_get_arg_type(&entry) != DBUS_TYPE_STRING)
+			goto failed;
 		dbus_message_iter_get_basic(&entry, &key);
 		dbus_message_iter_next(&entry);
+
+		if (dbus_message_iter_get_arg_type(&entry) != DBUS_TYPE_STRING)
+			goto failed;
 		dbus_message_iter_get_basic(&entry, &val);
 
 		if (g_str_equal(key, "handle"))
@@ -179,7 +193,13 @@ static struct listing_object *parse_listing_dict(DBusMessageIter *dict)
 			obj->mtime = g_strdup(val);
 		dbus_message_iter_next(dict);
 	}
+
+	if (obj->handle == NULL)
+		goto failed;
 	return obj;
+failed:
+	free_listing_object(obj);
+	return NULL;
 }
 
 static void get_listing_callback(DBusPendingCall *call, void *user_data)
@@ -191,37 +211,50 @@ static void get_listing_callback(DBusPendingCall *call, void *user_data)
 	GSList *list = NULL;
 
 	printf("get_listing_callback\n");
+	g_assert(data->cb != NULL);
 
-	if (msg == NULL) {
-		printf("error with reply\n");
-		return;
+	if (msg == NULL)
+		goto failed;
+
+	if (dbus_message_get_error_name(msg) != NULL) {
+		printf("dbus error %s\n", dbus_message_get_error_name(msg));
+		goto failed;
 	}
 
-	if (!dbus_message_iter_init(msg, &iter)) {
-		printf("error with reply\n");
-		return;
-	}
-	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_ARRAY) {
-		printf("missmatched type\n");
-		return;
-	}
+	if (!dbus_message_iter_init(msg, &iter))
+		goto failed;
+
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_ARRAY)
+		goto failed;
+
 	dbus_message_iter_recurse(&iter, &array);
-	
+
 	while (dbus_message_iter_get_arg_type(&array) == DBUS_TYPE_ARRAY) {
 		DBusMessageIter dict;
 		struct listing_object *obj;
 		dbus_message_iter_recurse(&array, &dict);
 		obj = parse_listing_dict(&dict);
+		if (obj == NULL)
+			goto failed;
 		list = g_slist_append(list, obj);
 		dbus_message_iter_next(&array);
 	}
 
-	printf("list: %p\n", list);
-
+	dbus_message_unref(msg);
 	context->image_list = list;
 
-	if (data->cb != NULL)
-		data->cb(data->context, 0);
+	data->cb(data->context, 0);
+	return;
+failed:
+	while (list != NULL) {
+		free_listing_object(list->data);
+		list = g_slist_remove(list, list->data);
+	}
+
+	if (msg != NULL)
+		dbus_message_unref(msg);
+	data->cb(data->context, -EBADR);
+	return;
 }
 
 static gboolean get_listing(struct archive_context *context, aos_callback cb)
@@ -233,6 +266,8 @@ static gboolean get_listing(struct archive_context *context, aos_callback cb)
 	DBusMessage *msg = dbus_message_new_method_call(CLIENT_ADDRESS, context->aos_path,
 					AOS_INTERFACE, "GetImagesListing");
 
+	printf("get_listing\n");
+
 	if (msg == NULL)
 		return FALSE;
 
@@ -240,29 +275,35 @@ static gboolean get_listing(struct archive_context *context, aos_callback cb)
 
 	if (!dbus_message_iter_open_container(&args, DBUS_TYPE_ARRAY, "{sv}",
 									&dict))
-		return FALSE;
+		goto failed;
 
 	if (!append_sv_dict_entry(&dict, "latest", DBUS_TYPE_BOOLEAN,
 					DBUS_TYPE_BOOLEAN_AS_STRING, &truth))
-		return FALSE;
+		goto failed;
 
 	if (!dbus_message_iter_close_container(&args, &dict))
-		return FALSE;
+		goto failed;
 	
 	if (!dbus_connection_send_with_reply(context->conn, msg, &result, -1))
-		return FALSE;
+		goto failed;
 
 	data = g_new0(struct callback_data, 1);
 	data->context = context;
 	data->cb = cb;
 
-	if (!dbus_pending_call_set_notify(result, get_listing_callback, data, NULL))
-		return FALSE;
+	if (!dbus_pending_call_set_notify(result, get_listing_callback,
+								data, g_free)) {
+		g_free(data);
+		goto failed;
+	}
 
 	dbus_message_unref(msg);
 	dbus_pending_call_unref(result);
 
 	return TRUE;
+failed:
+	dbus_message_unref(msg);
+	return FALSE;
 }
 
 static struct properties_object *parse_properties_dict(DBusMessageIter *dict)
@@ -273,8 +314,12 @@ static struct properties_object *parse_properties_dict(DBusMessageIter *dict)
 		DBusMessageIter entry;
 		char *key, *val;
 		dbus_message_iter_recurse(dict, &entry);
+		if (dbus_message_iter_get_arg_type(&entry) != DBUS_TYPE_STRING)
+			goto failed;
 		dbus_message_iter_get_basic(&entry, &key);
 		dbus_message_iter_next(&entry);
+		if (dbus_message_iter_get_arg_type(&entry) != DBUS_TYPE_STRING)
+			goto failed;
 		dbus_message_iter_get_basic(&entry, &val);
 
 		if (g_str_equal(key, "handle"))
@@ -283,7 +328,13 @@ static struct properties_object *parse_properties_dict(DBusMessageIter *dict)
 			obj->name = g_strdup(val);
 		dbus_message_iter_next(dict);
 	}
+
+	if (obj->handle == NULL)
+		goto failed;
 	return obj;
+failed:
+	free_properties_object(obj);
+	return NULL;
 }
 
 static void get_properties_callback(DBusPendingCall *call, void *user_data)
@@ -294,85 +345,109 @@ static void get_properties_callback(DBusPendingCall *call, void *user_data)
 	DBusMessageIter iter, array, dict;
 	DBusMessage *msg = dbus_pending_call_steal_reply(call);
 
+	g_assert(data->cb != NULL);
+
 	printf("get_properties_callback\n");
 
-	if (msg == NULL) {
-		printf("error with reply\n");
-		return;
-	}
+	if (msg == NULL)
+		goto failed;
 
-	if (!dbus_message_iter_init(msg, &iter)) {
-		printf("error with reply\n");
-		return;
-	}
+	if (dbus_message_get_error_name(msg) != NULL)
+		goto failed;
 
-	printf("%c\n", (char) dbus_message_iter_get_arg_type(&iter));
-	//dbus_message_iter_get_basic(&iter, &text);
-	//printf("test: %s\n", text);
+	if (!dbus_message_iter_init(msg, &iter))
+		goto failed;
 
-	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_ARRAY) {
-		printf("missmatched type\n");
-		return;
-	}
-	
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_ARRAY)
+		goto failed;
+
 	dbus_message_iter_recurse(&iter, &array);
+
+	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_ARRAY)
+		goto failed;
+
 	dbus_message_iter_recurse(&array, &dict);
 
 	obj = parse_properties_dict(&dict);
-	
+
+	if (obj == NULL)
+		goto failed;
+
 	context->cur_prop = obj;
 
-	if (data->cb != NULL)
-		data->cb(data->context, 0);
+	dbus_message_unref(msg);
+	data->cb(data->context, 0);
+	return;
+failed:
+	if (msg != NULL)
+		dbus_message_unref(msg);
+	data->cb(data->context, -EBADR);
 }
 
-static gboolean get_properties(struct archive_context *context, char *handle, 
+static void get_properties(struct archive_context *context, char *handle, 
 							aos_callback cb)
 {
 	DBusMessageIter args;
 	DBusPendingCall *result;
 	struct callback_data *data;
-	DBusMessage *msg = dbus_message_new_method_call(CLIENT_ADDRESS,
+	DBusMessage *msg;
+
+	g_assert(cb != NULL);
+
+	msg = dbus_message_new_method_call(CLIENT_ADDRESS,
 					context->aos_path, AOS_INTERFACE,
 						"GetImageProperties");
 
 	if (msg == NULL)
-		return FALSE;
+		goto failed;
 
 	dbus_message_iter_init_append(msg, &args);
 	
 	if (!dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &handle))
-		return FALSE;
+		goto failed;
 
 	if (!dbus_connection_send_with_reply(context->conn, msg, &result, -1))
-		return FALSE;
+		goto failed;
 
 	data = g_new0(struct callback_data, 1);
 	data->context = context;
 	data->cb = cb;
 
 	if (!dbus_pending_call_set_notify(result, get_properties_callback,
-								data, NULL))
-		return FALSE;
+								data, NULL)) {
+		g_free(data);
+		goto failed;
+	}
 
 	dbus_message_unref(msg);
 	dbus_pending_call_unref(result);
 
-	return TRUE;
+	return;
+failed:
+	if (msg != NULL)
+		dbus_message_unref(msg);
+	cb(context, -EBADR);
+	return;
 }
 
 static void get_image_callback(DBusPendingCall *call, void *user_data)
 {
 	struct callback_data *data = user_data;
 	DBusMessage *msg = dbus_pending_call_steal_reply(call);
-
+	g_assert(data->cb);
 	printf("get_image_callback\n");
 
-	if (msg == NULL) {
-		printf("error with reply\n");
-		data->cb(data->context, -1);
-		return;
-	}
+	if (msg == NULL)
+		goto failed;
+
+	if (dbus_message_get_error_name(msg) != NULL)
+		goto failed;
+
+	return;
+failed:
+	if (msg != NULL)
+		dbus_message_unref(msg);
+	data->cb(data->context, -EBADR);
 }
 
 static gboolean get_image_completed(DBusConnection *connection, DBusMessage *message,
@@ -389,16 +464,16 @@ static gboolean get_image_failed(DBusConnection *connection, DBusMessage *messag
 {
 	struct callback_data *data = user_data;
 	printf("get_image_failed\n");
-	data->cb(data->context, -1);
+	data->cb(data->context, -EBADR);
 	return TRUE;
 }
 
-static void reg_get_image_watches(struct archive_context *context, aos_callback cb)
+static gboolean reg_get_image_watches(struct archive_context *context, aos_callback cb)
 {
 	struct callback_data *data;
 
 	if (context->reg_watches)
-		return;
+		return TRUE;
 
 	data = g_new0(struct callback_data, 1);
 	data->context = context;
@@ -409,141 +484,202 @@ static void reg_get_image_watches(struct archive_context *context, aos_callback 
 						AOS_INTERFACE, "GetImageCompleted",
 						get_image_completed, data, NULL);
 
+	if (context->completed_watch == 0) {
+		g_free(data);
+		return FALSE;
+	}
+
 	context->failed_watch = g_dbus_add_signal_watch(context->conn, NULL,
 						context->aos_path,
 						AOS_INTERFACE, "GetImageFailed",
-						&get_image_failed, data, NULL);
+						&get_image_failed, data, g_free);
+
+	if (context->failed_watch == 0) {
+		g_dbus_remove_watch(context->conn, context->completed_watch);
+		g_free(data);
+		return FALSE;
+	}
 
 	context->reg_watches = TRUE;
+	return TRUE;
 }
 
-static gboolean get_image(struct archive_context *context, char *path,
+static void unreg_get_image_watches(struct archive_context *context)
+{
+	if (!context->reg_watches)
+		return;
+
+	g_assert(g_dbus_remove_watch(context->conn, context->completed_watch));
+	g_assert(g_dbus_remove_watch(context->conn, context->failed_watch));
+}
+
+static void get_image(struct archive_context *context, char *path,
 						char *handle, aos_callback cb)
 {
 	struct callback_data *data;
 	DBusMessageIter args, dict;
 	DBusPendingCall *result;
-	DBusMessage *msg = dbus_message_new_method_call(CLIENT_ADDRESS,
-						context->aos_path,
+	DBusMessage *msg;
+
+	printf("get_image\n");
+
+	g_assert(cb != NULL);
+
+	msg = dbus_message_new_method_call(CLIENT_ADDRESS, context->aos_path,
 						AOS_INTERFACE, "GetImage");
 
 	if (msg == NULL)
-		return FALSE;
+		goto failed;
 
 	dbus_message_iter_init_append(msg, &args);
 
 	if (!dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &path))
-		return FALSE;
+		goto failed;
 
 	if (!dbus_message_iter_append_basic(&args, DBUS_TYPE_STRING, &handle))
-		return FALSE;
+		goto failed;
 
 	if (!dbus_message_iter_open_container(&args, DBUS_TYPE_ARRAY, "{ss}",
 									&dict))
-		return FALSE;
+		goto failed;
 
 	if (!dbus_message_iter_close_container(&args, &dict))
-		return FALSE;
+		goto failed;
 
 	if (!dbus_connection_send_with_reply(context->conn, msg, &result, -1))
-		return FALSE;
+		goto failed;
+
+	if (!reg_get_image_watches(context, cb))
+		goto failed;
 
 	data = g_new0(struct callback_data, 1);
 	data->context = context;
 	data->cb = cb;
 
+	printf("omfg\n");
+
 	if (!dbus_pending_call_set_notify(result, get_image_callback,
-								data, NULL))
-		return FALSE;
+								data, g_free)) {
+		g_free(data);
+		goto failed;
+	}
 
 	dbus_message_unref(msg);
 	dbus_pending_call_unref(result);
 
-	reg_get_image_watches(context, cb);
-
-	return TRUE;
+	return;
+failed:
+	if (msg != NULL)
+		dbus_message_unref(msg);
+	printf("error in get_image\n");
+	cb(context, -EBADR);
 }
 
-static gboolean end_aos_session(struct archive_context *context) {
+static void end_aos_session(struct archive_context *context) {
 	DBusMessageIter args;
 	DBusMessage *msg = dbus_message_new_method_call(CLIENT_ADDRESS,
 					context->aos_path,
 					AOS_INTERFACE, "RemoveSession");
 
 	if (msg == NULL)
-		return FALSE;
+		goto cleanup;
 
 	dbus_message_iter_init_append(msg, &args);
 
 	if (!dbus_message_iter_append_basic(&args, DBUS_TYPE_OBJECT_PATH,
 							&context->aos_path))
-		return FALSE;
+		goto cleanup_msg;
 
 	if (!dbus_connection_send(context->conn, msg, NULL))
-		return FALSE;
+		goto cleanup_msg;
+
+cleanup_msg:
 	dbus_message_unref(msg);
-	return TRUE;
+cleanup:
+	unreg_get_image_watches(context);
+	free_archive_context(context);
+}
+
+static void reset_context(struct archive_context *context) {
+	free_properties_object(context->cur_prop);
+	context->cur_prop = NULL;
+	free_listing_object(context->cur_image);
+	context->cur_image = NULL;
+	g_free(context->cur_path);
+	context->cur_path = NULL;
+}
+
+static void rename_image(struct archive_context *context, int err) {
+	char *new_path = NULL, *name = NULL;
+	printf("rename_image, err: %d\n", err);
+	if (err < 0) {
+		//abort this image
+		get_next_image(context, -EBADR);
+	}
+	if (context->cur_prop != NULL)
+		name = context->cur_prop->name;
+	new_path = safe_rename(name, bip_dir, context->cur_path);
+	if (new_path == NULL) {
+		unlink(context->cur_path);
+		get_next_image(context, -EBADR);
+		return;
+	}
+	g_free(new_path);
+	get_next_image(context, 0);
+	return;
+}
+
+static void save_image_to_temp(struct archive_context *context, int err) {
+	int fd;
+	printf("save_image_to_temp, err: %d\n", err);
+	if (err < 0) {
+		// check errors, if critical abort
+	}
+	// finished obtaining properties
+	if ((fd = g_file_open_tmp(NULL, &context->cur_path, NULL)) < 0) {
+		get_next_image(context, -EBADR);
+		return;
+	}
+	close(fd);
+	if (context->cur_prop != NULL) {
+		printf("getting image: [%s: %s]\n", context->cur_prop->handle,
+						context->cur_prop->name);
+	}
+	get_image(context, context->cur_path, context->cur_image->handle,
+							rename_image);
+	return;
 }
 
 static void get_next_image(struct archive_context *context, int err) {
-	printf("get_next_image status: %d\n", err);
-	printf("list: %p\n", context->image_list);
-	if (err) {
-		//behave appropriately
+	printf("get_next_image, err: %d\n", err);
+	if (err < 0) {
+		//ignore error, prepare for next image
+		//this will have to change, since some errors
+		//are critical and should abort
+	}
+	reset_context(context);
+	// start with new image
+	if (context->image_list == NULL) {
+		end_aos_session(context);
 		return;
 	}
-	if (context->cur_path != NULL) {
-		//rename
-		char *new_path;
-		printf("renaming\n");
-		if ((new_path = safe_rename(context->cur_prop->name, bip_dir,
-						context->cur_path)) == NULL) {
-		}
-		g_free(new_path);
+	context->cur_image = context->image_list->data;
+	context->image_list = g_slist_remove(context->image_list,
+						context->cur_image);
 
-		free_properties_object(context->cur_prop);
-		context->cur_prop = NULL;
-		free_listing_object(context->cur_image);
-		context->cur_image = NULL;
-		g_free(context->cur_path);
-		context->cur_path = NULL;
-		get_next_image(context, err);
-		return;
-	}
-	else if (context->cur_prop != NULL) {
-		int fd;
-		GError *gerr;
-		printf("getting image: [%s: %s]\n", context->cur_prop->handle, context->cur_prop->name);
-		//get_image
-		if ((fd = g_file_open_tmp(NULL, &context->cur_path, &gerr))
-									< 0)
-			return;
-		close(fd);
-
-		get_image(context, context->cur_path,
-				context->cur_prop->handle, get_next_image);
-		return;
-	}
-	else if (context->image_list != NULL) {
-		//get_properties
-		printf("getting properties\n");
-		context->cur_image = context->image_list->data;
-		context->image_list = g_slist_remove(context->image_list,
-							context->cur_image);
-
-		get_properties(context, context->cur_image->handle,
-							get_next_image);
-		return;
-	}
-	printf("unregistering session\n");
-	end_aos_session(context);
-	// unregister session, or download attachments?
+	get_properties(context, context->cur_image->handle, save_image_to_temp);
 }
+////////////////////////////////////////////////////////
 
 static void get_listing_finished(struct archive_context *context, int err)
 {
 	GSList *l;
-	printf("get_listing_finished %p\n", context->image_list);
+	printf("get_listing_finished, status: %d\n", err);
+	if (err < 0) {
+		context->session->status = err;
+		end_aos_session(context);
+		return;
+	}
 	for (l = context->image_list; l != NULL; l = g_slist_next(l)) {
 		struct listing_object * obj = l->data;
 		printf("handle: %s, created: %s, modified: %s\n", obj->handle,
@@ -562,34 +698,36 @@ static void get_aos_interface_callback(DBusPendingCall *call, void *user_data)
 	printf("get_aos_interface_callback\n");
 
 	if (msg == NULL) {
-		context->err = -EBADR;
-		goto failed;
+		// assign int is atomic? - possible concurrency issue
+		context->session->status = -EBADR;
+		return;
+	}
+
+	if (dbus_message_get_error_name(msg) != NULL) {
+		// assign int is atomic? - possible concurrency issue
+		context->session->status = -EBADR;
+		return;
 	}
 
 	if (!dbus_message_get_args(msg, NULL, DBUS_TYPE_OBJECT_PATH, &path,
 						DBUS_TYPE_INVALID)) {
-		context->err = -EBADR;
-		goto failed;
+		context->session->status = -EBADR;
+		return;
 	}
 
-	context->aos_path = path;
+	context->aos_path = g_strdup(path);
 
-	get_listing(context, get_listing_finished);
-
-	printf("got path: %s\n", context->aos_path);
-
-	printf("callback\n");
-
-failed:
-	printf("status: %d\n", context->err);
-	obex_object_set_io_flags(context, G_IO_OUT, 0);
+	if (!get_listing(context, get_listing_finished)) {
+		end_aos_session(context);
+		context->session->status = -EBADR;
+		return;
+	}
 }
 
 static gboolean get_aos_interface(struct archive_context *context)
 {
 	DBusMessage *msg;
 	DBusMessageIter args, dict;
-	DBusError err;
 	DBusPendingCall *result;
 	msg = dbus_message_new_method_call(CLIENT_ADDRESS, CLIENT_PATH,
 							CLIENT_INTERFACE,
@@ -600,33 +738,33 @@ static gboolean get_aos_interface(struct archive_context *context)
 	dbus_message_iter_init_append(msg, &args);
 	if (!dbus_message_iter_open_container(&args, DBUS_TYPE_ARRAY, "{sv}",
 									&dict))
-		return FALSE;
+		goto failed;
 
 	if (!append_sv_dict_entry(&dict, "Destination", DBUS_TYPE_STRING,
 				DBUS_TYPE_STRING_AS_STRING, &context->session->address))
-		return FALSE;
+		goto failed;
 
 	if (!append_sv_dict_entry(&dict, "Target", DBUS_TYPE_STRING,
 					DBUS_TYPE_STRING_AS_STRING, &bip_aos))
-		return FALSE;
+		goto failed;
 
 	if (!dbus_message_iter_close_container(&args, &dict))
-		return FALSE;
+		goto failed;
 	
-	dbus_error_init(&err);
-	if (!dbus_connection_send_with_reply(context->conn, msg, &result, -1)) {
-		fprintf(stderr, "Conn error: (%s)\n", err.message);
-		return FALSE;
-	}
+	if (!dbus_connection_send_with_reply(context->conn, msg, &result, -1))
+		goto failed;
 
 	if (!dbus_pending_call_set_notify(result, get_aos_interface_callback,
 								context, NULL))
-		return FALSE;
+		goto failed;
 
 	dbus_message_unref(msg);
 	dbus_pending_call_unref(result);
 
 	return TRUE;
+failed:
+	dbus_message_unref(msg);
+	return FALSE;
 }
 
 static void *imgarch_open(const char *name, int oflag, mode_t mode,
@@ -635,21 +773,26 @@ static void *imgarch_open(const char *name, int oflag, mode_t mode,
 	struct archive_session *session = context;
 	struct archive_context *object = g_new0(struct archive_context, 1);
 	object->session = session;
-	if ((object->conn = connect_to_client()) == NULL) {
-		free_archive_context(object);
-		if (err != NULL)
-			*err = -EBADR;
-		return NULL;
-	}
+
+	if ((object->conn = connect_to_client()) == NULL)
+		goto failed;
+
+	if (!get_aos_interface(object))
+		goto failed;
 	printf("imgarch open\n");
 	return object;
+failed:
+	free_archive_context(object);
+	if (err != NULL)
+		*err = -EBADR;
+	return NULL;
 }
 
 static int imgarch_close(void *object)
 {
-	struct archive_context *context = object;
-	printf("imgarch close %d\n", context->err);
-	return context->err;
+	//struct archive_context *context = object;
+	printf("imgarch close\n");
+	return 0;
 }
 
 static ssize_t imgarch_write(void *object, const void *buf, size_t count)
@@ -659,14 +802,9 @@ static ssize_t imgarch_write(void *object, const void *buf, size_t count)
 
 static ssize_t imgarch_flush(void *object)
 {
-	struct archive_context *context = object;
 	printf("imgarch flush\n");
-	if (context->aos_path != NULL || context->err < 0)
-		return context->err;
-	if (!get_aos_interface(context))
-		return -EBADR;
-	printf("EAGAIN\n");
-	return -EAGAIN;
+
+	return 0;
 }
 
 static struct obex_mime_type_driver imgarch = {
