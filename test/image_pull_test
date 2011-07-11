@@ -122,7 +122,9 @@ def images_listing(session):
     print session.GetImagesListing({"latest" : True})
 
 def imaging_capabilities(session):
-    print "omg"
+    print session.GetImagingCapabilities()
+
+def get_capabilities(session):
     print session.GetImagingCapabilities()
 
 def get_image_properties(session, handle):
@@ -238,6 +240,8 @@ if  __name__ == '__main__':
    
     if options.listing:
        images_listing(bip)
+    if hasattr(options, 'capabilities'):
+       get_capabilities(bip)
     if hasattr(options, 'get'):
        path = options.get_settings[0]
        handle = options.get_settings[1]

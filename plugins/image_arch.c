@@ -219,27 +219,6 @@ int image_arch_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 	
 	rsize = obex_aparam_read(os, obj, &buffer);
 	aparam = parse_aparam(buffer, rsize);
-	/*
-	if (g_strcmp0(os->type, "x-bt/img-archive") == 0) {
-		int i;
-		DBusConnection *conn;
-		for(i=0;i<16;i++) {
-			printf("%x\n", (char) aparam->serviceid[i]);
-		}
-
-		for(i=0;i<18;i++) {
-			printf("lol:%x\n", session->address[i]);
-		}
-
-		if ((conn = connect_to_client()) == NULL)
-			return -EBADR;
-
-		get_aos_interface(session, conn);
-
-		printf("start archive\n");
-
-	}
-	*/
 	return 0;
 }
 

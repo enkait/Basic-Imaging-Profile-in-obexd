@@ -43,3 +43,5 @@ void parse_client_user_headers(const struct session_data *session,
 				unsigned int *desc_hdr_len,
 				char **handle_hdr,
 				unsigned int *handle_hdr_len);
+DBusMessage *get_imaging_capabilities(DBusConnection *connection,
+				DBusMessage *message, void *user_data);

@@ -39,6 +39,9 @@
 
 #define BIP_TEMP_FOLDER /tmp/bip/
 
+DBusMessage *get_imaging_capabilities(DBusConnection *connection,
+				DBusMessage *message, void *user_data);
+
 struct listing_object {
 	char *handle, *ctime, *mtime;
 };
@@ -615,7 +618,6 @@ static struct prop_object *parse_properties(char *data, unsigned int length, int
 		*err = 0;
 	status = g_markup_parse_context_parse(ctxt, data, length, &gerr);
 	g_markup_parse_context_free(ctxt);
-	printf("omg? %d %p\n", status, prop);
 	if (!status) {
 		printf("%s\n", gerr->message);
 		if (err != NULL)
@@ -1165,8 +1167,6 @@ static gboolean parse_get_image_dict(DBusMessage *msg, char **path,
 	
 	dbus_message_iter_recurse(&iter, &array);
 
-	printf("omg wtf\n");
-
 	while (dbus_message_iter_get_arg_type(&array) == DBUS_TYPE_DICT_ENTRY) {
 		DBusMessageIter entry;
 		const char *key, *val;
@@ -1259,6 +1259,8 @@ static DBusMessage *get_image(DBusConnection *connection,
 
 GDBusMethodTable image_pull_methods[] = {
 	{ "GetImage",	"ssa{ss}", "", get_image },
+	{ "GetImagingCapabilities", "", "s", get_imaging_capabilities,
+		G_DBUS_METHOD_FLAG_ASYNC },
 	{ "GetImageThumbnail",	"ss", "", get_image_thumbnail },
 	{ "GetImageAttachment",	"sss", "", get_image_attachment },
 	{ "GetImagesListing",	"a{sv}", "aa{ss}", get_images_listing,
