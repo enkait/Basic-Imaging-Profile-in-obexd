@@ -47,12 +47,13 @@ class Agent(dbus.service.Object):
 tasks = []
 
 def put_image_attachment_callback(option, opt, value, parser):
-        print value
         tasks.append(("attachment", value.split(',')))
 
 def put_image_callback(option, opt, value, parser):
-        print value
         tasks.append(("image", value.split(',')))
+
+def cap_callback(option, opt, value, parser):
+        tasks.append(("capabilities", 0))
 
 def parse_options():
     parser.add_option("-d", "--device", dest="device",
@@ -63,9 +64,9 @@ def parse_options():
     parser.add_option("-p", "--push", type="string", action="callback",
                       callback=put_image_callback,
                       help="Push image\nExample: -p [path to file]")
-    parser.add_option("-c", "--capabilities", action="store_true",
-                      dest="capabilities",
-                      help="Get imaging capabilities")
+    parser.add_option("-c", "--capabilities", action="callback",
+                      callback=cap_callback,
+                      help="Get imaging capabilities\n")
     parser.add_option("-v", "--verbose", action="store_true", dest="verbose")
 
     return parser.parse_args()
@@ -94,6 +95,8 @@ def execute():
         image_push(bip, entry[1][0])
     if entry[0] == "attachment":
         image_attachment_push(bip, entry[1][0], entry[1][1])
+    if entry[0] == "capabilities":
+        imaging_capabilities(bip)
 
 def image_push_completed(handle, thumbnail):
     print "Image pushed, received handle: "+handle
