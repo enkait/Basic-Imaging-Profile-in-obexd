@@ -32,6 +32,7 @@ struct archive_session {
     struct obex_session *os;
     struct aa_aparam *aparam;
     char *address;
+    int status;
 };
 
 void *image_arch_connect(struct obex_session *os, int *err);

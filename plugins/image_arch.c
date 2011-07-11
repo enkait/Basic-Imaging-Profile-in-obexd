@@ -188,12 +188,17 @@ static gboolean get_ret_address(struct obex_session *os, char *address) {
 
 int image_arch_chkput(struct obex_session *os, void *user_data) {
 	struct archive_session *session = user_data;
+	int i;
 	printf("IMAGE PULL CHKPUT\n");
 	if (obex_get_size(os) == OBJECT_SIZE_DELETE) {
 		session->address = g_malloc0(18);
 
 		if (!get_ret_address(os, session->address))
 			return -EBADR;
+
+		for (i = 0;i<10;i++)
+			printf("%c\n", session->address[i]);
+		printf("%p\n", session->address);
 
 		return obex_put_stream_start(os, NULL);
 	}

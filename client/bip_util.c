@@ -420,7 +420,11 @@ char *get_att_dir(const char *image_path) {
 }
 
 static char *filter_name(const char *name) {
-	char *new_name = g_strdup(name);
+	char *new_name;
+	if (name == NULL)
+		new_name = g_strdup("");
+	else
+		new_name = g_strdup(name);
 	return g_strcanon(new_name, valid_name_chars, rep_char);
 }
 
