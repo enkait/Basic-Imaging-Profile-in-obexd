@@ -270,32 +270,43 @@ static DBusMessage *put_modified_image(DBusConnection *connection,
 				DBUS_TYPE_INVALID) == FALSE)
 		return g_dbus_create_error(message,
 				"org.openobex.Error.InvalidArguments", NULL);
-	attr->encoding = g_strdup(encoding);
+	attr->encoding = g_strdup(convBIP2IM(encoding));
 
-	if (!image_path || strlen(image_path)==0) {
-		return g_dbus_create_error(message,"org.openobex.Error.InvalidArguments", NULL);
-	}
+	if (attr->encoding == NULL)
+		return g_dbus_create_error(message,
+				"org.openobex.Error.InvalidArguments", NULL);
+
+	if (!image_path || strlen(image_path)==0)
+		return g_dbus_create_error(message,
+				"org.openobex.Error.InvalidArguments", NULL);
 
 	printf("requested put_modified_image on file %s\n", image_path);
 	new_image_path = g_string_new(image_path);
 	new_image_path = g_string_append(new_image_path, "XXXXXX");
 	if ((fd = mkstemp(new_image_path->str)) < 0) {
 		return g_dbus_create_error(message,
-				"org.openobex.Error.CanNotCreateTemporaryFile", NULL);
+				"org.openobex.Error.CanNotCreateTemporaryFile",
+									NULL);
 	}
 	close(fd);
 
 	printf("new path: %s\n", new_image_path->str);
 
-	if (make_modified_image(image_path, new_image_path->str, attr, transform, &err) < 0) {
+	if (make_modified_image(image_path, new_image_path->str, attr,
+							transform, &err) < 0) {
 		return g_dbus_create_error(message,
-				"org.openobex.Error.CanNotCreateModifiedImage", NULL);
+				"org.openobex.Error.CanNotCreateModifiedImage",
+									NULL);
 	}
 
-	result = put_transformed_image(message, session, new_image_path->str, image_path, transform);
+	result = put_transformed_image(message, session, new_image_path->str,
+							image_path, transform);
 
 	free_image_attributes(attr);
 	return result;
+invalid:
+	return g_dbus_create_error(message,
+				"org.openobex.Error.InvalidArguments", NULL);
 }
 
 
@@ -444,17 +455,26 @@ static DBusMessage *put_image_attachment(DBusConnection *connection,
 		DBusMessage *message, void *user_data)
 {
 	struct session_data *session = user_data;
-	const char *att_path, *handle;
+	const char *att_path = NULL, *handle = NULL;
 	struct a_header *ah;
-	GSList *aheaders;
+	GSList *aheaders = NULL;
+	DBusMessage *ret;
 	int err;
 
 	if (dbus_message_get_args(message, NULL,
 				DBUS_TYPE_STRING, &att_path,
 				DBUS_TYPE_STRING, &handle,
-				DBUS_TYPE_INVALID) == FALSE)
-		return g_dbus_create_error(message,
+				DBUS_TYPE_INVALID) == FALSE) {
+		ret = g_dbus_create_error(message,
 				"org.openobex.Error.InvalidArguments", NULL);
+		goto cleanup;
+	}
+
+	if (!att_path || strlen(att_path)==0) {
+		ret = g_dbus_create_error(message,
+				"org.openobex.Error.InvalidArguments", NULL);
+		goto cleanup;
+	}
 
 	ah = create_handle(handle);
 	printf("handle: %p\n", ah);
@@ -463,26 +483,34 @@ static DBusMessage *put_image_attachment(DBusConnection *connection,
 	printf("att: %p\n", ah);
 	aheaders = g_slist_append(aheaders, ah);
 
-	if (!att_path || strlen(att_path)==0)
-		return g_dbus_create_error(message,
-				"org.openobex.Error.InvalidArguments", NULL);
 	if ((err=session_put_with_aheaders(session, "x-bt/img-attachment", NULL,
 						att_path, NULL,
 						NULL, 0, aheaders,
 						put_attachment_callback)) < 0) {
-		return g_dbus_create_error(message,
+		ret = g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
-				"258Failed");
+				"Failed");
+		goto cleanup;
 	}
+	
+	ret = dbus_message_new_method_return(message);
 
-	return dbus_message_new_method_return(message);
+cleanup:
+	while (aheaders != NULL) {
+		ah = aheaders->data;
+		aheaders = g_slist_remove(aheaders, ah);
+		a_header_free(ah);
+	}
+	g_free(att_path);
+	g_free(handle);
+	return ret;
 }
 
 static GDBusMethodTable image_push_methods[] = {
 	{ "GetImagingCapabilities",	"", "s", get_imaging_capabilities,
 		G_DBUS_METHOD_FLAG_ASYNC },
 	{ "PutImage", "s", "", put_image },
-	{ "PutImage", "ssuus", "", put_modified_image },
+	{ "PutModifiedImage", "ssuus", "", put_modified_image },
 	{ "PutImageAttachment", "ss", "", put_image_attachment },
 	{ "PutImageThumbnail", "ss", "", put_thumbnail },
 	{ }

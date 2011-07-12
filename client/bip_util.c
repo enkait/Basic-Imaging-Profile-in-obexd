@@ -102,9 +102,8 @@ struct encconv_pair encconv_table[] = {
 const gchar *convBIP2IM(const gchar *encoding) {
 	struct encconv_pair *et = encconv_table;
 	while (et->bip) {
-		if (g_strcmp0(encoding, et->bip) == 0) {
+		if (g_strcmp0(encoding, et->bip) == 0)
 			return et->im;
-		}
 		et++;
 	}
 	return NULL;
@@ -113,9 +112,8 @@ const gchar *convBIP2IM(const gchar *encoding) {
 const gchar *convIM2BIP(const gchar *encoding) {
 	struct encconv_pair *et = encconv_table;
 	while (et->im) {
-		if (g_strcmp0(encoding, et->im) == 0) {
+		if (g_strcmp0(encoding, et->im) == 0)
 			return et->bip;
-		}
 		et++;
 	}
 	return NULL;
