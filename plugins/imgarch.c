@@ -381,7 +381,7 @@ static void get_properties_callback(DBusPendingCall *call, void *user_data)
 failed:
 	if (msg != NULL)
 		dbus_message_unref(msg);
-	data->cb(data->context, -EBADR);
+	data->cb(data->context, -EINVAL);
 }
 
 static void get_properties(struct archive_context *context, char *handle, 
@@ -447,7 +447,7 @@ static void get_image_callback(DBusPendingCall *call, void *user_data)
 failed:
 	if (msg != NULL)
 		dbus_message_unref(msg);
-	data->cb(data->context, -EBADR);
+	data->cb(data->context, -EINVAL);
 }
 
 static gboolean get_image_completed(DBusConnection *connection, DBusMessage *message,
@@ -464,7 +464,7 @@ static gboolean get_image_failed(DBusConnection *connection, DBusMessage *messag
 {
 	struct callback_data *data = user_data;
 	printf("get_image_failed\n");
-	data->cb(data->context, -EBADR);
+	data->cb(data->context, -EINVAL);
 	return TRUE;
 }
 
@@ -610,16 +610,23 @@ static void reset_context(struct archive_context *context) {
 static void rename_image(struct archive_context *context, int err) {
 	char *new_path = NULL, *name = NULL;
 	printf("rename_image, err: %d\n", err);
-	if (err < 0) {
-		//abort this image
-		get_next_image(context, -EBADR);
+	if (err == -EBADR) {
+		//critical error - abort
+		context->session->status = -EBADR;
+		end_aos_session(context);
+		return;
+	}
+	else if (err == -EINVAL) {
+		//error with current image - get new one
+		get_next_image(context, 0);
+		return;
 	}
 	if (context->cur_prop != NULL)
 		name = context->cur_prop->name;
 	new_path = safe_rename(name, bip_dir, context->cur_path);
 	if (new_path == NULL) {
 		unlink(context->cur_path);
-		get_next_image(context, -EBADR);
+		get_next_image(context, 0);
 		return;
 	}
 	g_free(new_path);
@@ -630,12 +637,15 @@ static void rename_image(struct archive_context *context, int err) {
 static void save_image_to_temp(struct archive_context *context, int err) {
 	int fd;
 	printf("save_image_to_temp, err: %d\n", err);
-	if (err < 0) {
-		// check errors, if critical abort
+	if (err == -EBADR) {
+		//critical error - abort
+		context->session->status = -EBADR;
+		end_aos_session(context);
+		return;
 	}
 	// finished obtaining properties
 	if ((fd = g_file_open_tmp(NULL, &context->cur_path, NULL)) < 0) {
-		get_next_image(context, -EBADR);
+		get_next_image(context, 0);
 		return;
 	}
 	close(fd);
@@ -650,11 +660,6 @@ static void save_image_to_temp(struct archive_context *context, int err) {
 
 static void get_next_image(struct archive_context *context, int err) {
 	printf("get_next_image, err: %d\n", err);
-	if (err < 0) {
-		//ignore error, prepare for next image
-		//this will have to change, since some errors
-		//are critical and should abort
-	}
 	reset_context(context);
 	// start with new image
 	if (context->image_list == NULL) {
@@ -667,23 +672,15 @@ static void get_next_image(struct archive_context *context, int err) {
 
 	get_properties(context, context->cur_image->handle, save_image_to_temp);
 }
-////////////////////////////////////////////////////////
 
 static void get_listing_finished(struct archive_context *context, int err)
 {
-	GSList *l;
 	printf("get_listing_finished, status: %d\n", err);
 	if (err < 0) {
 		context->session->status = err;
 		end_aos_session(context);
 		return;
 	}
-	for (l = context->image_list; l != NULL; l = g_slist_next(l)) {
-		struct listing_object * obj = l->data;
-		printf("handle: %s, created: %s, modified: %s\n", obj->handle,
-						obj->ctime, obj->mtime);
-	}
-
 	get_next_image(context, 0);
 }
 
