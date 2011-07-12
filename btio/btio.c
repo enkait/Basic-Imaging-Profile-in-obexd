@@ -57,6 +57,7 @@ struct set_opts {
 	int sec_level;
 	uint8_t channel;
 	uint16_t psm;
+	uint16_t cid;
 	uint16_t mtu;
 	uint16_t imtu;
 	uint16_t omtu;
@@ -255,24 +256,31 @@ static void accept_add(GIOChannel *io, BtIOConnect connect, gpointer user_data,
 					(GDestroyNotify) accept_remove);
 }
 
-static int l2cap_bind(int sock, const bdaddr_t *src, uint16_t psm, GError **err)
+static int l2cap_bind(int sock, const bdaddr_t *src, uint16_t psm,
+						uint16_t cid, GError **err)
 {
 	struct sockaddr_l2 addr;
 
 	memset(&addr, 0, sizeof(addr));
 	addr.l2_family = AF_BLUETOOTH;
 	bacpy(&addr.l2_bdaddr, src);
-	addr.l2_psm = htobs(psm);
+
+	if (cid)
+		addr.l2_cid = htobs(cid);
+	else
+		addr.l2_psm = htobs(psm);
 
 	if (bind(sock, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
+		int error = -errno;
 		ERROR_FAILED(err, "l2cap_bind", errno);
-		return -1;
+		return error;
 	}
 
 	return 0;
 }
 
-static int l2cap_connect(int sock, const bdaddr_t *dst, uint16_t psm)
+static int l2cap_connect(int sock, const bdaddr_t *dst,
+					uint16_t psm, uint16_t cid)
 {
 	int err;
 	struct sockaddr_l2 addr;
@@ -280,11 +288,14 @@ static int l2cap_connect(int sock, const bdaddr_t *dst, uint16_t psm)
 	memset(&addr, 0, sizeof(addr));
 	addr.l2_family = AF_BLUETOOTH;
 	bacpy(&addr.l2_bdaddr, dst);
-	addr.l2_psm = htobs(psm);
+	if (cid)
+		addr.l2_cid = htobs(cid);
+	else
+		addr.l2_psm = htobs(psm);
 
 	err = connect(sock, (struct sockaddr *) &addr, sizeof(addr));
 	if (err < 0 && !(errno == EAGAIN || errno == EINPROGRESS))
-		return err;
+		return -errno;
 
 	return 0;
 }
@@ -548,8 +559,9 @@ static int rfcomm_bind(int sock,
 	addr.rc_channel = channel;
 
 	if (bind(sock, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
+		int error = -errno;
 		ERROR_FAILED(err, "rfcomm_bind", errno);
-		return -1;
+		return error;
 	}
 
 	return 0;
@@ -567,7 +579,7 @@ static int rfcomm_connect(int sock, const bdaddr_t *dst, uint8_t channel)
 
 	err = connect(sock, (struct sockaddr *) &addr, sizeof(addr));
 	if (err < 0 && !(errno == EAGAIN || errno == EINPROGRESS))
-		return err;
+		return -errno;
 
 	return 0;
 }
@@ -594,8 +606,9 @@ static int sco_bind(int sock, const bdaddr_t *src, GError **err)
 	bacpy(&addr.sco_bdaddr, src);
 
 	if (bind(sock, (struct sockaddr *) &addr, sizeof(addr)) < 0) {
+		int error = -errno;
 		ERROR_FAILED(err, "sco_bind", errno);
-		return -1;
+		return error;
 	}
 
 	return 0;
@@ -612,7 +625,7 @@ static int sco_connect(int sock, const bdaddr_t *dst)
 
 	err = connect(sock, (struct sockaddr *) &addr, sizeof(addr));
 	if (err < 0 && !(errno == EAGAIN || errno == EINPROGRESS))
-		return err;
+		return -errno;
 
 	return 0;
 }
@@ -686,6 +699,9 @@ static gboolean parse_set_opts(struct set_opts *opts, GError **err,
 			break;
 		case BT_IO_OPT_PSM:
 			opts->psm = va_arg(args, int);
+			break;
+		case BT_IO_OPT_CID:
+			opts->cid = va_arg(args, int);
 			break;
 		case BT_IO_OPT_MTU:
 			opts->mtu = va_arg(args, int);
@@ -836,6 +852,10 @@ static gboolean l2cap_get(int sock, GError **err, BtIOOption opt1,
 			*(va_arg(args, uint16_t *)) = src.l2_psm ?
 						src.l2_psm : dst.l2_psm;
 			break;
+		case BT_IO_OPT_CID:
+			*(va_arg(args, uint16_t *)) = src.l2_cid ?
+						src.l2_cid : dst.l2_cid;
+			break;
 		case BT_IO_OPT_OMTU:
 			*(va_arg(args, uint16_t *)) = l2o.omtu;
 			break;
@@ -866,6 +886,9 @@ static gboolean l2cap_get(int sock, GError **err, BtIOOption opt1,
 				return FALSE;
 			}
 			memcpy(va_arg(args, uint8_t *), dev_class, 3);
+			break;
+		case BT_IO_OPT_MODE:
+			*(va_arg(args, uint8_t *)) = l2o.mode;
 			break;
 		case BT_IO_OPT_FLUSHABLE:
 			if (l2cap_get_flushable(sock, &flushable) < 0) {
@@ -1187,8 +1210,8 @@ static GIOChannel *create_io(BtIOType type, gboolean server,
 			ERROR_FAILED(err, "socket(RAW, L2CAP)", errno);
 			return NULL;
 		}
-		if (l2cap_bind(sock, &opts->src,
-					server ? opts->psm : 0, err) < 0)
+		if (l2cap_bind(sock, &opts->src, server ? opts->psm : 0,
+							opts->cid, err) < 0)
 			goto failed;
 		if (!l2cap_set(sock, opts->sec_level, 0, 0, 0, -1, -1, err))
 			goto failed;
@@ -1199,8 +1222,8 @@ static GIOChannel *create_io(BtIOType type, gboolean server,
 			ERROR_FAILED(err, "socket(SEQPACKET, L2CAP)", errno);
 			return NULL;
 		}
-		if (l2cap_bind(sock, &opts->src,
-					server ? opts->psm : 0, err) < 0)
+		if (l2cap_bind(sock, &opts->src, server ? opts->psm : 0,
+							opts->cid, err) < 0)
 			goto failed;
 		if (!l2cap_set(sock, opts->sec_level, opts->imtu, opts->omtu,
 				opts->mode, opts->master, opts->flushable, err))
@@ -1273,10 +1296,10 @@ GIOChannel *bt_io_connect(BtIOType type, BtIOConnect connect,
 
 	switch (type) {
 	case BT_IO_L2RAW:
-		err = l2cap_connect(sock, &opts.dst, 0);
+		err = l2cap_connect(sock, &opts.dst, 0, opts.cid);
 		break;
 	case BT_IO_L2CAP:
-		err = l2cap_connect(sock, &opts.dst, opts.psm);
+		err = l2cap_connect(sock, &opts.dst, opts.psm, opts.cid);
 		break;
 	case BT_IO_RFCOMM:
 		err = rfcomm_connect(sock, &opts.dst, opts.channel);

@@ -301,7 +301,7 @@ static void query_result(const char *buffer, size_t bufsize, int vcards,
 
 	pbap->obj->lastpart = lastpart;
 
-	if (vcards <= 0) {
+	if (vcards < 0) {
 		obex_object_set_io_flags(pbap->obj, G_IO_ERR, -ENOENT);
 		return;
 	}
@@ -462,8 +462,6 @@ static int generate_response(void *user_data)
 	sorted = sort_entries(pbap->cache.entries, pbap->params->order,
 				pbap->params->searchattrib,
 				(const char *) pbap->params->searchval);
-	if (sorted == NULL)
-		return -ENOENT;
 
 	/* Computing offset considering first entry of the phonebook */
 	l = g_slist_nth(sorted, pbap->params->liststartoffset);
@@ -486,18 +484,15 @@ static int generate_response(void *user_data)
 static void cache_ready_notify(void *user_data)
 {
 	struct pbap_session *pbap = user_data;
-	int err;
 
 	DBG("");
 
+	phonebook_req_finalize(pbap->obj->request);
+	pbap->obj->request = NULL;
+
 	pbap->cache.valid = TRUE;
 
-	err = generate_response(pbap);
-	if (err < 0) {
-		obex_object_set_io_flags(pbap->obj, G_IO_ERR, err);
-		return;
-	}
-
+	generate_response(pbap);
 	obex_object_set_io_flags(pbap->obj, G_IO_IN, 0);
 }
 
