@@ -344,6 +344,7 @@ static struct obex_mime_type_driver img_capabilities_pull = {
 	.target_size = TARGET_SIZE,
 	.mimetype = "x-bt/img-capabilities",
 	.open = img_capabilities_open,
+	.close = string_free,
 	.read = img_capabilities_read,
 };
 
@@ -352,6 +353,7 @@ static struct obex_mime_type_driver img_capabilities_pull_aos = {
 	.target_size = TARGET_SIZE,
 	.mimetype = "x-bt/img-capabilities",
 	.open = img_capabilities_open,
+	.close = string_free,
 	.read = img_capabilities_read,
 };
 
