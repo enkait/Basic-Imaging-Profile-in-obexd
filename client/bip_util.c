@@ -102,8 +102,9 @@ struct encconv_pair encconv_table[] = {
 const gchar *convBIP2IM(const gchar *encoding) {
 	struct encconv_pair *et = encconv_table;
 	while (et->bip) {
-		if (g_strcmp0(encoding, et->bip) == 0)
+		if (g_strcmp0(encoding, et->bip) == 0) {
 			return et->im;
+		}
 		et++;
 	}
 	return NULL;
@@ -112,28 +113,12 @@ const gchar *convBIP2IM(const gchar *encoding) {
 const gchar *convIM2BIP(const gchar *encoding) {
 	struct encconv_pair *et = encconv_table;
 	while (et->im) {
-		if (g_strcmp0(encoding, et->im) == 0)
+		if (g_strcmp0(encoding, et->im) == 0) {
 			return et->bip;
+		}
 		et++;
 	}
 	return NULL;
-}
-
-char *transforms[] = {
-	"crop",
-	"stretch",
-	"fill",
-	NULL
-};
-
-gboolean verify_transform(const char *transform) {
-	char **str = transforms;
-	while (*str != NULL) {
-		if (g_str_equal(transform, *str))
-			return TRUE;
-		str++;
-	}
-	return FALSE;
 }
 
 struct image_attributes *get_image_attributes(const char *image_file, int *err)
@@ -176,6 +161,9 @@ time_t parse_iso8601_bip(const gchar *str, int len) {
 	gchar     tz;
 	time_t    time;
 	time_t    tz_offset = 0;
+
+	if (str == NULL)
+		return -1;
 
 	memset (&tm, 0, sizeof (struct tm));
 
@@ -226,38 +214,125 @@ time_t parse_iso8601_bip(const gchar *str, int len) {
 	return time;
 }
 
-gboolean parse_pixel_range(const gchar *dim, unsigned int *lower, unsigned int *upper, gboolean *fixed_ratio)
+gboolean parse_pixel_range(const gchar *dim, unsigned int *lower_ret,
+						unsigned int *upper_ret,
+						gboolean *fixed_ratio_ret)
 {
 	static regex_t no_range;
 	static regex_t range;
 	static regex_t range_fixed;
 	static int regex_initialized = 0;
+	unsigned int lower[2], upper[2];
+	gboolean fixed_ratio = FALSE;
 	if (!regex_initialized) {
-		regcomp(&no_range, "^([[:digit:]]+)\\*([[:digit:]]+)$", REG_EXTENDED);
-		regcomp(&range, "^([[:digit:]]+)\\*([[:digit:]]+)-([[:digit:]]+)\\*([[:digit:]]+)$", REG_EXTENDED);
-		regcomp(&range_fixed, "^([[:digit:]]+)\\*\\*-([[:digit:]]+)\\*([[:digit:]]+)$", REG_EXTENDED);
+		regcomp(&no_range, "^([[:digit:]]+)\\*([[:digit:]]+)$",
+							REG_EXTENDED);
+		regcomp(&range, "^([[:digit:]]+)\\*([[:digit:]]+)"
+				"-([[:digit:]]+)\\*([[:digit:]]+)$",
+							REG_EXTENDED);
+		regcomp(&range_fixed, "^([[:digit:]]+)\\*\\*"
+				"-([[:digit:]]+)\\*([[:digit:]]+)$",
+							REG_EXTENDED);
 		regex_initialized = 1;
 	}
+	if (dim == NULL)
+		return FALSE;
 	printf("dim=%s\n", dim);
 	if (regexec(&no_range, dim, 0, NULL, 0) == 0) {
 		sscanf(dim, "%u*%u", &lower[0], &lower[1]);
 		upper[0] = lower[0];
 		upper[1] = lower[1];
-		*fixed_ratio = FALSE;
+		fixed_ratio = FALSE;
 	}
 	else if (regexec(&range, dim, 0, NULL, 0) == 0) {
 		printf("range\n");
 		sscanf(dim, "%u*%u-%u*%u", &lower[0], &lower[1], &upper[0], &upper[1]);
-		*fixed_ratio = FALSE;
+		fixed_ratio = FALSE;
 	}
 	else if (regexec(&range_fixed, dim, 0, NULL, 0) == 0) {
 		sscanf(dim, "%u**-%u*%u", &lower[0], &upper[0], &upper[1]);
 		lower[1] = 0;
-		*fixed_ratio = TRUE;
+		fixed_ratio = TRUE;
 	}
 	if (lower[0] > 65535 || lower[1] > 65535 || upper[0] > 65535 || upper[1] > 65535)
 		return FALSE;
+	if (lower_ret == NULL || upper_ret == NULL || fixed_ratio_ret == NULL)
+		return TRUE;
+	lower_ret[0] = lower[0];
+	lower_ret[1] = lower[1];
+	upper_ret[0] = upper[0];
+	upper_ret[1] = upper[1];
+	*fixed_ratio_ret = fixed_ratio;
+
 	return TRUE;
+}
+
+int parse_handle(const char *data, unsigned int length)
+{
+	int handle;
+	char *ptr;
+	if (data == NULL)
+		return -1;
+	if (length != HANDLE_LEN)
+		return -1;
+	handle = strtol(data, &ptr, 10);
+	if (ptr != data + 7)
+		return -1;
+	if (handle < 0 || handle >= HANDLE_MAX)
+		return -1;
+	return handle;
+}
+
+char *transforms[] = {
+	"crop",
+	"stretch",
+	"fill",
+	NULL
+};
+
+gboolean verify_transform(const char *transform) {
+	char **str = transforms;
+	while (*str != NULL) {
+		if (g_str_equal(transform, *str))
+			return TRUE;
+		str++;
+	}
+	return FALSE;
+}
+
+char *parse_transform(const char *transform) {
+	if (!verify_transform(transform))
+		return NULL;
+	return g_strdup(transform);
+}
+
+char *parse_transform_list(const char *transform) {
+	char **args = NULL, *arg = NULL;
+	if (transform == NULL)
+		return NULL;
+	if (strlen(transform) == 0)
+		return NULL;
+	args = g_strsplit(transform, " ", 0);
+	for (arg = *args; arg != NULL; arg++) {
+		if (!verify_transform(arg)) {
+			g_strfreev(args);
+			return NULL;
+		}
+	}
+	g_strfreev(args);
+	return g_strdup(transform);
+}
+
+char *parse_unsignednumber(const char *size) {
+	static regex_t unumber;
+	static int regex_initialized = 0;
+	if (!regex_initialized) {
+		regcomp(&unumber, "^[:digit:]+$", REG_EXTENDED);
+		regex_initialized = 1;
+	}
+	if (regexec(&unumber, size, 0, NULL, 0) != 0)
+		return NULL;
+	return g_strdup(size);
 }
 
 gboolean make_modified_image(const char *image_path, const char *modified_path,
@@ -348,21 +423,6 @@ failed:
 	if (err != NULL)
 		*err = -EBADR;
 	return FALSE;
-}
-
-int get_handle(const char *data, unsigned int length)
-{
-	int handle, ret;
-	if (data == NULL)
-		return -1;
-	if (length != HANDLE_LEN)
-		return -1;
-	ret = sscanf(data, "%d", &handle);
-	if (ret < 1)
-		return -1;
-	if (handle < 0 || handle >= HANDLE_MAX)
-		return -1;
-	return handle;
 }
 
 void parse_bip_user_headers(const struct obex_session *os,

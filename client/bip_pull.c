@@ -62,7 +62,7 @@ static gboolean listing_parse_attr(struct listing_object *object, const gchar *k
 	if (g_str_equal(key, "handle")) {
 		if (value == NULL)
 			goto invalid;
-		if (get_handle(value, strlen(value)) < 0)
+		if (parse_handle(value, strlen(value)) < 0)
 			goto invalid;
 		object->handle = g_strdup(value);
 		printf("handle: %s\n", object->handle);
@@ -118,7 +118,6 @@ static void listing_element(GMarkupParseContext *ctxt,
 		}
 	}
 	*listing = g_slist_append(*listing, obj);
-	printf("%p\n", *listing);
 }
 
 static const GMarkupParser images_listing_parser = {
@@ -140,9 +139,7 @@ static GSList *parse_images_listing(char *data,	unsigned int length, int *err)
 		*err = 0;
 	status = g_markup_parse_context_parse(ctxt, data, length, &gerr);
 	g_markup_parse_context_free(ctxt);
-	printf("%d %p\n", status, listing);
 	if (!status) {
-		printf("%s\n", gerr->message);
 		if (err != NULL)
 			*err = -EINVAL;
 		while (listing != NULL) {
@@ -222,50 +219,49 @@ static void get_images_listing_callback(
 {
 	DBusMessage *reply;
 	DBusMessageIter iter;
-	int err, i;
+	int err;
 	struct transfer_data *transfer = session->pending->data;
-	GSList *listing;
+	GSList *listing = NULL;
 	printf("get_images_listing_callback called\n");
+
 	if (gerr != NULL) {
 		reply = g_dbus_create_error(session->msg, "org.openobex.Error",
 							"%s", gerr->message);
-		goto done;
+		goto cleanup;
 	}
-
-	for (i = 0;i<transfer->filled;i++)
-		printf("%c", transfer->buffer[i]);
-	printf("\n");
 
 	listing = parse_images_listing(transfer->buffer, transfer->filled, &err);
 
-	printf("%p\n", listing);
-
 	if (err < 0) {
-		reply = g_dbus_create_error(session->msg, "org.openobex.Error",
-									NULL);
-		goto done;
+		reply = g_dbus_create_error(session->msg,
+				"org.openobex.Error.InvalidArguments", NULL);
+		goto cleanup;
 	}
 	
 	reply = dbus_message_new_method_return(session->msg);
 	dbus_message_iter_init_append(reply, &iter);
 	append_listing_dict(&iter, listing);
+
+cleanup:
+	g_dbus_send_message(session->conn, reply);
+	dbus_message_unref(session->msg);
+	dbus_message_unref(reply);
+	
 	while (listing != NULL) {
 		struct listing_object *obj = listing->data;
 		listing = g_slist_remove(listing, obj);
 		free_listing_object(obj);
 	}
 
-done:
-	g_dbus_send_message(session->conn, reply);
-	dbus_message_unref(session->msg);
-
 	transfer_unregister(transfer);
 	return;
 }
 
-static struct images_listing_aparam *new_images_listing_aparam(uint16_t nb, uint16_t ls, gboolean latest)
+static struct images_listing_aparam *new_images_listing_aparam(uint16_t nb,
+						uint16_t ls, gboolean latest)
 {
-	struct images_listing_aparam *aparam = g_try_malloc(sizeof(struct images_listing_aparam));
+	struct images_listing_aparam *aparam =
+				g_new0(struct images_listing_aparam, 1);
 	aparam->nbtag = NBRETURNEDHANDLES_TAG;
 	aparam->nblen = NBRETURNEDHANDLES_LEN;
 	aparam->nb = GUINT16_TO_BE(nb);
@@ -282,7 +278,7 @@ static struct images_listing_aparam *new_images_listing_aparam(uint16_t nb, uint
 }
 
 static struct a_header *create_handle(const char *handle) {
-	struct a_header *ah = g_try_new(struct a_header, 1);
+	struct a_header *ah = g_new0(struct a_header, 1);
 	ah->hi = IMG_HANDLE_HDR;
 	ah->hv.bs = encode_img_handle(handle, strlen(handle), &ah->hv_size);
 	return ah;
@@ -358,27 +354,26 @@ static void free_prop_object(struct prop_object *object) {
 static gboolean parse_attrib_native(struct native_prop *prop, const gchar *key,
 					const gchar *value, GError **gerr)
 {
-	printf("key: %s\n", key);
 	if (g_str_equal(key, "encoding")) {
 		if (convBIP2IM(value) == NULL)
 			goto invalid;
 		prop->encoding = g_strdup(value);
-		printf("encoding: %s\n", prop->encoding);
 	}
 	else if (g_str_equal(key, "pixel")) {
-		/* add verification */
+		if (!parse_pixel_range(value, NULL, NULL, NULL))
+			goto invalid;
 		prop->pixel = g_strdup(value);
 	}
 	else if (g_str_equal(key, "size")) {
-		/* add verification */
-		prop->size = g_strdup(value);
+		prop->size = parse_unsignednumber(value);
+		if (prop->size == NULL)
+			goto invalid;
 	}
 	else {
 		g_set_error(gerr, G_MARKUP_ERROR,
 				G_MARKUP_ERROR_UNKNOWN_ATTRIBUTE, NULL);
 		return FALSE;
 	}
-	printf("ok\n");
 	return TRUE;
 invalid:
 	g_set_error(gerr, G_MARKUP_ERROR, G_MARKUP_ERROR_INVALID_CONTENT, NULL);
@@ -388,31 +383,31 @@ invalid:
 static gboolean parse_attrib_variant(struct variant_prop *prop, const gchar *key,
 					const gchar *value, GError **gerr)
 {
-	printf("key: %s\n", key);
 	if (g_str_equal(key, "encoding")) {
 		if (convBIP2IM(value) == NULL)
 			goto invalid;
 		prop->encoding = g_strdup(value);
-		printf("encoding: %s\n", prop->encoding);
 	}
 	else if (g_str_equal(key, "pixel")) {
-		/* add verification */
+		if (!parse_pixel_range(value, NULL, NULL, NULL))
+			goto invalid;
 		prop->pixel = g_strdup(value);
 	}
 	else if (g_str_equal(key, "maxsize")) {
-		/* add verification */
-		prop->maxsize = g_strdup(value);
+		prop->maxsize = parse_unsignednumber(value);
+		if (prop->maxsize == NULL)
+			goto invalid;
 	}
 	else if (g_str_equal(key, "transform")) {
-		/* add verification */
-		prop->transform = g_strdup(value);
+		prop->transform = parse_transform_list(value);
+		if (prop->transform == NULL)
+			goto invalid;
 	}
 	else {
 		g_set_error(gerr, G_MARKUP_ERROR,
 				G_MARKUP_ERROR_UNKNOWN_ATTRIBUTE, NULL);
 		return FALSE;
 	}
-	printf("ok\n");
 	return TRUE;
 invalid:
 	g_set_error(gerr, G_MARKUP_ERROR, G_MARKUP_ERROR_INVALID_CONTENT, NULL);
@@ -422,28 +417,28 @@ invalid:
 static gboolean parse_attrib_att(struct att_prop *prop, const gchar *key,
 					const gchar *value, GError **gerr)
 {
-	printf("key: %s\n", key);
 	if (g_str_equal(key, "content-type")) {
-		/* add verification */
 		prop->content_type = g_strdup(value);
 	}
 	else if (g_str_equal(key, "charset")) {
-		/* add verification */
 		prop->charset = g_strdup(value);
 	}
 	else if (g_str_equal(key, "name")) {
 		prop->name = g_strdup(value);
 	}
 	else if (g_str_equal(key, "size")) {
-		/* add verification */
-		prop->size = g_strdup(value);
+		prop->size = parse_unsignednumber(value);
+		if (prop->size == NULL)
+			goto invalid;
 	}
 	else if (g_str_equal(key, "created")) {
-		/* add verification */
+		if (parse_iso8601_bip(value, strlen(value)) == -1)
+			goto invalid;
 		prop->ctime = g_strdup(value);
 	}
 	else if (g_str_equal(key, "modified")) {
-		/* add verification */
+		if (parse_iso8601_bip(value, strlen(value)) == -1)
+			goto invalid;
 		prop->mtime = g_strdup(value);
 	}
 	else {
@@ -451,11 +446,10 @@ static gboolean parse_attrib_att(struct att_prop *prop, const gchar *key,
 				G_MARKUP_ERROR_UNKNOWN_ATTRIBUTE, NULL);
 		return FALSE;
 	}
-	printf("ok\n");
 	return TRUE;
-/*invalid:
+invalid:
 	g_set_error(gerr, G_MARKUP_ERROR, G_MARKUP_ERROR_INVALID_CONTENT, NULL);
-	return FALSE;*/
+	return FALSE;
 }
 
 static struct att_prop *parse_elem_att(const gchar **names,
@@ -507,7 +501,7 @@ static gboolean parse_attrib_prop(struct prop_object *prop, const gchar *key,
 {
 	printf("key: %s\n", key);
 	if (g_str_equal(key, "handle")) {
-		if (get_handle(value, strlen(value)) < 0)
+		if (parse_handle(value, strlen(value)) < 0)
 			goto invalid;
 		prop->handle = g_strdup(value);
 	}
@@ -515,6 +509,7 @@ static gboolean parse_attrib_prop(struct prop_object *prop, const gchar *key,
 		prop->name = g_strdup(value);
 	}
 	else if (g_str_equal(key, "version")) {
+		// pass;
 	}
 	else {
 		g_set_error(gerr, G_MARKUP_ERROR,
@@ -550,39 +545,37 @@ static void prop_element(GMarkupParseContext *ctxt,
 {
 	struct prop_object **obj = user_data;
 
-	printf("element: %s %d\n", element, g_str_equal(element, "image-properties"));
+	printf("element: %s\n", element);
 
 	if (g_str_equal(element, "image-properties")) {
-		printf("object: %p\n", *obj);
 		if (*obj != NULL) {
 			free_prop_object(*obj);
 			*obj = NULL;
 			goto invalid;
 		}
 		*obj = parse_elem_prop(names, values, gerr);
-		printf("object: %p\n", *obj);
 	}
 	else if (g_str_equal(element, "native")) {
 		struct native_prop *prop;
-		if (*obj == NULL) {
+
+		if (*obj == NULL)
 			goto invalid;
-		}
 		prop = parse_elem_native(names, values, gerr);
 		(*obj)->native = g_slist_append((*obj)->native, prop);
 	}
 	else if (g_str_equal(element, "variant")) {
 		struct variant_prop *prop;
-		if (*obj == NULL) {
+
+		if (*obj == NULL)
 			goto invalid;
-		}
 		prop = parse_elem_variant(names, values, gerr);
 		(*obj)->variant = g_slist_append((*obj)->variant, prop);
 	}
 	else if (g_str_equal(element, "attachment")) {
 		struct att_prop *prop;
-		if (*obj == NULL) {
+
+		if (*obj == NULL)
 			goto invalid;
-		}
 		prop = parse_elem_att(names, values, gerr);
 		(*obj)->att = g_slist_append((*obj)->att, prop);
 	}
@@ -619,7 +612,6 @@ static struct prop_object *parse_properties(char *data, unsigned int length, int
 	status = g_markup_parse_context_parse(ctxt, data, length, &gerr);
 	g_markup_parse_context_free(ctxt);
 	if (!status) {
-		printf("%s\n", gerr->message);
 		if (err != NULL)
 			*err = -EINVAL;
 		free_prop_object(prop);
@@ -633,7 +625,6 @@ static gboolean append_prop(DBusMessageIter *args,
 {
 	DBusMessageIter dict, iter;
 	GSList *list;
-	printf("append_prop\n");
 	if (!dbus_message_iter_open_container(args, DBUS_TYPE_ARRAY, "a{ss}",
 									&dict))
 		return FALSE;
@@ -752,50 +743,72 @@ static DBusMessage *get_image_properties(DBusConnection *connection,
 	struct session_data *session = user_data;
 	DBusMessage *reply;
 	DBusMessageIter iter;
-	char *handle, *buffer;
-	struct a_header *hdesc;
-	GSList *aheaders;
+	char *handle = NULL, *buffer = NULL;
+	struct a_header *hdesc = NULL;
+	GSList *aheaders = NULL;
 	int err, length;
-	struct prop_object *prop;
+	struct prop_object *prop = NULL;
 
 	printf("requested get image properties\n");
 	
 	if (dbus_message_get_args(message, NULL,
 					DBUS_TYPE_STRING, &handle,
-					DBUS_TYPE_INVALID) == FALSE)
-		return g_dbus_create_error(message,
+					DBUS_TYPE_INVALID) == FALSE) {
+		reply = g_dbus_create_error(message,
 				"org.openobex.Error.InvalidArguments", NULL);
+		goto cleanup;
+	}
+
+	if (parse_handle(handle, strlen(handle)) < 0) {
+		reply = g_dbus_create_error(message,
+				"org.openobex.Error.InvalidArguments", NULL);
+		goto cleanup;
+	}
 
 	hdesc = create_handle(handle);
 	
-	if (hdesc == NULL)
-		return g_dbus_create_error(message,
+	if (hdesc == NULL) {
+		reply = g_dbus_create_error(message,
 			"org.openobex.Error.InvalidArguments", NULL);
+		goto cleanup;
+	}
 	
 	aheaders = g_slist_append(NULL, hdesc);
 
-	if (!gw_obex_get_buf_with_aheaders(session->obex, NULL, "x-bt/img-properties",
+	if (!gw_obex_get_buf_with_aheaders(session->obex, NULL,
+					"x-bt/img-properties",
 					NULL, 0, aheaders,
 					&buffer, &length, &err)) {
-		return g_dbus_create_error(message,
+		reply = g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
 				"Failed");
+		goto cleanup;
 	}
 	
 	prop = parse_properties(buffer, length, &err);
 
 	if (prop == NULL) {
-		return g_dbus_create_error(message,
+		reply = g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
 				"Failed");
+		goto cleanup;
 	}
 
 	reply = dbus_message_new_method_return(message);
-	
 	dbus_message_iter_init_append(reply, &iter);
-	append_prop(&iter, prop);
-	g_free(buffer);
+	
+	if (!append_prop(&iter, prop)) {
+		reply = g_dbus_create_error(message,
+				"org.openobex.Error.Failed",
+				"Failed");
+		goto cleanup;
+	}
 
+cleanup:
+	g_free(buffer);
+	dbus_message_unref(message);
+	a_header_free(hdesc);
+	g_slist_free(aheaders);
 	return reply;
 }
 
@@ -804,37 +817,94 @@ static DBusMessage *delete_image(DBusConnection *connection,
 {
 	struct session_data *session = user_data;
 	DBusMessage *reply;
-	char *handle;
-	struct a_header *hdesc;
-	GSList *aheaders;
+	char *handle = NULL;
+	struct a_header *hdesc = NULL;
+	GSList *aheaders = NULL;
 	int err;
 
 	printf("requested delete image\n");
 	
 	if (dbus_message_get_args(message, NULL,
 					DBUS_TYPE_STRING, &handle,
-					DBUS_TYPE_INVALID) == FALSE)
-		return g_dbus_create_error(message,
+					DBUS_TYPE_INVALID) == FALSE) {
+		reply = g_dbus_create_error(message,
 				"org.openobex.Error.InvalidArguments", NULL);
+		goto cleanup;
+	}
+
+	if (parse_handle(handle, strlen(handle)) < 0) {
+		reply = g_dbus_create_error(message,
+				"org.openobex.Error.InvalidArguments", NULL);
+		goto cleanup;
+	}
 
 	hdesc = create_handle(handle);
 	
-	if (hdesc == NULL)
-		return g_dbus_create_error(message,
+	if (hdesc == NULL) {
+		reply = g_dbus_create_error(message,
 			"org.openobex.Error.InvalidArguments", NULL);
+		goto cleanup;
+	}
 	
 	aheaders = g_slist_append(NULL, hdesc);
 
 	if (!gw_obex_put_buf_with_aheaders(session->obex, NULL, "x-bt/img-img",
 					NULL, 0, aheaders,
 					NULL, 0, -1, &err)) {
-		return g_dbus_create_error(message,
+		reply = g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
 				"Failed");
+		goto cleanup;
 	}
 	
 	reply = dbus_message_new_method_return(message);
+cleanup:
+	a_header_free(hdesc);
+	g_slist_free(aheaders);
+	dbus_message_unref(message);
 	return reply;
+}
+
+static gboolean parse_filter_arg(const char *key, DBusMessageIter *value, uint16_t *count,
+			uint16_t *start, gboolean *latest, char **created,
+			char **modified, char **encoding, char **pixel)
+{
+	char *val = NULL;
+	switch (dbus_message_iter_get_arg_type(value)) {
+	case DBUS_TYPE_STRING:
+		dbus_message_iter_get_basic(value, &val);
+		if (g_str_equal(key, "created")) {
+			if (parse_iso8601_bip(val, strlen(val)) == -1)
+				return FALSE;
+			*created = g_strdup(val);
+		}
+		else if (g_str_equal(key, "modified")) {
+			if (parse_iso8601_bip(val, strlen(val)) == -1)
+				return FALSE;
+			*modified = g_strdup(val);
+		}
+		else if (g_str_equal(key, "encoding")) {
+			*encoding = g_strdup(convBIP2IM(val));
+			if (*encoding == NULL)
+				return FALSE;
+		}
+		else if (g_str_equal(key, "pixel")) {
+			if (!parse_pixel_range(val, NULL, NULL, NULL))
+				return FALSE;
+			*pixel = g_strdup(val);
+		}
+		break;
+	case DBUS_TYPE_UINT16:
+		if (g_str_equal(key, "count"))
+			dbus_message_iter_get_basic(value, count);
+		else if (g_str_equal(key, "offset"))
+			dbus_message_iter_get_basic(value, start);
+		break;
+	case DBUS_TYPE_BOOLEAN:
+		if (g_str_equal(key, "latest"))
+			dbus_message_iter_get_basic(value, latest);
+	}
+	return TRUE;
 }
 
 static gboolean parse_filter_dict(DBusMessageIter *iter,
@@ -852,7 +922,7 @@ static gboolean parse_filter_dict(DBusMessageIter *iter,
 
 	while (dbus_message_iter_get_arg_type(iter) == DBUS_TYPE_DICT_ENTRY) {
 		DBusMessageIter entry, value;
-		const char *key, *val;
+		char *key;
 
 		dbus_message_iter_recurse(iter, &entry);
 		printf("get basic\n");
@@ -861,32 +931,11 @@ static gboolean parse_filter_dict(DBusMessageIter *iter,
 		dbus_message_iter_next(&entry);
 		printf("recurse\n");
 		dbus_message_iter_recurse(&entry, &value);
-		
-		switch (dbus_message_iter_get_arg_type(&value)) {
-		case DBUS_TYPE_STRING:
-			dbus_message_iter_get_basic(&value, &val);
-			printf("val: %s\n", val);
-			if (g_str_equal(key, "created"))
-				*created = g_strdup(val);
-			else if (g_str_equal(key, "modified"))
-				*modified = g_strdup(val);
-			else if (g_str_equal(key, "encoding"))
-				*encoding = g_strdup(val);
-			else if (g_str_equal(key, "pixel"))
-				*pixel = g_strdup(val);
-			break;
-		case DBUS_TYPE_UINT16:
-			printf("val2 %s\n", key);
-			if (g_str_equal(key, "count"))
-				dbus_message_iter_get_basic(&value, count);
-			else if (g_str_equal(key, "offset"))
-				dbus_message_iter_get_basic(&value, start);
-			break;
-		case DBUS_TYPE_BOOLEAN:
-			printf("val3 %s\n", key);
-			if (g_str_equal(key, "latest"))
-				dbus_message_iter_get_basic(&value, latest);
-		}
+
+		if (!parse_filter_arg(key, &value, count, start, latest,
+					created, modified, encoding, pixel))
+			return FALSE;
+
 		dbus_message_iter_next(iter);
 	}
 
@@ -907,9 +956,7 @@ static struct a_header *create_filtering_descriptor(char *created, char *modifie
 	GString *object = g_string_new("");
 	guint8 *encoded_data;
 	unsigned int length;
-	struct a_header *ah = g_try_new(struct a_header, 1);
-	if (ah == NULL)
-		return NULL;
+	struct a_header *ah;
 
 	if (created)
 		g_string_append_printf(filter, FILTERING_CREATED, created);
@@ -926,6 +973,10 @@ static struct a_header *create_filtering_descriptor(char *created, char *modifie
 	encoded_data = encode_img_descriptor(object->str, object->len, &length);
 	g_string_free(object, TRUE);
 
+	if (encoded_data == NULL)
+		return NULL;
+
+	ah = g_new0(struct a_header, 1);
 	ah->hi = IMG_DESC_HDR;
 	ah->hv_size = length;
 	ah->hv.bs = encoded_data;
@@ -937,58 +988,80 @@ static DBusMessage *get_images_listing(DBusConnection *connection,
 {
 	struct session_data *session = user_data;
 	DBusMessageIter iter, dict;
-	struct images_listing_aparam *aparam;
+	DBusMessage *reply = NULL;
+	struct images_listing_aparam *aparam = NULL;
 	char *created = NULL, *modified = NULL,
 	     *encoding = NULL, *pixel = NULL;
-	struct a_header *handles_desc;
+	struct a_header *handles_desc = NULL;
 	uint16_t count, begin;
 	gboolean latest;
-	GSList *aheaders;
+	GSList *aheaders = NULL;
 	int err;
 
 	printf("requested get images listing with range and filtering\n");
 
 	dbus_message_iter_init(message, &iter);
 	dbus_message_iter_recurse(&iter, &dict);
-	parse_filter_dict(&dict, &count, &begin, &latest, &created, &modified, &encoding, &pixel);
+	if (!parse_filter_dict(&dict, &count, &begin, &latest, &created,
+					&modified, &encoding, &pixel)) {
+		reply = g_dbus_create_error(message,
+					"org.openobex.Error.Failed", "Failed");
+		goto cleanup;
+	}
 	
-	handles_desc = create_filtering_descriptor(created, modified, encoding, pixel);
+	handles_desc = create_filtering_descriptor(created, modified, encoding,
+									pixel);
+
+	if (handles_desc == NULL) {
+		reply = g_dbus_create_error(message,
+					"org.openobex.Error.Failed", "Failed");
+		goto cleanup;
+	}
+
 	aheaders = g_slist_append(NULL, handles_desc);
 
 	aparam = new_images_listing_aparam(count, begin, latest);
 
-	printf("rozmiar aparam: %u\n", sizeof(struct images_listing_aparam));
-	
 	session->msg = dbus_message_ref(message);
-	printf("message pointer: %p\n", session->msg);
 
-	if ((err=session_get_with_aheaders(session, "x-bt/img-listing", NULL, NULL,
-					(const guint8 *)aparam, sizeof(struct images_listing_aparam),
-					aheaders, get_images_listing_callback)) < 0) {
-		return g_dbus_create_error(message,
+	if ((err=session_get_with_aheaders(session, "x-bt/img-listing", NULL,
+					NULL, (const guint8 *)aparam,
+					sizeof(struct images_listing_aparam),
+					aheaders, get_images_listing_callback))
+									< 0) {
+		reply = g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
 				"Failed");
+		goto cleanup;
 	}
 
-	g_slist_free(aheaders);
+cleanup:
+	dbus_message_unref(message);
 	a_header_free(handles_desc);
-	return NULL;
+	g_slist_free(aheaders);
+	g_free(aparam);
+
+	return reply;
 }
 
 static struct a_header *create_img_desc(const char *encoding, const char *pixel,
 						const char *transform)
 {
 	guint8 *data;
-	struct a_header *ah = g_try_new(struct a_header, 1);
+	struct a_header *ah;
 	GString *descriptor = g_string_new(IMG_DESC_BEGIN);
 	g_string_append_printf(descriptor,IMG_BEGIN, encoding, pixel);
 	if (transform != NULL)
 		g_string_append_printf(descriptor,IMG_TRANSFORM, transform);
 	g_string_append(descriptor,IMG_END);
 	descriptor = g_string_append(descriptor, IMG_DESC_END);
-	data = encode_img_descriptor(descriptor->str, descriptor->len, &ah->hv_size);
+	data = encode_img_descriptor(descriptor->str, descriptor->len,
+								&ah->hv_size);
 	g_string_free(descriptor, TRUE);
+	if (data == NULL)
+		return NULL;
 
+	ah = g_try_new(struct a_header, 1);
 	ah->hi = IMG_DESC_HDR;
 	ah->hv.bs = data;
 	return ah;
@@ -1015,16 +1088,17 @@ static void get_image_callback(struct session_data *session, GError *err,
 	return;
 }
 
-static void get_image_thumbnail_callback(struct session_data *session, GError *err,
-		void *user_data)
+static void get_image_thumbnail_callback(struct session_data *session,
+						GError *err, void *user_data)
 {
 	struct transfer_data *transfer = session->pending->data;
 	printf("get_image_callback\n");
 	if (err) {
 		g_dbus_emit_signal(session->conn, session->path,
-				IMAGE_PULL_INTERFACE, "GetImageFailed",
-				DBUS_TYPE_STRING, &err->message,
-				DBUS_TYPE_INVALID);
+					IMAGE_PULL_INTERFACE,
+					"GetImageThumbnailFailed",
+					DBUS_TYPE_STRING, &err->message,
+					DBUS_TYPE_INVALID);
 		transfer_unregister(transfer);
 		return;
 	}
@@ -1036,106 +1110,137 @@ static void get_image_thumbnail_callback(struct session_data *session, GError *e
 	return;
 }
 
-static void get_image_attachment_callback(struct session_data *session, GError *err,
-		void *user_data)
+static void get_image_attachment_callback(struct session_data *session,
+						GError *err, void *user_data)
 {
 	struct transfer_data *transfer = session->pending->data;
 	printf("get_image_attachment_callback\n");
 	if (err) {
 		printf("emitting message\n");
 		g_dbus_emit_signal(session->conn, session->path,
-				IMAGE_PULL_INTERFACE, "GetImageAttachmentFailed",
-				DBUS_TYPE_STRING, &err->message,
-				DBUS_TYPE_INVALID);
+					IMAGE_PULL_INTERFACE,
+					"GetImageAttachmentFailed",
+					DBUS_TYPE_STRING, &err->message,
+					DBUS_TYPE_INVALID);
 		transfer_unregister(transfer);
 		return;
 	}
 
-	g_dbus_emit_signal(session->conn, session->path,
-			IMAGE_PULL_INTERFACE, "GetImageAttachmentCompleted",
-			DBUS_TYPE_INVALID);
+	g_dbus_emit_signal(session->conn, session->path, IMAGE_PULL_INTERFACE,
+						"GetImageAttachmentCompleted",
+							DBUS_TYPE_INVALID);
 	transfer_unregister(transfer);
 	return;
 }
 
 
 static DBusMessage *get_image_thumbnail(DBusConnection *connection,
-				DBusMessage *message, void *user_data)
+					DBusMessage *message, void *user_data)
 {
 	struct session_data *session = user_data;
-	const char *handle, *image_path;
+	const char *handle = NULL, *image_path = NULL;
 	GSList *aheaders = NULL;
 	struct a_header *hdesc = NULL;
+	DBusMessage *reply = NULL;
 	int err;
 
 	if (dbus_message_get_args(message, NULL,
 				DBUS_TYPE_STRING, &image_path,
 				DBUS_TYPE_STRING, &handle,
-				DBUS_TYPE_INVALID) == FALSE)
-		return g_dbus_create_error(message,
+				DBUS_TYPE_INVALID) == FALSE) {
+		reply = g_dbus_create_error(message,
 				"org.openobex.Error.InvalidArguments", NULL);
+		goto cleanup;
+	}
 	
+	if (parse_handle(handle, strlen(handle)) < 0) {
+		reply = g_dbus_create_error(message,
+				"org.openobex.Error.InvalidArguments", NULL);
+		goto cleanup;
+	}
 	printf("requested get image thumbnail %s %s\n", image_path, handle);
 
 	hdesc = create_handle(handle);
 	
-	if (hdesc == NULL)
-		return g_dbus_create_error(message,
-			"org.openobex.Error.InvalidArguments", NULL);
+	if (hdesc == NULL) {
+		reply = g_dbus_create_error(message,
+				"org.openobex.Error.InvalidArguments", NULL);
+		goto cleanup;
+	}
 	
 	aheaders = g_slist_append(NULL, hdesc);
 
-	if ((err=session_get_with_aheaders(session, "x-bt/img-thm", NULL, image_path,
-						NULL, 0, aheaders,
-						get_image_thumbnail_callback)) < 0) {
-		return g_dbus_create_error(message,
-				"org.openobex.Error.Failed",
-				"Failed");
+	if ((err=session_get_with_aheaders(session, "x-bt/img-thm", NULL,
+						image_path, NULL, 0, aheaders,
+						get_image_thumbnail_callback))
+									< 0) {
+		reply = g_dbus_create_error(message,
+					"org.openobex.Error.Failed", "Failed");
+		goto cleanup;
 	}
 
 	session->msg = dbus_message_ref(message);
-
-	return dbus_message_new_method_return(message);
+	reply = dbus_message_new_method_return(message);
+cleanup:
+	a_header_free(hdesc);
+	g_slist_free(aheaders);
+	dbus_message_unref(message);
+	return reply;
 }
-
+///////////////////////////////////////////////////////////////////
 static DBusMessage *get_image_attachment(DBusConnection *connection,
 				DBusMessage *message, void *user_data)
 {
 	struct session_data *session = user_data;
-	const char *handle, *file_path, *att_name;
+	const char *handle = NULL, *file_path = NULL, *att_name = NULL;
 	GSList *aheaders = NULL;
 	struct a_header *hdesc = NULL;
+	DBusMessage *reply = NULL;
 	int err;
 
 	if (dbus_message_get_args(message, NULL,
 				DBUS_TYPE_STRING, &file_path,
 				DBUS_TYPE_STRING, &handle,
 				DBUS_TYPE_STRING, &att_name,
-				DBUS_TYPE_INVALID) == FALSE)
-		return g_dbus_create_error(message,
+				DBUS_TYPE_INVALID) == FALSE) {
+		reply = g_dbus_create_error(message,
 				"org.openobex.Error.InvalidArguments", NULL);
-	
+		goto cleanup;
+	}
+
 	printf("requested get image attachment %s %s %s\n", file_path, handle, att_name);
+	if (parse_handle(handle, strlen(handle)) < 0) {
+		reply = g_dbus_create_error(message,
+				"org.openobex.Error.InvalidArguments", NULL);
+		goto cleanup;
+	}
 
 	hdesc = create_handle(handle);
 	
-	if (hdesc == NULL)
-		return g_dbus_create_error(message,
-			"org.openobex.Error.InvalidArguments", NULL);
+	if (hdesc == NULL) {
+		reply = g_dbus_create_error(message,
+				"org.openobex.Error.InvalidArguments", NULL);
+		goto cleanup;
+	}
 	
 	aheaders = g_slist_append(NULL, hdesc);
 
 	if ((err=session_get_with_aheaders(session, "x-bt/img-attachment", att_name, file_path,
 						NULL, 0, aheaders,
 						get_image_attachment_callback)) < 0) {
-		return g_dbus_create_error(message,
+		reply = g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
 				"Failed");
+		goto cleanup;
 	}
 
 	session->msg = dbus_message_ref(message);
-
-	return dbus_message_new_method_return(message);
+	reply = dbus_message_new_method_return(message);
+cleanup:
+	a_header_free(hdesc);
+	g_slist_free(aheaders);
+	dbus_message_unref(message);
+	return reply;
 }
 
 static gboolean parse_get_image_dict(DBusMessage *msg, char **path,
@@ -1172,24 +1277,33 @@ static gboolean parse_get_image_dict(DBusMessage *msg, char **path,
 		const char *key, *val;
 
 		dbus_message_iter_recurse(&array, &entry);
-		printf("get basic\n");
+
 		if (dbus_message_iter_get_arg_type(&entry) != DBUS_TYPE_STRING)
 			return FALSE;
 		dbus_message_iter_get_basic(&entry, &key);
 		dbus_message_iter_next(&entry);
 		dbus_message_iter_get_basic(&entry, &val);
 		
-		printf("val: %s\n", val);
-		//verify
-		if (g_str_equal(key, "pixel"))
+		if (g_str_equal(key, "pixel")) {
+			if (!parse_pixel_range(val, NULL, NULL, NULL))
+				goto failed;
 			*pixel = g_strdup(val);
-		else if (g_str_equal(key, "encoding"))
-			*encoding = g_strdup(val);
-		else if (g_str_equal(key, "maxsize"))
-			*maxsize = g_strdup(val);
-		else if (g_str_equal(key, "transformation"))
-			*transform = g_strdup(val);
-		break;
+		}
+		else if (g_str_equal(key, "encoding")) {
+			*encoding = g_strdup(convBIP2IM(val));
+			if (*encoding == NULL)
+				goto failed;
+		}
+		else if (g_str_equal(key, "maxsize")) {
+			*maxsize = parse_unsignednumber(val);
+			if (*maxsize == NULL)
+				goto failed;
+		}
+		else if (g_str_equal(key, "transformation")) {
+			*transform = parse_transform(val);
+			if (*transform == NULL)
+				goto failed;
+		}
 		dbus_message_iter_next(&array);
 	}
 
@@ -1220,24 +1334,32 @@ static DBusMessage *get_image(DBusConnection *connection,
 				DBusMessage *message, void *user_data)
 {
 	struct session_data *session = user_data;
-	char *transform, *handle, *encoding, *image_path, *pixel, *maxsize;
+	char *transform = NULL, *handle = NULL, *encoding = NULL,
+				*image_path = NULL, *pixel = NULL,
+						*maxsize = NULL;
 	GSList *aheaders = NULL;
 	struct a_header *imgdesc = NULL, *hdesc = NULL;
+	struct DBusMessage *reply = NULL;
 	int err;
 
-	if (!parse_get_image_dict(message, &image_path, &handle, &pixel, &encoding, &maxsize, &transform))
-		return g_dbus_create_error(message,
+	if (!parse_get_image_dict(message, &image_path, &handle, &pixel,
+					&encoding, &maxsize, &transform)) {
+		reply = g_dbus_create_error(message,
 			"org.openobex.Error.InvalidArguments", NULL);
+		goto cleanup;
+	}
 
 	printf("requested get image %s %s %s %s %s %s\n", image_path, handle,
 			encoding, transform, pixel, maxsize);
 
 	imgdesc = create_img_desc(encoding, pixel, transform);
 	hdesc = create_handle(handle);
-	
-	if (imgdesc == NULL || hdesc == NULL)
-		return g_dbus_create_error(message,
+
+	if (imgdesc == NULL || hdesc == NULL) {
+		reply = g_dbus_create_error(message,
 			"org.openobex.Error.InvalidArguments", NULL);
+		goto cleanup;
+	}
 	
 	aheaders = g_slist_append(NULL, hdesc);
 	aheaders = g_slist_append(aheaders, imgdesc);
@@ -1253,8 +1375,13 @@ static DBusMessage *get_image(DBusConnection *connection,
 	}
 
 	session->msg = dbus_message_ref(message);
-
-	return dbus_message_new_method_return(message);
+	reply = dbus_message_new_method_return(message);
+cleanup:
+	a_header_free(hdesc);
+	a_header_free(imgdesc);
+	g_slist_free(aheaders);
+	dbus_message_unref(message);
+	return reply;
 }
 
 GDBusMethodTable image_pull_methods[] = {

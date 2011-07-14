@@ -44,12 +44,15 @@ int make_modified_image(const char *image_path, const char *modified_path,
 			int *err);
 gboolean make_thumbnail(const char *image_path, const char *modified_path,
 								int *err);
-int get_handle(const char *data, unsigned int length);
+int parse_handle(const char *data, unsigned int length);
 void parse_bip_user_headers(const struct obex_session *os, obex_object_t *obj,
 				char **desc_hdr,
 				unsigned int *desc_hdr_len,
 				char **handle_hdr,
 				unsigned int *handle_hdr_len);
+char *parse_transform(const char *transform);
+char *parse_transform_list(const char *transform);
+char *parse_unsignednumber(const char *size);
 char *get_att_dir(const char *image_path);
 char *safe_rename(const char *name, const char *folder,
 							const char *orig_path);
