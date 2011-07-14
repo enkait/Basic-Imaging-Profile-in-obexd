@@ -1058,6 +1058,7 @@ static struct a_header *create_img_desc(const char *encoding, const char *pixel,
 {
 	guint8 *data;
 	struct a_header *ah;
+	unsigned int length;
 	GString *descriptor = g_string_new(IMG_DESC_BEGIN);
 	g_string_append_printf(descriptor,IMG_BEGIN, encoding, pixel);
 	if (transform != NULL)
@@ -1065,14 +1066,15 @@ static struct a_header *create_img_desc(const char *encoding, const char *pixel,
 	g_string_append(descriptor,IMG_END);
 	descriptor = g_string_append(descriptor, IMG_DESC_END);
 	data = encode_img_descriptor(descriptor->str, descriptor->len,
-								&ah->hv_size);
+								&length);
 	g_string_free(descriptor, TRUE);
 	if (data == NULL)
 		return NULL;
 
-	ah = g_try_new(struct a_header, 1);
+	ah = g_new0(struct a_header, 1);
 	ah->hi = IMG_DESC_HDR;
 	ah->hv.bs = data;
+	ah->hv_size = length;
 	return ah;
 }
 
