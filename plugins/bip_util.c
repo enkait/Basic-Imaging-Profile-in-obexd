@@ -237,7 +237,7 @@ gboolean parse_pixel_range(const gchar *dim, unsigned int *lower_ret,
 	}
 	if (dim == NULL)
 		return FALSE;
-	printf("dim=%s\n", dim);
+	printf("dim=%send\n", dim);
 	if (regexec(&no_range, dim, 0, NULL, 0) == 0) {
 		sscanf(dim, "%u*%u", &lower[0], &lower[1]);
 		upper[0] = lower[0];
@@ -327,7 +327,7 @@ char *parse_unsignednumber(const char *size) {
 	static regex_t unumber;
 	static int regex_initialized = 0;
 	if (!regex_initialized) {
-		regcomp(&unumber, "^[:digit:]+$", REG_EXTENDED);
+		regcomp(&unumber, "^[[:digit:]]+$", REG_EXTENDED);
 		regex_initialized = 1;
 	}
 	if (regexec(&unumber, size, 0, NULL, 0) != 0)

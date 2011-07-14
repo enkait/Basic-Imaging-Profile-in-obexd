@@ -234,13 +234,22 @@ static void get_images_listing_callback(
 
 	if (err < 0) {
 		reply = g_dbus_create_error(session->msg,
-				"org.openobex.Error.InvalidArguments", NULL);
+				"org.openobex.Error.Failed", "Failed");
+		goto cleanup;
+	}
+
+	if ((reply = dbus_message_new_method_return(session->msg)) == NULL) {
+		reply = g_dbus_create_error(session->msg,
+				"org.openobex.Error.Failed", "Failed");
 		goto cleanup;
 	}
 	
-	reply = dbus_message_new_method_return(session->msg);
 	dbus_message_iter_init_append(reply, &iter);
-	append_listing_dict(&iter, listing);
+	if (!append_listing_dict(&iter, listing)) {
+		reply = g_dbus_create_error(session->msg,
+				"org.openobex.Error.Failed", "Failed");
+		goto cleanup;
+	}
 
 cleanup:
 	g_dbus_send_message(session->conn, reply);
@@ -489,6 +498,7 @@ static struct native_prop *parse_elem_native(const gchar **names,
 	struct native_prop *prop = g_new0(struct native_prop, 1);
 	for (key = (gchar **) names; *key; key++, values++) {
 		if (!parse_attrib_native(prop, *key, *values, gerr)) {
+			printf("freeing\n");
 			free_native_prop(prop);
 			return NULL;
 		}
@@ -781,7 +791,7 @@ static DBusMessage *get_image_properties(DBusConnection *connection,
 					&buffer, &length, &err)) {
 		reply = g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
-				"Failed");
+				"TransferFailed");
 		goto cleanup;
 	}
 	
@@ -790,17 +800,17 @@ static DBusMessage *get_image_properties(DBusConnection *connection,
 	if (prop == NULL) {
 		reply = g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
-				"Failed");
+				"ParseResultFailed");
 		goto cleanup;
 	}
 
 	reply = dbus_message_new_method_return(message);
 	dbus_message_iter_init_append(reply, &iter);
-	
+
 	if (!append_prop(&iter, prop)) {
 		reply = g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
-				"Failed");
+				"AppendResultFailed");
 		goto cleanup;
 	}
 
@@ -1036,7 +1046,6 @@ static DBusMessage *get_images_listing(DBusConnection *connection,
 	}
 
 cleanup:
-	dbus_message_unref(message);
 	a_header_free(handles_desc);
 	g_slist_free(aheaders);
 	g_free(aparam);
