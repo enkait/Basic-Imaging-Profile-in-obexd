@@ -270,7 +270,7 @@ int image_push_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 		add_reply_handle(os, obj, img->handle);
 	}
 	else if(g_strcmp0(os->type, "x-bt/img-attachment") == 0) {
-		int handle = get_handle(ips->handle_hdr, ips->handle_hdr_len);
+		int handle = parse_handle(ips->handle_hdr, ips->handle_hdr_len);
 		char *att_path, *new_path;
 		struct stat file_stat;
 		struct att_desc *desc;
