@@ -117,7 +117,7 @@ static void *imgattpull_open(const char *name, int oflag, mode_t mode,
 	printf("imgattpull_open\n");
 	printf("name: %s\n", name);
 
-	handle = get_handle(session->handle_hdr, session->handle_hdr_len);
+	handle = parse_handle(session->handle_hdr, session->handle_hdr_len);
 
 	if (handle == -1) {
 		if (err)

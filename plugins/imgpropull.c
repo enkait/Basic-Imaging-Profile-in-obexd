@@ -143,7 +143,7 @@ static void *imgpropull_open(const char *name, int oflag, mode_t mode,
 	if (err != NULL)
 		*err = 0;
 
-	handle = get_handle(session->handle_hdr, session->handle_hdr_len);
+	handle = parse_handle(session->handle_hdr, session->handle_hdr_len);
 
 	if (handle < 0) {
 		if (err != NULL)

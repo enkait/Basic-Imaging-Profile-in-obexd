@@ -137,6 +137,74 @@ Methods		void ChangeFolder(string folder)
 
 			Deletes the specified file/folder.
 
+Basic Imaging Push hierarchy
+=======================
+
+Service		org.openobex.client
+Interface	org.openobex.ImagePush
+Object path	[variable prefix]/{session0,session1,...}
+
+Methods		string GetImagingCapabilities()
+
+			Get the imaging capabilities object of the remote device.
+
+		void PutImage(string path)
+
+			Sends the image at the specified path to the remote device.
+			This method returns immediately. The PutImageCompleted
+			and PutImageFailed signals are used to notify that
+			the upload has ended.
+
+		void PutModifiedImage(string path, string encoding, uint32 width,
+					uint32 height, string transformation)
+
+			Sends the image at the specified path to the remote device,
+			but first converts it to make sure it is in the given
+			encoding, and has the given width and height. The conversion
+			is done using ImageMagick.
+			
+			path : where the image is currently located
+
+			encoding : what encoding should be used, possible values:
+				"JPEG", "GIF", "WBMP", "PNG", "JPEG2000", "BMP"
+
+			width : the desired width
+
+			height : the desired height
+
+			transform : method to be used to change the image
+					dimensions if necessary, possible values:
+				"stretch"
+				"fill"
+				"crop"
+
+		void PutImageAttachment(string path, string handle)
+		
+			Sends the specified file as an attachment to the image
+			specified by handle.
+
+			path : where the file is placed
+
+			handle : a 7 digit number representing the image to which
+					the file is an attachment, the image
+					must have been sent within the current
+					session
+
+Signals		PutImageCompleted(string handle, boolean thumbnail)
+		
+			Informs that the image was successfully sent.
+
+			handle : a 7 digit number being the handle given
+					to the image by the server
+
+			thumbnail : true if the server requests a thumbnail
+					for the image to be sent
+		
+		PutImageFailed(string err)
+
+			Informs there was an error while sending the message.
+
+			err : the error encountered
 
 Phonebook Access hierarchy
 =======================

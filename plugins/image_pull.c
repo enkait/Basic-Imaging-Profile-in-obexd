@@ -344,7 +344,7 @@ int image_pull_put(struct obex_session *os, obex_object_t *obj,
 					&session->handle_hdr,
 					&session->handle_hdr_len);
 	
-	handle = get_handle(session->handle_hdr, session->handle_hdr_len);
+	handle = parse_handle(session->handle_hdr, session->handle_hdr_len);
 
 	if (handle < 0)
 		return -EBADR;

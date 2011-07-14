@@ -90,7 +90,7 @@ static void *imgthmpull_open(const char *name, int oflag, mode_t mode,
 	
 	printf("imgthmpull_open\n");
 
-	handle = get_handle(session->handle_hdr, session->handle_hdr_len);
+	handle = parse_handle(session->handle_hdr, session->handle_hdr_len);
 
 	if (handle == -1) {
 		if (err != NULL)
