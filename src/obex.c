@@ -229,41 +229,46 @@ static void os_set_response(obex_object_t *obj, int err)
 {
 	uint8_t rsp;
 	uint8_t lastrsp;
-
-	switch (err) {
-	case 0:
-		rsp = OBEX_RSP_CONTINUE;
-		lastrsp = OBEX_RSP_SUCCESS;
-		break;
-	case -EPERM:
-	case -EACCES:
-		rsp = OBEX_RSP_FORBIDDEN;
-		lastrsp = OBEX_RSP_FORBIDDEN;
-		break;
-	case -ENOENT:
-		rsp = OBEX_RSP_NOT_FOUND;
-		lastrsp = OBEX_RSP_NOT_FOUND;
-		break;
-	case -EBADR:
-		rsp = OBEX_RSP_BAD_REQUEST;
-		lastrsp = OBEX_RSP_BAD_REQUEST;
-		break;
-	case -EFAULT:
-		rsp = OBEX_RSP_SERVICE_UNAVAILABLE;
-		lastrsp = OBEX_RSP_SERVICE_UNAVAILABLE;
-		break;
-	case -EINVAL:
-		rsp = OBEX_RSP_NOT_IMPLEMENTED;
-		lastrsp = OBEX_RSP_NOT_IMPLEMENTED;
-		break;
-	case -ENOTEMPTY:
-	case -EEXIST:
-		rsp = OBEX_RSP_PRECONDITION_FAILED;
-		lastrsp = OBEX_RSP_PRECONDITION_FAILED;
-		break;
-	default:
-		rsp = OBEX_RSP_INTERNAL_SERVER_ERROR;
-		lastrsp = OBEX_RSP_INTERNAL_SERVER_ERROR;
+	if (err <= 0) {
+		switch (err) {
+		case 0:
+			rsp = OBEX_RSP_CONTINUE;
+			lastrsp = OBEX_RSP_SUCCESS;
+			break;
+		case -EPERM:
+		case -EACCES:
+			rsp = OBEX_RSP_FORBIDDEN;
+			lastrsp = OBEX_RSP_FORBIDDEN;
+			break;
+		case -ENOENT:
+			rsp = OBEX_RSP_NOT_FOUND;
+			lastrsp = OBEX_RSP_NOT_FOUND;
+			break;
+		case -EBADR:
+			rsp = OBEX_RSP_BAD_REQUEST;
+			lastrsp = OBEX_RSP_BAD_REQUEST;
+			break;
+		case -EFAULT:
+			rsp = OBEX_RSP_SERVICE_UNAVAILABLE;
+			lastrsp = OBEX_RSP_SERVICE_UNAVAILABLE;
+			break;
+		case -EINVAL:
+			rsp = OBEX_RSP_NOT_IMPLEMENTED;
+			lastrsp = OBEX_RSP_NOT_IMPLEMENTED;
+			break;
+		case -ENOTEMPTY:
+		case -EEXIST:
+			rsp = OBEX_RSP_PRECONDITION_FAILED;
+			lastrsp = OBEX_RSP_PRECONDITION_FAILED;
+			break;
+		default:
+			rsp = OBEX_RSP_INTERNAL_SERVER_ERROR;
+			lastrsp = OBEX_RSP_INTERNAL_SERVER_ERROR;
+		}
+	}
+	else {
+		rsp = err;
+		lastrsp = err;
 	}
 
 	print_event(-1, -1, rsp);
@@ -1081,21 +1086,16 @@ static void cmd_put(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 	}
 
 	err = os->service->put(os, obj, os->service_data);
-	printf("KAIT: PREPREFLUSHING\n");
 	if (err < 0) {
 		os_set_response(obj, err);
 		return;
 	}
 	
-	printf("KAIT: PREFLUSHING %d\n", (int)os->size);
-
 	/* Check if there is a body and it is not empty (size > 0), otherwise
 	   openobex won't notify us with OBEX_EV_STREAMAVAIL and it gonna reply
 	   right away */
 	if (os->size > 0 || os->size == OBJECT_SIZE_UNKNOWN)
 		return;
-
-	printf("KAIT: FLUSHING\n");
 
 	/* Flush immediatly since there is nothing to write so the driver
 	   has a chance to do something before we reply */

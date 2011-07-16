@@ -234,13 +234,22 @@ static void get_images_listing_callback(
 
 	if (err < 0) {
 		reply = g_dbus_create_error(session->msg,
-				"org.openobex.Error.InvalidArguments", NULL);
+				"org.openobex.Error.Failed", "Failed");
+		goto cleanup;
+	}
+
+	if ((reply = dbus_message_new_method_return(session->msg)) == NULL) {
+		reply = g_dbus_create_error(session->msg,
+				"org.openobex.Error.Failed", "Failed");
 		goto cleanup;
 	}
 	
-	reply = dbus_message_new_method_return(session->msg);
 	dbus_message_iter_init_append(reply, &iter);
-	append_listing_dict(&iter, listing);
+	if (!append_listing_dict(&iter, listing)) {
+		reply = g_dbus_create_error(session->msg,
+				"org.openobex.Error.Failed", "Failed");
+		goto cleanup;
+	}
 
 cleanup:
 	g_dbus_send_message(session->conn, reply);
@@ -489,6 +498,7 @@ static struct native_prop *parse_elem_native(const gchar **names,
 	struct native_prop *prop = g_new0(struct native_prop, 1);
 	for (key = (gchar **) names; *key; key++, values++) {
 		if (!parse_attrib_native(prop, *key, *values, gerr)) {
+			printf("freeing\n");
 			free_native_prop(prop);
 			return NULL;
 		}
@@ -781,7 +791,7 @@ static DBusMessage *get_image_properties(DBusConnection *connection,
 					&buffer, &length, &err)) {
 		reply = g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
-				"Failed");
+				"TransferFailed");
 		goto cleanup;
 	}
 	
@@ -790,17 +800,17 @@ static DBusMessage *get_image_properties(DBusConnection *connection,
 	if (prop == NULL) {
 		reply = g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
-				"Failed");
+				"ParseResultFailed");
 		goto cleanup;
 	}
 
 	reply = dbus_message_new_method_return(message);
 	dbus_message_iter_init_append(reply, &iter);
-	
+
 	if (!append_prop(&iter, prop)) {
 		reply = g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
-				"Failed");
+				"AppendResultFailed");
 		goto cleanup;
 	}
 
@@ -842,7 +852,7 @@ static DBusMessage *delete_image(DBusConnection *connection,
 	
 	if (hdesc == NULL) {
 		reply = g_dbus_create_error(message,
-			"org.openobex.Error.InvalidArguments", NULL);
+			"org.openobex.Error.Failed", "Out Of Memory");
 		goto cleanup;
 	}
 	
@@ -1027,8 +1037,8 @@ static DBusMessage *get_images_listing(DBusConnection *connection,
 	if ((err=session_get_with_aheaders(session, "x-bt/img-listing", NULL,
 					NULL, (const guint8 *)aparam,
 					sizeof(struct images_listing_aparam),
-					aheaders, get_images_listing_callback))
-									< 0) {
+					aheaders, get_images_listing_callback,
+								NULL)) < 0) {
 		reply = g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
 				"Failed");
@@ -1036,7 +1046,6 @@ static DBusMessage *get_images_listing(DBusConnection *connection,
 	}
 
 cleanup:
-	dbus_message_unref(message);
 	a_header_free(handles_desc);
 	g_slist_free(aheaders);
 	g_free(aparam);
@@ -1049,6 +1058,7 @@ static struct a_header *create_img_desc(const char *encoding, const char *pixel,
 {
 	guint8 *data;
 	struct a_header *ah;
+	unsigned int length;
 	GString *descriptor = g_string_new(IMG_DESC_BEGIN);
 	g_string_append_printf(descriptor,IMG_BEGIN, encoding, pixel);
 	if (transform != NULL)
@@ -1056,14 +1066,15 @@ static struct a_header *create_img_desc(const char *encoding, const char *pixel,
 	g_string_append(descriptor,IMG_END);
 	descriptor = g_string_append(descriptor, IMG_DESC_END);
 	data = encode_img_descriptor(descriptor->str, descriptor->len,
-								&ah->hv_size);
+								&length);
 	g_string_free(descriptor, TRUE);
 	if (data == NULL)
 		return NULL;
 
-	ah = g_try_new(struct a_header, 1);
+	ah = g_new0(struct a_header, 1);
 	ah->hi = IMG_DESC_HDR;
 	ah->hv.bs = data;
+	ah->hv_size = length;
 	return ah;
 }
 
@@ -1172,8 +1183,8 @@ static DBusMessage *get_image_thumbnail(DBusConnection *connection,
 
 	if ((err=session_get_with_aheaders(session, "x-bt/img-thm", NULL,
 						image_path, NULL, 0, aheaders,
-						get_image_thumbnail_callback))
-									< 0) {
+						get_image_thumbnail_callback,
+								NULL)) < 0) {
 		reply = g_dbus_create_error(message,
 					"org.openobex.Error.Failed", "Failed");
 		goto cleanup;
@@ -1225,9 +1236,11 @@ static DBusMessage *get_image_attachment(DBusConnection *connection,
 	
 	aheaders = g_slist_append(NULL, hdesc);
 
-	if ((err=session_get_with_aheaders(session, "x-bt/img-attachment", att_name, file_path,
+	if ((err=session_get_with_aheaders(session, "x-bt/img-attachment",
+						att_name, file_path,
 						NULL, 0, aheaders,
-						get_image_attachment_callback)) < 0) {
+						get_image_attachment_callback,
+						NULL)) < 0) {
 		reply = g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
 				"Failed");
@@ -1366,9 +1379,9 @@ static DBusMessage *get_image(DBusConnection *connection,
 
 	printf("rozmiar aparam: %u\n", sizeof(struct images_listing_aparam));
 
-	if ((err=session_get_with_aheaders(session, "x-bt/img-img", NULL, image_path,
-						NULL, 0, aheaders,
-						get_image_callback)) < 0) {
+	if ((err=session_get_with_aheaders(session, "x-bt/img-img", NULL,
+					image_path, NULL, 0, aheaders,
+					get_image_callback, NULL)) < 0) {
 		return g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
 				"Failed");
