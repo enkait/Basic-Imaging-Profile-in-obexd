@@ -56,11 +56,13 @@ void parse_client_user_headers(const struct session_data *session,
 	
 	if (desc_hdr != NULL && desc_hdr_len != NULL) {
 		g_free(*desc_hdr);
+		*desc_hdr = NULL;
 		*desc_hdr_len = 0;
 	}
 
 	if (handle_hdr != NULL && handle_hdr_len != NULL) {
 		g_free(*handle_hdr);
+		*handle_hdr = NULL;
 		*handle_hdr_len = 0;
 	}
 
@@ -71,59 +73,137 @@ void parse_client_user_headers(const struct session_data *session,
 	
 	if (ah != NULL) {
 		printf("handle: %u\n", ah->hv_size);
-		*handle_hdr = decode_img_handle(ah->hv.bs, ah->hv_size, handle_hdr_len);
+		*handle_hdr = decode_img_handle(ah->hv.bs, ah->hv_size,
+							handle_hdr_len);
 	}
 	
 	ah = a_header_find(xfer->aheaders, IMG_DESC_HDR);
 
 	if (ah != NULL) {
 		printf("desc: %u\n", ah->hv_size);
-		*desc_hdr = decode_img_descriptor(ah->hv.bs, ah->hv_size, desc_hdr_len);
+		*desc_hdr = decode_img_descriptor(ah->hv.bs, ah->hv_size,
+							desc_hdr_len);
 	}
 }
 
-const char *improper = "Improper handle returned";
+static void put_image_completed(struct session_data *session, char *handle)
+{
+	g_dbus_emit_signal(session->conn, session->path,
+			IMAGE_PUSH_INTERFACE, "PutImageCompleted",
+			DBUS_TYPE_STRING, &handle,
+			DBUS_TYPE_INVALID);
+}
+
+static void put_image_failed(struct session_data *session, char *err)
+{
+	g_dbus_emit_signal(session->conn, session->path,
+				IMAGE_PUSH_INTERFACE, "PutImageFailed",
+				DBUS_TYPE_STRING, &err,
+				DBUS_TYPE_INVALID);
+}
+
+static struct a_header *create_handle(const char *handle) {
+	struct a_header *ah = g_try_new(struct a_header, 1);
+	ah->hi = IMG_HANDLE_HDR;
+	ah->hv.bs = encode_img_handle(handle, 7, &ah->hv_size);
+	return ah;
+}
+
+static void put_thumbnail_callback(struct session_data *session, GError *err,
+							void *user_data)
+{
+	struct transfer_data *transfer = session->pending->data;
+	char *handle = user_data;
+	transfer_unregister(transfer);
+	printf("thumbnail callback called\n");
+
+	if (err) {
+		put_image_failed(session, err->message);
+		goto cleanup;
+	}
+
+	put_image_completed(session, handle);
+cleanup:
+	g_free(handle);
+}
+
+static DBusMessage *put_thumbnail(struct session_data *session,
+					char *image_path, char *handle)
+{
+	char *thm_path = NULL;
+	struct a_header *ah = NULL;
+	GSList *aheaders = NULL;
+	DBusMessage *reply = NULL;
+	int fd, err;
+	printf("requested put_thumbnail from %s\n", thm_path);
+
+	ah = create_handle(handle);
+	aheaders = g_slist_append(NULL, ah);
+
+	if (ah == NULL || aheaders == NULL) {
+		put_image_failed(session, "Out of memory");
+		goto cleanup;
+	}
+
+	fd = g_file_open_tmp(NULL, &thm_path, NULL);
+
+	if (fd < 0) {
+		put_image_failed(session, "Can not open temporary file");
+		goto cleanup;
+	}
+	close(fd);
+
+	printf("new path: %s\n", thm_path);
+
+	if (!make_thumbnail(image_path, thm_path, &err)) {
+		put_image_failed(session, "Can not create thumbnail");
+		goto cleanup;
+	}
+
+	if ((err=session_put_with_aheaders(session, "x-bt/img-thm", NULL,
+						thm_path, NULL, NULL, 0,
+						aheaders,
+						put_thumbnail_callback,
+						handle)) < 0) {
+		put_image_failed(session, "Failed");
+		goto cleanup;
+	}
+
+cleanup:
+	a_header_free(ah);
+	g_slist_free(aheaders);
+	return reply;
+}
 
 static void put_image_callback(struct session_data *session, GError *err,
-		void *user_data)
+							void *user_data)
 {
 	struct transfer_data *transfer = session->pending->data;
 	unsigned int length = 0;
+	char *image_path = user_data;
 	char *handle = NULL;
 	int required;
 	if (err) {
-		g_dbus_emit_signal(session->conn, session->path,
-				IMAGE_PUSH_INTERFACE, "PutImageFailed",
-				DBUS_TYPE_STRING, &err->message,
-				DBUS_TYPE_INVALID);
+		put_image_failed(session, err->message);
 		transfer_unregister(transfer);
 		return;
 	}
 	required = (session->obex->obex_rsp == OBEX_RSP_PARTIAL_CONTENT)?(1):(0);
 	parse_client_user_headers(session, NULL, NULL, &handle, &length);
-	
+	transfer_unregister(transfer);
+
 	printf("callback called %s\n", handle);
 
 	if (handle == NULL) {
-		g_dbus_emit_signal(session->conn, session->path,
-				IMAGE_PUSH_INTERFACE, "PutImageFailed",
-				DBUS_TYPE_STRING, &improper,
-				DBUS_TYPE_INVALID);
-		transfer_unregister(transfer);
+		put_image_failed(session, "ImproperHandle");
 		return;
 	}
 
-	dbus_message_unref(session->msg);
-	session->msg = NULL;
-
-	/* fix to handle partial content */
-	g_dbus_emit_signal(session->conn, session->path,
-			IMAGE_PUSH_INTERFACE, "PutImageCompleted",
-			DBUS_TYPE_STRING, &handle,
-			DBUS_TYPE_BOOLEAN, &required,
-			DBUS_TYPE_INVALID);
-	transfer_unregister(transfer);
-	return;
+	if (required) {
+		put_thumbnail(session, image_path, handle);
+		return;
+	}
+	put_image_completed(session, handle);
 }
 
 static void put_attachment_callback(struct session_data *session, GError *err,
@@ -148,30 +228,9 @@ static void put_attachment_callback(struct session_data *session, GError *err,
 	return;
 }
 
-static void put_thumbnail_callback(struct session_data *session, GError *err,
-		void *user_data)
-{
-	struct transfer_data *transfer = session->pending->data;
-	printf("thumbnail callback called\n");
-
-	if (err) {
-		g_dbus_emit_signal(session->conn, session->path,
-				IMAGE_PUSH_INTERFACE, "PutThumbnailFailed",
-				DBUS_TYPE_STRING, &err->message,
-				DBUS_TYPE_INVALID);
-		transfer_unregister(transfer);
-		return;
-	}
-	
-	g_dbus_emit_signal(session->conn, session->path,
-			IMAGE_PUSH_INTERFACE, "PutThumbnailCumpleted",
-			DBUS_TYPE_INVALID);
-	transfer_unregister(transfer);
-	return;
-}
-
-static void create_image_descriptor(const struct image_attributes *attr, const char *transform, struct a_header *ah) {
+static struct a_header *create_image_descriptor(const struct image_attributes *attr, const char *transform) {
 	GString *descriptor = g_string_new(IMG_DESC_BEGIN);
+	struct a_header *ah;
 	if (transform) {
 		g_string_append_printf(descriptor,
 				IMG_DESC_WITH_TRANSFORM_FORMAT,
@@ -183,9 +242,11 @@ static void create_image_descriptor(const struct image_attributes *attr, const c
 				attr->encoding, attr->width, attr->height, attr->length);
 	}
 	descriptor = g_string_append(descriptor, IMG_DESC_END);
+	ah = g_new0(struct a_header, 1);
 	ah->hi = IMG_DESC_HDR;
 	ah->hv_size = descriptor->len;
 	ah->hv.bs = (guint8 *) g_string_free(descriptor, FALSE);
+	return ah;
 }
 
 static struct a_header *create_att_descriptor(const char *att_path) {
@@ -221,34 +282,37 @@ static DBusMessage *put_transformed_image(DBusMessage *message, struct session_d
 		const char *local_image, const char *remote_image, const char *transform)
 {
 	int err;
-	struct image_attributes *attr;
-	struct a_header *descriptor = g_try_new(struct a_header, 1);
+	struct image_attributes *attr = NULL;
+	struct a_header *descriptor = NULL;
+	DBusMessage *reply;
 	GSList * aheaders = NULL;
 
 	if ((attr = get_image_attributes(local_image, &err)) == NULL) {
-		return g_dbus_create_error(message,
+		reply = g_dbus_create_error(message,
 				"org.openobex.Error.InvalidArguments", NULL);
+		goto cleanup;
 	}
 
-	create_image_descriptor(attr, transform, descriptor);
-	printf("descriptor: %p %d\n", descriptor->hv.bs, descriptor->hv_size);
+	descriptor = create_image_descriptor(attr, transform);
 	aheaders = g_slist_append(NULL, descriptor);
 
 	if ((err=session_put_with_aheaders(session, "x-bt/img-img", NULL,
 						local_image, remote_image,
 						NULL, 0, aheaders,
-						put_image_callback)) < 0) {
-		free_image_attributes(attr);
-		return g_dbus_create_error(message,
+						put_image_callback,
+						g_strdup(local_image))) < 0) {
+		reply = g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
-				"258Failed");
+				"Failed");
+		goto cleanup;
 	}
-	session->msg = dbus_message_ref(message);
+
+	reply = dbus_message_new_method_return(message);
+cleanup:
 	free_image_attributes(attr);
 	g_slist_free(aheaders);
 	a_header_free(descriptor);
-
-	return dbus_message_new_method_return(message);
+	return reply;
 }
 
 static DBusMessage *put_modified_image(DBusConnection *connection,
@@ -409,59 +473,6 @@ DBusMessage *get_imaging_capabilities(DBusConnection *connection,
 	return NULL;
 }
 
-static struct a_header *create_handle(const char *handle) {
-	struct a_header *ah = g_try_new(struct a_header, 1);
-	ah->hi = IMG_HANDLE_HDR;
-	ah->hv.bs = encode_img_handle(handle, 7, &ah->hv_size);
-	return ah;
-}
-
-static DBusMessage *put_thumbnail(DBusConnection *connection,
-		DBusMessage *message, void *user_data)
-{
-	struct session_data *session = user_data;
-	char *thm_path, *image_path, *handle;
-	struct a_header *ah;
-	GSList *aheaders;
-	int fd, err;
-
-	if (dbus_message_get_args(message, NULL,
-				DBUS_TYPE_STRING, &image_path,
-				DBUS_TYPE_STRING, &handle,
-				DBUS_TYPE_INVALID) == FALSE)
-		return g_dbus_create_error(message,
-				"org.openobex.Error.InvalidArguments", NULL);
-	if (!image_path || strlen(image_path)==0) {
-		return g_dbus_create_error(message,"org.openobex.Error.InvalidArguments", NULL);
-	}
-	
-	ah = create_handle(handle);
-	printf("handle: %p\n", ah);
-	aheaders = g_slist_append(NULL, ah);
-
-	fd = g_file_open_tmp(NULL, &thm_path, NULL);
-	close(fd);
-	printf("requested put_thumbnail from %s\n", thm_path);
-
-	printf("new path: %s\n", thm_path);
-
-	if (!make_thumbnail(image_path, thm_path, &err)) {
-		return g_dbus_create_error(message,
-				"org.openobex.Error.CanNotCreateModifiedImage", NULL);
-	}
-
-	if ((err=session_put_with_aheaders(session, "x-bt/img-thm", NULL,
-						thm_path, NULL, NULL, 0,
-						aheaders,
-						put_thumbnail_callback)) < 0) {
-		return g_dbus_create_error(message,
-				"org.openobex.Error.Failed",
-				"258Failed");
-	}
-	
-	return dbus_message_new_method_return(message);
-}
-
 static DBusMessage *put_image_attachment(DBusConnection *connection,
 		DBusMessage *message, void *user_data)
 {
@@ -494,10 +505,10 @@ static DBusMessage *put_image_attachment(DBusConnection *connection,
 	printf("att: %p\n", ah);
 	aheaders = g_slist_append(aheaders, ah);
 
-	if ((err=session_put_with_aheaders(session, "x-bt/img-attachment", NULL,
-						att_path, NULL,
-						NULL, 0, aheaders,
-						put_attachment_callback)) < 0) {
+	if ((err=session_put_with_aheaders(session, "x-bt/img-attachment",
+					NULL, att_path, NULL, NULL, 0,
+					aheaders, put_attachment_callback,
+							NULL)) < 0) {
 		ret = g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
 				"Failed");
@@ -521,7 +532,6 @@ static GDBusMethodTable image_push_methods[] = {
 	{ "PutImage", "s", "", put_image },
 	{ "PutModifiedImage", "ssuus", "", put_modified_image },
 	{ "PutImageAttachment", "ss", "", put_image_attachment },
-	{ "PutImageThumbnail", "ss", "", put_thumbnail },
 	{ }
 };
 

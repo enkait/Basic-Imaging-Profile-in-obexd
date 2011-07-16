@@ -121,6 +121,15 @@ static struct obex_mime_type_driver imgimg = {
 	.write = imgimg_write,
 };
 
+static struct obex_mime_type_driver imgimgthm = {
+	.target = IMAGE_PUSH_TARGET,
+	.target_size = TARGET_SIZE,
+	.mimetype = "x-bt/img-thm",
+	.open = imgimg_open,
+	.close = imgimg_close,
+	.write = imgimg_write,
+};
+
 void *img_capabilities_open(const char *name, int oflag, mode_t mode,
 		void *context, size_t *size, int *err)
 {
@@ -156,13 +165,18 @@ static int imgimg_init(void)
 	if ((res = obex_mime_type_driver_register(&img_capabilities)) < 0) {
 		return res;
 	}
+
+	if ((res = obex_mime_type_driver_register(&imgimgthm)) < 0) {
+		return res;
+	}
 	return obex_mime_type_driver_register(&imgimg);
 }
 
 static void imgimg_exit(void)
 {
-	obex_mime_type_driver_unregister(&img_capabilities);
 	obex_mime_type_driver_unregister(&imgimg);
+	obex_mime_type_driver_unregister(&imgimgthm);
+	obex_mime_type_driver_unregister(&img_capabilities);
 }
 
 OBEX_PLUGIN_DEFINE(imgimg, imgimg_init, imgimg_exit)

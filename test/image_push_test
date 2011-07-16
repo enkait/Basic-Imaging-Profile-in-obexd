@@ -75,7 +75,7 @@ cur = 0
 bip = None
 
 def image_push(session, filename):
-    session.PutImage(os.path.abspath(filename),"BMP",1000,200,"fill")
+    session.PutModifiedImage(os.path.abspath(filename),"BMP",1000,200,"fill")
 
 def image_attachment_push(session, filename, handle):
     session.PutImageAttachment(os.path.abspath(filename),handle)

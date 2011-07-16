@@ -94,9 +94,9 @@ int session_put_with_aheaders(struct session_data *session, const char *type,
 		char *buf, const char *filename, const char *targetname,
 		const guint8 *apparam, gint apparam_size,
 		const GSList *aheaders,
-		session_callback_t func);
+		session_callback_t func, void *user_data);
 int session_get_with_aheaders(struct session_data *session, const char *type,
 		const char *filename, const char *targetname,
 		const guint8 *apparam, gint apparam_size,
-        const GSList * aheaders,
-		session_callback_t func);
+		const GSList * aheaders,
+		session_callback_t func, void *user_data);

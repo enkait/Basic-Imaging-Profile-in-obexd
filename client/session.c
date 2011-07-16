@@ -1212,7 +1212,7 @@ int session_get_with_aheaders(struct session_data *session, const char *type,
 		const char *filename, const char *targetname,
 		const guint8 *apparam, gint apparam_size,
 		const GSList * aheaders,
-		session_callback_t func)
+		session_callback_t func, void *user_data)
 {
 	struct transfer_data *transfer;
 	struct transfer_params *params = NULL;
@@ -1257,6 +1257,7 @@ int session_get_with_aheaders(struct session_data *session, const char *type,
 		struct session_callback *callback;
 		callback = g_new0(struct session_callback, 1);
 		callback->func = func;
+		callback->data = user_data;
 		session->callback = callback;
 	}
 
@@ -1637,7 +1638,7 @@ int session_put_with_aheaders(struct session_data *session, const char *type,
 		char *buf, const char *filename, const char *targetname,
 		const guint8 *apparam, gint apparam_size,
 		const GSList *aheaders,
-		session_callback_t func)
+		session_callback_t func, void *user_data)
 {
 	struct transfer_data *transfer;
 	struct transfer_params *params = NULL;
@@ -1687,6 +1688,7 @@ int session_put_with_aheaders(struct session_data *session, const char *type,
 		struct session_callback *callback;
 		callback = g_new0(struct session_callback, 1);
 		callback->func = func;
+		callback->data = user_data;
 		session->callback = callback;
 	}
 
