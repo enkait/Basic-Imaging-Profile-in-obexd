@@ -812,14 +812,25 @@ static struct obex_mime_type_driver imgarch = {
 	.flush = imgarch_flush,
 };
 
+static struct obex_mime_type_driver imgstatus = {
+	.target = IMAGE_ARCH_TARGET,
+	.target_size = TARGET_SIZE,
+	.mimetype = "x-bt/img-status",
+};
+
 static int imgarch_init(void)
 {
+	int ret;
+	if ((ret = obex_mime_type_driver_register(&imgstatus)) < 0)
+		return ret;
+
 	return obex_mime_type_driver_register(&imgarch);
 }
 
 static void imgarch_exit(void)
 {
 	obex_mime_type_driver_unregister(&imgarch);
+	obex_mime_type_driver_unregister(&imgstatus);
 }
 
 OBEX_PLUGIN_DEFINE(imgarch, imgarch_init, imgarch_exit)

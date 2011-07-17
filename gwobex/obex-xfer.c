@@ -568,9 +568,11 @@ gboolean gw_obex_xfer_close(GwObexXfer *xfer, gint *err) {
     /* Check for error but ignore ERROR_ABORT since we can still do a proper
      * xfer_close() in that case */
     if (gw_obex_set_error(ctx) && ctx->error != GW_OBEX_ERROR_ABORT) {
+        printf("abort\n");
         gw_obex_get_error(ctx, err);
         ret = FALSE;
     }
+    printf("continue\n");
 
     /* Remove the idle function related to this transfer (if there is one) */
     if (xfer->idle_source) {

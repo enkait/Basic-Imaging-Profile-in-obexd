@@ -7,6 +7,7 @@ import dbus
 import dbus.service
 import dbus.mainloop.glib
 import os.path
+import time
 from optparse import OptionParser
 
 class Agent(dbus.service.Object):
@@ -58,6 +59,9 @@ def parse_options():
 
 def start_archive(session):
         print session.StartArchive()
+        while True:
+                time.sleep("1000")
+                session.GetStatus()
 
 if  __name__ == '__main__':
 

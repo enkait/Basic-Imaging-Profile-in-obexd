@@ -217,7 +217,7 @@ static void print_event(int evt, int cmd, int rsp)
 								rspstr, rsp);
 }
 
-static void os_set_response(obex_object_t *obj, int err)
+void os_set_response(obex_object_t *obj, int err)
 {
 	uint8_t rsp;
 	uint8_t lastrsp;
