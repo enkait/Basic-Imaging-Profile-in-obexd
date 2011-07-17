@@ -288,6 +288,7 @@ int image_pull_get(struct obex_session *os, obex_object_t *obj,
 	const uint8_t *buffer;
 	int ret;
 	ssize_t rsize;
+
 	rsize = obex_aparam_read(os, obj, &buffer);
 
 	printf("IMAGE PULL GET\n");

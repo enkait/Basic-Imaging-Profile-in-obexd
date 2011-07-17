@@ -112,6 +112,7 @@ void *image_arch_connect(struct obex_session *os, int *err) {
 
 	as = g_new0(struct archive_session, 1);
 	as->os = os;
+	as->status = 1;
 
 	if (err)
 		*err = 0;
@@ -165,9 +166,18 @@ failed:
 
 int image_arch_get(struct obex_session *os, obex_object_t *obj,
 		gboolean *stream, void *user_data) {
+	struct archive_session *session = user_data;
 	int ret;
 
 	printf("IMAGE PULL GET\n");
+	if (g_str_equal(os->type,"x-bt/img-status")) {
+		if (session->status == 1)
+			OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE,
+							OBEX_RSP_CONTINUE);
+		else
+			os_set_response(obj, session->status);
+		return 0;
+	}
 
 	ret = obex_get_stream_start(os, os->name);
 	if (ret < 0)

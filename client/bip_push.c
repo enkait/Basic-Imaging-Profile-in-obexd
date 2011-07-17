@@ -88,10 +88,11 @@ void parse_client_user_headers(const struct session_data *session,
 
 static void put_image_completed(struct session_data *session, char *handle)
 {
-	g_dbus_emit_signal(session->conn, session->path,
+	gboolean ret = g_dbus_emit_signal(session->conn, session->path,
 			IMAGE_PUSH_INTERFACE, "PutImageCompleted",
 			DBUS_TYPE_STRING, &handle,
 			DBUS_TYPE_INVALID);
+	printf("%d\n", ret);
 }
 
 static void put_image_failed(struct session_data *session, char *err)
@@ -118,10 +119,12 @@ static void put_thumbnail_callback(struct session_data *session, GError *err,
 	printf("thumbnail callback called\n");
 
 	if (err) {
+		printf("Error\n");
 		put_image_failed(session, err->message);
 		goto cleanup;
 	}
 
+	printf("Win\n");
 	put_image_completed(session, handle);
 cleanup:
 	g_free(handle);
@@ -536,7 +539,7 @@ static GDBusMethodTable image_push_methods[] = {
 };
 
 static GDBusSignalTable image_push_signals[] = {
-	{ "PutImageCompleted",	"sb" },
+	{ "PutImageCompleted",	"s" },
 	{ "PutImageFailed",	"s" },
 	{ "PutAttachmentCompleted",	"" },
 	{ "PutAttachmentFailed",	"s" },
