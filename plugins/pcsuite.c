@@ -109,7 +109,7 @@ static const uint8_t FTP_TARGET[TARGET_SIZE] = {
 			0x98, 0x4E, 0x52, 0x54, 0x00, 0xDC, 0x9E, 0x09 };
 
 static const uint8_t PCSUITE_WHO[PCSUITE_WHO_SIZE] = {
-			'P','C',' ','S','u','i','t','e' };
+			'P', 'C', ' ', 'S', 'u', 'i', 't', 'e' };
 
 struct pcsuite_session {
 	struct ftp_session *ftp;
@@ -219,6 +219,16 @@ static int pcsuite_setpath(struct obex_session *os, obex_object_t *obj,
 	return ftp_setpath(os, obj, pcsuite->ftp);
 }
 
+static int pcsuite_action(struct obex_session *os, obex_object_t *obj,
+							void *user_data)
+{
+	struct pcsuite_session *pcsuite = user_data;
+
+	DBG("%p", pcsuite);
+
+	return ftp_action(os, obj, pcsuite->ftp);
+}
+
 static void pcsuite_disconnect(struct obex_session *os, void *user_data)
 {
 	struct pcsuite_session *pcsuite = user_data;
@@ -253,10 +263,11 @@ static struct obex_service_driver pcsuite = {
 	.put = pcsuite_put,
 	.chkput = pcsuite_chkput,
 	.setpath = pcsuite_setpath,
+	.action = pcsuite_action,
 	.disconnect = pcsuite_disconnect
 };
 
-struct backup_object{
+struct backup_object {
 	gchar *cmd;
 	int fd;
 	int oflag;

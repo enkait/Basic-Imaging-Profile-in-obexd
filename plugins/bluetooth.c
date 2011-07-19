@@ -126,21 +126,15 @@ failed:
 }
 
 static struct bluetooth_service *find_service(
-					struct obex_service_driver *driver,
-					uint8_t channel)
+					struct obex_service_driver *driver)
 {
 	GSList *l;
 
 	for (l = any->services; l; l = l->next) {
 		struct bluetooth_service *service = l->data;
 
-		if (driver != NULL && service->driver != driver)
-			continue;
-
-		if (channel != 0 && service->driver->channel != channel)
-			continue;
-
-		return service;
+		if (service->driver == driver)
+			return service;
 	}
 
 	return NULL;
@@ -158,7 +152,7 @@ static void register_record(struct obex_server *server)
 		struct bluetooth_service *service;
 		char *xml;
 
-		service = find_service(driver, 0);
+		service = find_service(driver);
 		if (service == NULL) {
 			service = g_new0(struct bluetooth_service, 1);
 			service->driver = driver;
@@ -463,6 +457,7 @@ static void confirm_event(GIOChannel *io, void *user_data)
 	GError *err = NULL;
 	char address[18];
 	uint8_t channel;
+	struct obex_service_driver *driver = user_data;
 
 	bt_io_get(io, BT_IO_RFCOMM, &err,
 			BT_IO_OPT_DEST, address,
@@ -477,13 +472,13 @@ static void confirm_event(GIOChannel *io, void *user_data)
 	info("bluetooth: New connection from: %s, channel %u", address,
 			channel);
 
-	service = find_service(NULL, channel);
+	service = find_service(driver);
 	if (service == NULL) {
 		error("bluetooth: Unable to find service");
 		goto drop;
 	}
 
-	if (service->driver->service != OBEX_OPP) {
+	if (driver->service != OBEX_OPP) {
 		if (request_service_authorization(service, io, address) < 0)
 			goto drop;
 
@@ -510,7 +505,7 @@ static GIOChannel *start(struct obex_server *server,
 	GError *err = NULL;
 
 	io = bt_io_listen(BT_IO_RFCOMM, NULL, confirm_event,
-				server, NULL, &err,
+				service, NULL, &err,
 				BT_IO_OPT_CHANNEL, service->channel,
 				BT_IO_OPT_SEC_LEVEL, sec_level,
 				BT_IO_OPT_INVALID);
