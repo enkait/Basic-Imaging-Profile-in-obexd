@@ -31,7 +31,6 @@ static DBusMessage *start_archive(DBusConnection *connection,
 	struct session_data *session = user_data;
 	DBusMessage *reply;
 	struct sa_aparam *aparam;
-	GSList *aheaders;
 	int err;
 
 	printf("requested start archive\n");
@@ -43,27 +42,56 @@ static DBusMessage *start_archive(DBusConnection *connection,
 						(uint8_t *) aparam,
 						sizeof(struct sa_aparam),
 						NULL, NULL, 0, -1, &err)) {
+		reply = g_dbus_create_error(message,
+				"org.openobex.Error.Failed",
+				"Failed");
+		goto cleanup;
+	}
+
+	reply = dbus_message_new_method_return(message);
+cleanup:
+	g_free(aparam);
+	return reply;
+}
+
+static DBusMessage *get_status(DBusConnection *connection,
+		DBusMessage *message, void *user_data)
+{
+	struct session_data *session = user_data;
+	DBusMessage *reply;
+	DBusMessageIter iter;
+	int err, size;
+	char *data;
+	const char *cont = "Continue", *failed = "Failed", *success = "Success";
+
+	printf("requested start archive\n");
+	
+	if (!gw_obex_get_buf_with_aheaders(session->obex, NULL,
+						"x-bt/img-status",
+						NULL, 0, NULL, &data,
+						&size, &err)) {
+		printf("err = %d\n", err);
 		return g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
 				"Failed");
 	}
-
-	if (session->obex && session->obex->xfer && session->obex->xfer->aheaders) {
-		aheaders = session->obex->xfer->aheaders;
-		while (aheaders != NULL) {
-			struct a_header *ah = aheaders->data;
-			printf("%d\n", ah->hi);
-			aheaders = g_slist_next(aheaders);
-		}
-	}
-	
 	reply = dbus_message_new_method_return(message);
+	dbus_message_iter_init_append(reply, &iter);
+
+	printf("status = %d\n", session->obex->obex_rsp);
+	if (session->obex->obex_rsp == OBEX_RSP_CONTINUE)
+		dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &cont);
+	else if (session->obex->obex_rsp == OBEX_RSP_SUCCESS)
+		dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &success);
+	else
+		dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &failed);
+
 	return reply;
 }
 
-
 GDBusMethodTable archive_methods[] = {
 	{ "StartArchive", "", "", start_archive },
+	{ "GetStatus", "", "s", get_status },
 	{ }
 };
 
