@@ -268,10 +268,10 @@ int image_push_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 		img->image = new_path;
 		ips->pushed_images = g_slist_append(ips->pushed_images, img);
 		add_reply_handle(os, obj, img->handle);
-		OBEX_ObjectSetRsp(obj, OBEX_RSP_PARTIAL_CONTENT,
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE,
 						OBEX_RSP_PARTIAL_CONTENT);
 	}
-	else if (g_strcmp0(os->type, "x-bt/img-img") == 0) {
+	else if (g_strcmp0(os->type, "x-bt/img-thm") == 0) {
 		int handle = parse_handle(ips->handle_hdr, ips->handle_hdr_len);
 		char *new_path, *name;
 		GString *thmname = NULL;
@@ -284,8 +284,8 @@ int image_push_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 		if (img == NULL)
 			return -EEXIST;
 
-		printf("wtf\n");
-		name = g_path_get_basename(ips->file_path);
+		printf("path: %s\n", img->image);
+		name = g_path_get_basename(img->image);
 		thmname = g_string_new(name);
 		thmname = g_string_append(thmname, "_thm");
 		g_free(name);
