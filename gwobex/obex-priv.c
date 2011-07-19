@@ -150,7 +150,10 @@ static gboolean gw_obex_request_sync(GwObex *ctx, obex_object_t *object) {
 
     gw_obex_set_error(ctx);
 
-    if (ctx->error == OBEX_RSP_SUCCESS) {
+    printf("error: %d\n", ctx->error);
+
+    if (ctx->error == OBEX_RSP_SUCCESS || ctx->error == OBEX_RSP_CONTINUE ||
+		    ctx->error == OBEX_RSP_PARTIAL_CONTENT) {
         /* It is possible that a EV_PROGRESS doesn't arrive after all data has
          * been transfered. Call pr_cb here to ensure app gets 100% progress */
         if (ctx->report_progress && ctx->pr_cb)
@@ -346,7 +349,9 @@ static void obex_request_done(GwObex *ctx, obex_object_t *object,
 
     ctx->obex_rsp = obex_rsp;
 
-    if (obex_rsp != OBEX_RSP_SUCCESS && obex_rsp != OBEX_RSP_PARTIAL_CONTENT) {
+    if (obex_rsp != OBEX_RSP_SUCCESS &&
+				    obex_rsp != OBEX_RSP_PARTIAL_CONTENT &&
+					    obex_rsp != OBEX_RSP_CONTINUE) {
         debug("%s command (0x%02x) failed: %s (0x%02x)\n",
                 optostr((uint8_t)obex_cmd), (uint8_t)obex_cmd,
                 OBEX_ResponseToString(obex_rsp), (uint8_t)obex_rsp);
@@ -524,6 +529,7 @@ static void obex_writestream(GwObex *ctx, obex_object_t *object) {
 static void obex_event_handler(obex_t *handle, obex_object_t *object, int mode,
                                int event, int obex_cmd, int obex_rsp) {
     GwObex *ctx = OBEX_GetUserData(handle);
+    printf("obex_rsp: %x\n", obex_rsp);
     switch (event) {
         case OBEX_EV_ABORT:
             debug("OBEX_EV_ABORT\n");
@@ -585,7 +591,8 @@ gboolean gw_obex_set_error(GwObex *ctx) {
         ctx->error = (gint)ctx->obex_rsp;
 
     if (ctx->error == OBEX_RSP_SUCCESS ||
-		    ctx->error == OBEX_RSP_PARTIAL_CONTENT)
+		    ctx->error == OBEX_RSP_PARTIAL_CONTENT ||
+		    ctx->error == OBEX_RSP_CONTINUE)
         return FALSE;
 
     return TRUE;

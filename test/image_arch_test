@@ -60,8 +60,8 @@ def parse_options():
 def start_archive(session):
         print session.StartArchive()
         while True:
-                time.sleep("1000")
-                session.GetStatus()
+                time.sleep(10)
+                print session.GetStatus()
 
 if  __name__ == '__main__':
 
