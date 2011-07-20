@@ -881,6 +881,35 @@ static void cmd_setpath(struct obex_session *os,
 	os_set_response(obj, err);
 }
 
+static void obex_reset_object(struct obex_session *os, obex_object_t *obj)
+{
+	uint32_t hlen;
+	uint8_t hi;
+	obex_headerdata_t hd;
+	while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen));
+	g_assert(OBEX_ObjectReParseHeaders(os->obex, obj));
+}
+
+int obex_feed_headers(struct obex_session *os, obex_object_t *obj)
+{
+	uint32_t hlen;
+	uint8_t hi;
+	obex_headerdata_t hd;
+	int err;
+	g_assert(os->object != NULL);
+
+	if (os->driver->feed_next_header == NULL)
+		return 0;
+	obex_reset_object(os, obj);
+	while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen)) {
+		err = os->driver->feed_next_header(os->object, hi, hd, hlen);
+
+		if (err < 0)
+			return err;
+	}
+	return 0;
+}
+
 int obex_get_stream_start(struct obex_session *os, const char *filename)
 {
 	int err;
