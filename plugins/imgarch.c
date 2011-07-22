@@ -663,6 +663,7 @@ static void get_next_image(struct archive_context *context, int err) {
 	reset_context(context);
 	// start with new image
 	if (context->image_list == NULL) {
+		context->session->status = 0;
 		end_aos_session(context);
 		return;
 	}
@@ -812,10 +813,27 @@ static struct obex_mime_type_driver imgarch = {
 	.flush = imgarch_flush,
 };
 
+static void *imgstatus_open(const char *name, int oflag, mode_t mode,
+		void *context, size_t *size, int *err)
+{
+	printf("imgstatus open\n");
+	*size = 0;
+	return context;
+}
+
+static int imgstatus_close(void *object)
+{
+	//struct archive_context *context = object;
+	printf("imgstatus close\n");
+	return 0;
+}
+
 static struct obex_mime_type_driver imgstatus = {
 	.target = IMAGE_ARCH_TARGET,
 	.target_size = TARGET_SIZE,
 	.mimetype = "x-bt/img-status",
+	.open = imgstatus_open,
+	.close = imgstatus_close,
 };
 
 static int imgarch_init(void)

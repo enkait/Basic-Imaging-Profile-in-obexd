@@ -273,7 +273,7 @@ void os_set_response(obex_object_t *obj, int err)
 
 	print_event(-1, -1, rsp);
 
-	OBEX_ObjectSetRsp(obj, rsp, lastrsp);
+	printf("setrsp: %d\n", OBEX_ObjectSetRsp(obj, rsp, lastrsp));
 }
 
 static void os_session_mark_aborted(struct obex_session *os)
@@ -877,6 +877,7 @@ static void cmd_get(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 
 done:
 	os_set_response(obj, err);
+	printf("wut err=%d\n", err);
 }
 
 static void cmd_setpath(struct obex_session *os,
