@@ -620,7 +620,7 @@ static void *pbap_connect(struct obex_session *os, int *err)
 }
 
 static int pbap_get(struct obex_session *os, obex_object_t *obj,
-					gboolean *stream, void *user_data)
+							void *user_data)
 {
 	struct pbap_session *pbap = user_data;
 	const char *type = obex_get_type(os);
@@ -658,7 +658,6 @@ static int pbap_get(struct obex_session *os, obex_object_t *obj,
 		else
 			path = g_build_filename("/", name, NULL);
 
-		*stream = (params->maxlistcount == 0 ? FALSE : TRUE);
 	} else if (strcmp(type, VCARDLISTING_TYPE) == 0) {
 		/* Always relative */
 		if (!name || strlen(name) == 0)
@@ -668,11 +667,9 @@ static int pbap_get(struct obex_session *os, obex_object_t *obj,
 			/* Current folder + relative path */
 			path = g_build_filename(pbap->folder, name, NULL);
 
-		*stream = (params->maxlistcount == 0 ? FALSE : TRUE);
 	} else if (strcmp(type, VCARDENTRY_TYPE) == 0) {
 		/* File name only */
 		path = g_strdup(name);
-		*stream = TRUE;
 	} else
 		return -EBADR;
 
@@ -961,8 +958,27 @@ static ssize_t array_read(GByteArray *array, void *buf, size_t count)
 	return len;
 }
 
-static ssize_t vobject_pull_read(void *object, void *buf, size_t count,
+static ssize_t vobject_pull_get_next_header(void *object, void *buf, size_t mtu,
 								uint8_t *hi)
+{
+	struct pbap_object *obj = object;
+	struct pbap_session *pbap = obj->session;
+
+	if (!obj->buffer && !obj->aparams)
+		return -EAGAIN;
+
+	*hi = OBEX_HDR_APPARAM;
+
+	if (pbap->params->maxlistcount == 0 || obj->firstpacket) {
+		obj->firstpacket = FALSE;
+
+		return array_read(obj->aparams, buf, mtu);
+	}
+
+	return 0;
+}
+
+static ssize_t vobject_pull_read(void *object, void *buf, size_t count)
 {
 	struct pbap_object *obj = object;
 	struct pbap_session *pbap = obj->session;
@@ -974,37 +990,44 @@ static ssize_t vobject_pull_read(void *object, void *buf, size_t count,
 	if (!obj->buffer && !obj->aparams)
 		return -EAGAIN;
 
-	if (pbap->params->maxlistcount == 0) {
-		/* PhoneBookSize */
-		*hi = OBEX_HDR_APPARAM;
-		return array_read(obj->aparams, buf, count);
-	} else if (obj->firstpacket) {
-		/* NewMissedCalls */
-		*hi = OBEX_HDR_APPARAM;
-		obj->firstpacket = FALSE;
-		return array_read(obj->aparams, buf, count);
-	} else {
-		/* Stream data */
-		*hi = OBEX_HDR_BODY;
-		len = string_read(obj->buffer, buf, count);
-		if (len == 0 && !obj->lastpart) {
-			/* in case when buffer is empty and we know that more
-			 * data is still available in backend, requesting new
-			 * data part via phonebook_pull_read and returning
-			 * -EAGAIN to suspend request for now */
-			ret = phonebook_pull_read(obj->request);
-			if (ret)
-				return -EPERM;
+	if (pbap->params->maxlistcount == 0)
+		return -ENOSTR;
 
-			return -EAGAIN;
-		}
+	len = string_read(obj->buffer, buf, count);
+	if (len == 0 && !obj->lastpart) {
+		/* in case when buffer is empty and we know that more
+		 * data is still available in backend, requesting new
+		 * data part via phonebook_pull_read and returning
+		 * -EAGAIN to suspend request for now */
+		ret = phonebook_pull_read(obj->request);
+		if (ret)
+			return -EPERM;
 
-		return len;
+		return -EAGAIN;
 	}
+
+	return len;
 }
 
-static ssize_t vobject_list_read(void *object, void *buf, size_t count,
+static ssize_t vobject_list_get_next_header(void *object, void *buf, size_t mtu,
 								uint8_t *hi)
+{
+	struct pbap_object *obj = object;
+	struct pbap_session *pbap = obj->session;
+
+	/* Backend still busy reading contacts */
+	if (!pbap->cache.valid)
+		return -EAGAIN;
+
+	*hi = OBEX_HDR_APPARAM;
+
+	if (pbap->params->maxlistcount == 0)
+		return array_read(obj->aparams, buf, mtu);
+
+	return 0;
+}
+
+static ssize_t vobject_list_read(void *object, void *buf, size_t count)
 {
 	struct pbap_object *obj = object;
 	struct pbap_session *pbap = obj->session;
@@ -1012,21 +1035,13 @@ static ssize_t vobject_list_read(void *object, void *buf, size_t count,
 	DBG("valid %d maxlistcount %d", pbap->cache.valid,
 						pbap->params->maxlistcount);
 
-	/* Backend still busy reading contacts */
-	if (!pbap->cache.valid)
-		return -EAGAIN;
+	if (pbap->params->maxlistcount == 0)
+		return -ENOSTR;
 
-	if (pbap->params->maxlistcount == 0) {
-		*hi = OBEX_HDR_APPARAM;
-		return array_read(obj->aparams, buf, count);
-	} else {
-		*hi = OBEX_HDR_BODY;
-		return string_read(obj->buffer, buf, count);
-	}
+	return string_read(obj->buffer, buf, count);
 }
 
-static ssize_t vobject_vcard_read(void *object, void *buf, size_t count,
-								uint8_t *hi)
+static ssize_t vobject_vcard_read(void *object, void *buf, size_t count)
 {
 	struct pbap_object *obj = object;
 
@@ -1035,7 +1050,6 @@ static ssize_t vobject_vcard_read(void *object, void *buf, size_t count,
 	if (!obj->buffer)
 		return -EAGAIN;
 
-	*hi = OBEX_HDR_BODY;
 	return string_read(obj->buffer, buf, count);
 }
 
@@ -1046,6 +1060,7 @@ static struct obex_mime_type_driver mime_pull = {
 	.open = vobject_pull_open,
 	.close = vobject_close,
 	.read = vobject_pull_read,
+	.get_next_header = vobject_pull_get_next_header,
 };
 
 static struct obex_mime_type_driver mime_list = {
@@ -1055,6 +1070,7 @@ static struct obex_mime_type_driver mime_list = {
 	.open = vobject_list_open,
 	.close = vobject_close,
 	.read = vobject_list_read,
+	.get_next_header = vobject_list_get_next_header,
 };
 
 static struct obex_mime_type_driver mime_vcard = {

@@ -181,13 +181,13 @@ fail:
 }
 
 static int pcsuite_get(struct obex_session *os, obex_object_t *obj,
-					gboolean *stream, void *user_data)
+							void *user_data)
 {
 	struct pcsuite_session *pcsuite = user_data;
 
 	DBG("%p", pcsuite);
 
-	return ftp_get(os, obj, stream, pcsuite->ftp);
+	return ftp_get(os, obj, pcsuite->ftp);
 }
 
 static int pcsuite_chkput(struct obex_session *os, void *user_data)
@@ -428,12 +428,10 @@ static int backup_close(void *object)
 	return 0;
 }
 
-static ssize_t backup_read(void *object, void *buf, size_t count, uint8_t *hi)
+static ssize_t backup_read(void *object, void *buf, size_t count)
 {
 	struct backup_object *obj = object;
 	ssize_t ret = 0;
-
-	*hi = OBEX_HDR_BODY;
 
 	if (obj->pending_call) {
 		DBG("cmd = %s, IN WAITING STAGE", obj->cmd);

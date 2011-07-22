@@ -59,6 +59,11 @@
 
 #define OBEX_IO_ERROR obex_io_error_quark()
 
+#define BT_BUS_NAME		"org.bluez"
+#define BT_PATH			"/"
+#define BT_ADAPTER_IFACE	"org.bluez.Adapter"
+#define BT_MANAGER_IFACE	"org.bluez.Manager"
+
 static guint64 counter = 0;
 
 static unsigned char pcsuite_uuid[] = { 0x00, 0x00, 0x50, 0x05, 0x00, 0x00,
@@ -88,6 +93,11 @@ struct agent_data {
 	char *path;
 	guint watch;
 	struct pending_data *pending;
+};
+
+struct pending_req {
+	DBusPendingCall *call;
+	void *user_data;
 };
 
 static GSList *sessions = NULL;
@@ -183,9 +193,44 @@ static void session_unregistered(struct session_data *session)
 	session->path = NULL;
 }
 
+static struct pending_req *find_session_request(
+				const struct session_data *session,
+				const DBusPendingCall *call)
+{
+	GSList *l;
+
+	for (l = session->pending_calls; l; l = l->next) {
+		struct pending_req *req = l->data;
+
+		if (req->call == call)
+			return req;
+	}
+
+	return NULL;
+}
+
+static void pending_req_finalize(struct pending_req *req)
+{
+	if (!dbus_pending_call_get_completed(req->call))
+		dbus_pending_call_cancel(req->call);
+
+	dbus_pending_call_unref(req->call);
+	g_free(req);
+}
+
 static void session_free(struct session_data *session)
 {
+	GSList *l = session->pending_calls;
+
 	DBG("%p", session);
+
+	while (l) {
+		struct pending_req *req = l->data;
+		l = l->next;
+
+		session->pending_calls = g_slist_remove(session->pending_calls, req);
+		pending_req_finalize(req);
+	}
 
 	if (session->agent)
 		agent_release(session);
@@ -207,13 +252,66 @@ static void session_free(struct session_data *session)
 	if (session->conn)
 		dbus_connection_unref(session->conn);
 
+	if (session->conn_system)
+		dbus_connection_unref(session->conn_system);
+
 	sessions = g_slist_remove(sessions, session);
 
+	g_free(session->adapter);
 	g_free(session->callback);
 	g_free(session->path);
 	g_free(session->service);
 	g_free(session->owner);
 	g_free(session);
+}
+
+static struct pending_req *send_method_call(DBusConnection *connection,
+				const char *dest, const char *path,
+				const char *interface, const char *method,
+				DBusPendingCallNotifyFunction cb,
+				void *user_data, int type, ...)
+{
+	DBusMessage *msg;
+	DBusPendingCall *call;
+	va_list args;
+	struct pending_req *req;
+
+	msg = dbus_message_new_method_call(dest, path, interface, method);
+	if (!msg) {
+		error("Unable to allocate new D-Bus %s message", method);
+		return NULL;
+	}
+
+	va_start(args, type);
+
+	if (!dbus_message_append_args_valist(msg, type, args)) {
+		dbus_message_unref(msg);
+		va_end(args);
+		return NULL;
+	}
+
+	va_end(args);
+
+	if (!cb) {
+		g_dbus_send_message(connection, msg);
+		return 0;
+	}
+
+	if (!dbus_connection_send_with_reply(connection, msg, &call, -1)) {
+		error("Sending %s failed", method);
+		dbus_message_unref(msg);
+		return NULL;
+	}
+
+	dbus_pending_call_set_notify(call, cb, user_data, NULL);
+
+	req = g_new0(struct pending_req, 1);
+	req->call = call;
+	req->user_data = user_data;
+
+	dbus_message_unref(msg);
+
+	return req;
 }
 
 void session_unref(struct session_data *session)
@@ -227,6 +325,11 @@ void session_unref(struct session_data *session)
 	if (ret == FALSE)
 		return;
 
+	send_method_call(session->conn_system,
+				BT_BUS_NAME, session->adapter,
+				BT_ADAPTER_IFACE, "ReleaseSession",
+				NULL, NULL,
+				DBUS_TYPE_INVALID);
 	session_free(session);
 }
 
@@ -537,6 +640,116 @@ static struct session_data *session_find(const char *source,
 	return NULL;
 }
 
+static int session_connect(struct session_data *session,
+						struct callback_data *callback)
+{
+	int err;
+
+	if (session->obex) {
+		g_idle_add(connection_complete, callback);
+		err = 0;
+	} else if (session->channel > 0) {
+		session->io = rfcomm_connect(&session->src, &session->dst,
+							session->channel,
+							rfcomm_callback,
+							callback);
+		err = (session->io == NULL) ? -EINVAL : 0;
+	} else {
+		callback->sdp = service_connect(&session->src, &session->dst,
+						service_callback, callback);
+		err = (callback->sdp == NULL) ? -ENOMEM : 0;
+	}
+
+	return err;
+}
+
+static void adapter_reply(DBusPendingCall *call, void *user_data)
+{
+	DBusError err;
+	DBusMessage *reply;
+	struct callback_data *callback = user_data;
+	struct session_data *session = callback->session;
+	struct pending_req *req = find_session_request(session, call);
+
+	reply = dbus_pending_call_steal_reply(call);
+
+	session->pending_calls = g_slist_remove(session->pending_calls, req);
+	pending_req_finalize(req);
+
+	dbus_error_init(&err);
+	if (dbus_set_error_from_message(&err, reply)) {
+		error("manager replied with an error: %s, %s",
+				err.name, err.message);
+		dbus_error_free(&err);
+
+		goto failed;
+	}
+
+	if (session_connect(session, callback) < 0)
+		goto failed;
+
+	goto proceed;
+
+failed:
+	session_unref(session);
+	g_free(callback);
+
+proceed:
+	dbus_message_unref(reply);
+}
+
+static void manager_reply(DBusPendingCall *call, void *user_data)
+{
+	DBusError err;
+	DBusMessage *reply;
+	char *adapter;
+	struct callback_data *callback = user_data;
+	struct session_data *session = callback->session;
+	struct pending_req *req = find_session_request(session, call);
+
+	reply = dbus_pending_call_steal_reply(call);
+
+	session->pending_calls = g_slist_remove(session->pending_calls, req);
+	pending_req_finalize(req);
+
+	dbus_error_init(&err);
+	if (dbus_set_error_from_message(&err, reply)) {
+		error("manager replied with an error: %s, %s",
+				err.name, err.message);
+		dbus_error_free(&err);
+
+		goto failed;
+	}
+
+	if (dbus_message_get_args(reply, NULL,
+				DBUS_TYPE_OBJECT_PATH, &adapter,
+				DBUS_TYPE_INVALID)) {
+		DBG("adapter path %s", adapter);
+
+		session->adapter = g_strdup(adapter);
+		req = send_method_call(session->conn_system,
+					BT_BUS_NAME, adapter,
+					BT_ADAPTER_IFACE, "RequestSession",
+					adapter_reply, callback,
+					DBUS_TYPE_INVALID);
+		if (!req)
+			goto failed;
+
+		session->pending_calls = g_slist_prepend(session->pending_calls,
+									req);
+	} else
+		goto failed;
+
+	goto proceed;
+
+failed:
+	session_unref(session);
+	g_free(callback);
+
+proceed:
+	dbus_message_unref(reply);
+}
+
 struct session_data *session_create(const char *source,
 						const char *destination,
 						const char *service,
@@ -547,7 +760,7 @@ struct session_data *session_create(const char *source,
 {
 	struct session_data *session;
 	struct callback_data *callback;
-	int err;
+	struct pending_req *req;
 
 	if (destination == NULL)
 		return NULL;
@@ -567,6 +780,12 @@ struct session_data *session_create(const char *source,
 
 	session->conn = dbus_bus_get(DBUS_BUS_SESSION, NULL);
 	if (session->conn == NULL) {
+		session_free(session);
+		return NULL;
+	}
+
+	session->conn_system = g_dbus_setup_bus(DBUS_BUS_SYSTEM, NULL, NULL);
+	if (session->conn_system == NULL) {
 		session_free(session);
 		return NULL;
 	}
@@ -626,26 +845,28 @@ proceed:
 	callback->func = function;
 	callback->data = user_data;
 
-	if (session->obex) {
-		g_idle_add(connection_complete, callback);
-		err = 0;
-	} else if (session->channel > 0) {
-		session->io = rfcomm_connect(&session->src, &session->dst,
-							session->channel,
-							rfcomm_callback,
-							callback);
-		err = (session->io == NULL) ? -EINVAL : 0;
+	if (source) {
+		req = send_method_call(session->conn_system,
+				BT_BUS_NAME, BT_PATH,
+				BT_MANAGER_IFACE, "FindAdapter",
+				manager_reply, callback,
+				DBUS_TYPE_STRING, &source,
+				DBUS_TYPE_INVALID);
 	} else {
-		callback->sdp = service_connect(&session->src, &session->dst,
-						service_callback, callback);
-		err = (callback->sdp == NULL) ? -ENOMEM : 0;
+		req = send_method_call(session->conn_system,
+				BT_BUS_NAME, BT_PATH,
+				BT_MANAGER_IFACE, "DefaultAdapter",
+				manager_reply, callback,
+				DBUS_TYPE_INVALID);
 	}
 
-	if (err < 0) {
+	if (!req) {
 		session_unref(session);
 		g_free(callback);
 		return NULL;
 	}
+
+	session->pending_calls = g_slist_prepend(session->pending_calls, req);
 
 	if (owner)
 		session_set_owner(session, owner, owner_disconnected);
