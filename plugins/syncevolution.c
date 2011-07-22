@@ -250,11 +250,8 @@ static int synce_put(struct obex_session *os, obex_object_t *obj,
 }
 
 static int synce_get(struct obex_session *os, obex_object_t *obj,
-					gboolean *stream, void *user_data)
+							void *user_data)
 {
-	if (stream)
-		*stream = TRUE;
-
 	return obex_get_stream_start(os, NULL);
 }
 
@@ -331,7 +328,7 @@ done:
 	return 0;
 }
 
-static ssize_t synce_read(void *object, void *buf, size_t count, uint8_t *hi)
+static ssize_t synce_read(void *object, void *buf, size_t count)
 {
 	struct synce_context *context = object;
 	DBusConnection *conn;
@@ -342,10 +339,8 @@ static ssize_t synce_read(void *object, void *buf, size_t count, uint8_t *hi)
 	gboolean authenticate;
 	DBusPendingCall *call;
 
-	if (context->buffer) {
-		*hi = OBEX_HDR_BODY;
+	if (context->buffer)
 		return string_read(context->buffer, buf, count);
-	}
 
 	conn = obex_dbus_get_connection();
 	if (conn == NULL)

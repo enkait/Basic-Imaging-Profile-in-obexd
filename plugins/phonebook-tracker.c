@@ -147,7 +147,7 @@
 	"SELECT ?c nco:nameFamily(?c) "					\
 	"nco:nameGiven(?c) nco:nameAdditional(?c) "			\
 	"nco:nameHonorificPrefix(?c) nco:nameHonorificSuffix(?c) "	\
-	"nco:phoneNumber(?h) \"NOTACALL\" "				\
+	"nco:phoneNumber(?h) "						\
 	"WHERE { "							\
 		"?c a nco:PersonContact . "				\
 	"OPTIONAL { ?c nco:hasPhoneNumber ?h . } "			\
@@ -182,11 +182,11 @@ CONSTRAINT								\
 "} "
 
 #define CALLS_LIST(CONSTRAINT)						\
-"SELECT ?_contact nco:nameFamily(?_contact) "				\
+"SELECT ?_call nco:nameFamily(?_contact) "				\
 	"nco:nameGiven(?_contact) nco:nameAdditional(?_contact) "	\
 	"nco:nameHonorificPrefix(?_contact) "				\
 	"nco:nameHonorificSuffix(?_contact) "				\
-	"nco:phoneNumber(?_cpn) ?_call"					\
+	"nco:phoneNumber(?_cpn) "					\
 CALLS_CONSTRAINTS(CONSTRAINT)						\
 "ORDER BY DESC(nmo:sentDate(?_call)) "
 
@@ -278,8 +278,9 @@ CALLS_CONSTRAINTS(CONSTRAINT)						\
 "	?_call nmo:isSent true "		\
 "} "
 
-#define CALL_URI_CONSTRAINT		\
-"FILTER (?_call = <%s>)	"
+#define CALL_URI_CONSTRAINT	\
+COMBINED_CONSTRAINT		\
+"FILTER (?_call = <%s>) "
 
 #define MISSED_CALLS_QUERY CALLS_QUERY(MISSED_CONSTRAINT)
 #define MISSED_CALLS_LIST CALLS_LIST(MISSED_CONSTRAINT)
@@ -477,7 +478,6 @@ struct phonebook_data {
 	char *req_name;
 	int vcard_part_count;
 	int tracker_index;
-	char *name;
 };
 
 struct phonebook_index {
@@ -1296,7 +1296,6 @@ static int add_to_cache(const char **reply, int num_fields, void *user_data)
 {
 	struct phonebook_data *data = user_data;
 	char *formatted;
-	const char *id;
 	int i;
 
 	if (reply == NULL || num_fields < 0)
@@ -1319,18 +1318,13 @@ static int add_to_cache(const char **reply, int num_fields, void *user_data)
 					reply[1], reply[2], reply[3], reply[4],
 					reply[5]);
 
-	if (g_str_equal(data->name, "/telecom/pb"))
-		id = reply[0];
-	else
-		id = reply[7];
-
 	/* The owner vCard must have the 0 handle */
 	if (strcmp(reply[0], TRACKER_DEFAULT_CONTACT_ME) == 0)
-		data->entry_cb(reply[0], 0, formatted, "", reply[6],
-							data->user_data);
+		data->entry_cb(reply[0], 0, formatted, "",
+						reply[6], data->user_data);
 	else
-		data->entry_cb(id, PHONEBOOK_INVALID_HANDLE, formatted,
-						"", reply[6], data->user_data);
+		data->entry_cb(reply[0], PHONEBOOK_INVALID_HANDLE, formatted,
+					"", reply[6], data->user_data);
 
 	g_free(formatted);
 
@@ -1530,7 +1524,6 @@ void phonebook_req_finalize(void *request)
 	free_data_numbers(data);
 	free_data_contacts(data);
 	g_free(data->req_name);
-	g_free(data->name);
 	g_free(data);
 }
 
@@ -1659,9 +1652,8 @@ void *phonebook_create_cache(const char *name, phonebook_entry_cb entry_cb,
 	data->entry_cb = entry_cb;
 	data->ready_cb = ready_cb;
 	data->user_data = user_data;
-	data->name = g_strdup(name);
 
-	ret = query_tracker(query, 8, add_to_cache, data);
+	ret = query_tracker(query, 7, add_to_cache, data);
 	if (err)
 		*err = ret;
 

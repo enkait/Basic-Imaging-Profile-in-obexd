@@ -42,6 +42,7 @@ struct session_data {
 	uuid_t uuid;		/* Bluetooth Service Class */
 	gchar *path;		/* Session path */
 	DBusConnection *conn;
+	DBusConnection *conn_system; /* system bus connection */
 	DBusMessage *msg;
 	GwObex *obex;
 	GIOChannel *io;
@@ -50,7 +51,9 @@ struct session_data {
 	gchar *owner;		/* Session owner */
 	guint watch;
 	GSList *pending;
+	GSList *pending_calls;
 	void *priv;
+	char *adapter;
 };
 
 typedef void (*session_callback_t) (struct session_data *session,

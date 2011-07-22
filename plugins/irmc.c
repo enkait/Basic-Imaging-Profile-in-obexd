@@ -233,7 +233,7 @@ static void *irmc_connect(struct obex_session *os, int *err)
 }
 
 static int irmc_get(struct obex_session *os, obex_object_t *obj,
-		gboolean *stream, void *user_data)
+							void *user_data)
 {
 	struct irmc_session *irmc = user_data;
 	const char *type = obex_get_type(os);
@@ -244,7 +244,6 @@ static int irmc_get(struct obex_session *os, obex_object_t *obj,
 	DBG("name %s type %s irmc %p", name, type ? type : "NA", irmc);
 
 	path = g_strdup(name);
-	*stream = TRUE;
 
 	ret = obex_get_stream_start(os, path);
 
@@ -463,7 +462,7 @@ static int irmc_close(void *object)
 	return 0;
 }
 
-static ssize_t irmc_read(void *object, void *buf, size_t count, uint8_t *hi)
+static ssize_t irmc_read(void *object, void *buf, size_t count)
 {
 	struct irmc_session *irmc = object;
 	int len;
@@ -472,7 +471,6 @@ static ssize_t irmc_read(void *object, void *buf, size_t count, uint8_t *hi)
 	if (!irmc->buffer)
                 return -EAGAIN;
 
-	*hi = OBEX_HDR_BODY;
 	len = string_read(irmc->buffer, buf, count);
 	DBG("returning %d bytes", len);
 	return len;
