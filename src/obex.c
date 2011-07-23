@@ -705,10 +705,13 @@ static int obex_write(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 		return -EIO;
 
 	if (os->headers_sent)
-		return obex_write_stream(os, obex, obj);
+		goto skip;
 
 	if (!os->driver->get_next_header)
 		goto skip;
+	
+	if (os->buf)
+		os->buf = g_malloc0(os->tx_mtu);
 
 	while ((len = os->driver->get_next_header(os->object, os->buf,
 					os->tx_mtu, &hi)) != 0) {
@@ -732,7 +735,9 @@ static int obex_write(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 skip:
 	os->headers_sent = TRUE;
 
-	return obex_write_stream(os, obex, obj);
+	if (os->cmd == OBEX_CMD_GET)
+		return obex_write_stream(os, obex, obj);
+	return 0;
 }
 
 static gboolean handle_async_io(void *object, int flags, int err,
@@ -940,23 +945,29 @@ static void obex_reset_object(struct obex_session *os, obex_object_t *obj)
 	g_assert(OBEX_ObjectReParseHeaders(os->obex, obj));
 }
 
-int obex_feed_headers(struct obex_session *os, obex_object_t *obj)
+int obex_feed_headers(struct obex_session *os)
 {
 	uint32_t hlen;
 	uint8_t hi;
 	obex_headerdata_t hd;
-	int err;
+	int err = 0;
 	g_assert(os->object != NULL);
+	g_assert(os->obj != NULL);
 
 	if (os->driver->feed_next_header == NULL)
 		return 0;
-	obex_reset_object(os, obj);
-	while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen)) {
+	obex_reset_object(os, os->obj);
+	while (OBEX_ObjectGetNextHeader(os->obex, os->obj, &hi, &hd, &hlen)) {
 		err = os->driver->feed_next_header(os->object, hi, hd, hlen);
 
 		if (err < 0)
 			return err;
 	}
+	hd.bs = NULL;
+	err = os->driver->feed_next_header(os->object, OBEX_HDR_EMPTY, hd, 0);
+
+	if (err < 0)
+		return err;
 	return 0;
 }
 
@@ -969,6 +980,11 @@ int obex_get_stream_start(struct obex_session *os, const char *filename)
 	object = os->driver->open(filename, O_RDONLY, 0, os->service_data,
 								&size, &err);
 	if (object == NULL) {
+		error("open(%s): %s (%d)", filename, strerror(-err), -err);
+		return err;
+	}
+
+	if ((err = obex_feed_headers(os)) < 0) {
 		error("open(%s): %s (%d)", filename, strerror(-err), -err);
 		return err;
 	}
@@ -1183,6 +1199,17 @@ static void cmd_put(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 		OBEX_SuspendRequest(obex, obj);
 		os->obj = obj;
 		os->driver->set_io_watch(os->object, handle_async_io, os);
+		return;
+	}
+
+	/* Try to write to stream and suspend the stream immediately
+	 * if no data available to send. */
+	err = obex_write(os, obex, obj);
+	if (err == -EAGAIN) {
+		OBEX_SuspendRequest(obex, obj);
+		os->obj = obj;
+		os->driver->set_io_watch(os->object, handle_async_io, os);
+		return;
 	}
 }
 
@@ -1293,6 +1320,7 @@ static void obex_event_cb(obex_t *obex, obex_object_t *obj, int mode,
 	print_event(evt, cmd, rsp);
 
 	os = OBEX_GetUserData(obex);
+	os->obj = obj;
 
 	switch (evt) {
 	case OBEX_EV_PROGRESS:

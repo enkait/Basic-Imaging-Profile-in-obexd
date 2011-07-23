@@ -36,7 +36,7 @@ struct archive_session {
 };
 
 void *image_arch_connect(struct obex_session *os, int *err);
-int image_arch_get(struct obex_session *os, obex_object_t *obj, gboolean *stream,
+int image_arch_get(struct obex_session *os, obex_object_t *obj,
 							void *user_data);
 int image_arch_chkput(struct obex_session *os, void *user_data);
 int image_arch_put(struct obex_session *os, obex_object_t *obj, void *user_data);

@@ -50,7 +50,7 @@ struct image_pull_session {
 };
 
 void *image_pull_connect(struct obex_session *os, int *err);
-int image_pull_get(struct obex_session *os, obex_object_t *obj, gboolean *stream,
+int image_pull_get(struct obex_session *os, obex_object_t *obj,
 							void *user_data);
 int image_pull_chkput(struct obex_session *os, void *user_data);
 int image_pull_put(struct obex_session *os, obex_object_t *obj, void *user_data);

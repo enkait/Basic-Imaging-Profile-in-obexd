@@ -20,14 +20,14 @@
  *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
  *
  */
-
+/*
 void *image_push_connect(struct obex_session *os, int *err);
 int image_push_get(struct obex_session *os, obex_object_t *obj, gboolean *stream,
 							void *user_data);
 int image_push_chkput(struct obex_session *os, void *user_data);
 int image_push_put(struct obex_session *os, obex_object_t *obj, void *user_data);
 void image_push_disconnect(struct obex_session *os, void *user_data);
-
+*/
 struct pushed_image {
 	int handle;
 	char *image;
@@ -35,16 +35,16 @@ struct pushed_image {
 
 struct image_push_session {
     struct obex_session *os;
-    int fd;
-    int next_handle;
     char *handle_hdr;
     unsigned int handle_hdr_len;
     char *desc_hdr;
     unsigned int desc_hdr_len;
-    char *file_path;
+    char *bip_root;
+    int next_handle;
     GSList *pushed_images;
 };
 
+int get_new_handle(struct image_push_session *ips);
 void free_image_push_session(struct image_push_session *session);
 int obex_handle_write(struct obex_session *os, obex_object_t *obj, const char *data, unsigned int size);
 struct pushed_image *get_pushed_image(struct image_push_session *session,

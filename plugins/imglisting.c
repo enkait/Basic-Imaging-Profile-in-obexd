@@ -471,23 +471,19 @@ static void *imglisting_open(const char *name, int oflag, mode_t mode,
 	return resp;
 }
 
-static ssize_t imglisting_read(void *object, void *buf, size_t count,
-		uint8_t *hi)
+static ssize_t imglisting_read(void *object, void *buf, size_t count)
 {
 	struct imglist_resp *resp = object;
 	GString *data;
-	if (resp->aparam->len > 0) {
+	/*if (resp->aparam->len > 0) {
 		data = resp->aparam;
 		*hi = OBEX_HDR_APPARAM;
-	}
+	}*/
 	/*if (resp->hdesc->len > 0) {
 		data = resp->hdesc;
 		*hi = IMG_DESC_HDR;
 	}*/
-	else {
-		data = resp->body;
-		*hi = OBEX_HDR_BODY;
-	}
+	data = resp->body;
 	printf("imglisting_read %u\n", data->len);
 	return string_read(data, buf, count);
 }
