@@ -187,6 +187,11 @@ static struct {
 	{ 0xFF,					NULL			},
 };
 
+static int obex_write(struct obex_session *os, obex_t *obex, obex_object_t *obj);
+
+static gboolean handle_async_io(void *object, int flags, int err,
+						void *user_data);
+
 static void print_event(int evt, int cmd, int rsp)
 {
 	const char *evtstr = NULL, *cmdstr = NULL, *rspstr = NULL;
@@ -325,6 +330,7 @@ static void os_reset_session(struct obex_session *os)
 	os->size = OBJECT_SIZE_DELETE;
 	os->headers_sent = FALSE;
 	os->streaming = FALSE;
+	os->body_streamed = FALSE;
 }
 
 static void obex_session_free(struct obex_session *os)
@@ -566,7 +572,7 @@ static gboolean chk_cid(obex_t *obex, obex_object_t *obj, uint32_t cid)
 static int obex_read_stream(struct obex_session *os, obex_t *obex,
 						obex_object_t *obj)
 {
-	int size;
+	int size = 0;
 	ssize_t len = 0;
 	const uint8_t *buffer;
 
@@ -586,6 +592,14 @@ static int obex_read_stream(struct obex_session *os, obex_t *obex,
 		goto write;
 
 	size = OBEX_ObjectReadStream(obex, obj, &buffer);
+
+	DBG("got data: size=%d", size);
+
+	if (size == 0) {
+		// streaming completed
+		os->body_streamed = TRUE;
+	}
+
 	if (size < 0) {
 		error("Error on OBEX stream");
 		return -EIO;
@@ -627,12 +641,25 @@ write:
 		os->pending -= w;
 	}
 
-	printf("os->size = %lld\nos->offset = %lld\n", os->size, os->offset);
+	printf("size = %d\nos->size = %lld\nos->offset = %lld\n", size, os->size, os->offset);
 
 	/* Flush on EOS */
-	if (os->size != OBJECT_SIZE_UNKNOWN && os->size == os->offset &&
-							os->driver->flush)
-		return os->driver->flush(os->object) > 0 ? -EAGAIN : 0;
+	if (os->body_streamed && os->pending == 0) {
+		int ret = os->driver->flush(os->object) > 0 ? -EAGAIN : 0;
+
+		if (ret < 0)
+			return ret;
+
+		/* Try to write to stream and suspend the stream immediately
+		 * if no data available to send. */
+		ret = obex_write(os, obex, obj);
+		if (ret == -EAGAIN) {
+			OBEX_SuspendRequest(obex, obj);
+			os->obj = obj;
+			os->driver->set_io_watch(os->object, handle_async_io, os);
+			return 0;
+		}
+	}
 
 	return 0;
 }
@@ -712,7 +739,7 @@ static int obex_write(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 	if (!os->driver->get_next_header)
 		goto skip;
 	
-	if (os->buf)
+	if (os->buf == NULL)
 		os->buf = g_malloc0(os->tx_mtu);
 
 	while ((len = os->driver->get_next_header(os->object, os->buf,
@@ -998,6 +1025,8 @@ int obex_get_stream_start(struct obex_session *os, const char *filename)
 	if (size > 0)
 		os->buf = g_malloc0(os->tx_mtu);
 
+	os->body_streamed = FALSE;
+
 	return 0;
 }
 
@@ -1023,6 +1052,8 @@ int obex_put_stream_start(struct obex_session *os, const char *filename)
 
 	if (os->pending == 0)
 		return 0;
+
+	os->body_streamed = FALSE;
 
 	return obex_read_stream(os, os->obex, NULL);
 }

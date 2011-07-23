@@ -219,6 +219,7 @@ static ssize_t add_reply_handle(void *buf, size_t mtu, uint8_t *hi, int handle)
 		g_free(handle_hdr);
 		return -ENOMEM;
 	}
+	printf("%p %p %d\n", buf, handle_hdr, handle_hdr_len);
 	g_memmove(buf, handle_hdr, handle_hdr_len);
 	g_free(handle_hdr);
 	return handle_hdr_len;
@@ -233,6 +234,7 @@ static ssize_t imgimg_get_next_header(void *object, void *buf, size_t mtu,
 		return 0;
 	if ((len = add_reply_handle(buf, mtu, hi, data->handle)) < 0)
 		return len;
+	data->handle_sent = TRUE;
 	return len;
 }
 
