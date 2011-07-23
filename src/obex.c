@@ -627,6 +627,8 @@ write:
 		os->pending -= w;
 	}
 
+	printf("os->size = %lld\nos->offset = %lld\n", os->size, os->offset);
+
 	/* Flush on EOS */
 	if (os->size != OBJECT_SIZE_UNKNOWN && os->size == os->offset &&
 							os->driver->flush)
@@ -1185,6 +1187,8 @@ static void cmd_put(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 		os_set_response(obj, err);
 		return;
 	}
+	
+	printf("os->size = %lld\nUNKNOWN = %d\n", os->size, OBJECT_SIZE_UNKNOWN);
 	
 	/* Check if there is a body and it is not empty (size > 0), otherwise
 	   openobex won't notify us with OBEX_EV_STREAMAVAIL and it gonna reply
