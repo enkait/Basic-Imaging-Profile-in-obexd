@@ -172,7 +172,7 @@ static void session_unregistered(struct session_data *session)
 						FTP_INTERFACE);
 		break;
 	case IMAGING_RESPONDER_SVCLASS_ID:
-        bip_unregister_interface(session->conn, session->path,
+		bip_unregister_interface(session->conn, session->path,
                         session);
 		break;
 	case PBAP_PSE_SVCLASS_ID:
@@ -812,6 +812,10 @@ struct session_data *session_create(const char *source,
 		sdp_uuid16_create(&session->uuid, IMAGING_RESPONDER_SVCLASS_ID);
 		session->target = ARCHIVE_UUID;
 		session->target_len = ARCHIVE_UUID_LEN;
+	} else if (!g_ascii_strncasecmp(service, "BIP:RD", 8)) {
+		sdp_uuid16_create(&session->uuid, IMAGING_RESPONDER_SVCLASS_ID);
+		session->target = REMOTE_DISPLAY_UUID;
+		session->target_len = REMOTE_DISPLAY_UUID_LEN;
 	} else if (!g_ascii_strncasecmp(service, "BIP:AOS", 8)) {
 		sdp_uuid16_create(&session->uuid, IMAGING_ARCHIVE_SVCLASS_ID);
 		session->target = ARCHIVED_OBJECTS_UUID;

@@ -21,31 +21,13 @@
  *
  */
 
-static const uint8_t IMAGE_PULL_TARGET[TARGET_SIZE] = {
-	0x8E, 0xE9, 0xB3, 0xD0, 0x46, 0x08, 0x11, 0xD5,
+static const uint8_t REMOTE_DISPLAY_TARGET[TARGET_SIZE] = {
+	0x94, 0xC7, 0xCD, 0x20, 0x46, 0x08, 0x11, 0xD5,
 	0x84, 0x1A, 0x00, 0x02, 0xA5, 0x32, 0x5B, 0x4E };
 
-static const uint8_t IMAGE_AOS_TARGET[TARGET_SIZE] = {
-			0x8E, 0x61, 0xF9, 0x5E, 0x1A, 0x79, 0x11, 0xD4,
-			0x8E, 0xA4, 0x00, 0x80, 0x5F, 0x9B, 0x98, 0x34 };
-
-struct image_pull_session {
+struct remote_display_session {
     struct obex_session *os;
-    uint8_t *aparam_data;
-    unsigned int aparam_data_len;
-    char *handle_hdr;
-    unsigned int handle_hdr_len;
-    char *desc_hdr;
-    unsigned int desc_hdr_len;
     GSList *image_list;
+    char *dir;
     int status;
 };
-
-GSList *get_image_list(const char *dir, int *err);
-void *image_pull_connect(struct obex_session *os, int *err);
-int image_pull_get(struct obex_session *os, obex_object_t *obj,
-							void *user_data);
-int image_pull_chkput(struct obex_session *os, void *user_data);
-int image_pull_put(struct obex_session *os, obex_object_t *obj, void *user_data);
-void image_pull_disconnect(struct obex_session *os, void *user_data);
-struct image_handles_desc *new_hdesc();
