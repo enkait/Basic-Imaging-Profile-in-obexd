@@ -26,3 +26,16 @@ struct images_listing_aparam {
 
 extern GDBusMethodTable image_pull_methods[];
 extern GDBusSignalTable image_pull_signals[];
+
+DBusMessage *get_image(DBusConnection *connection,
+					DBusMessage *message, void *user_data);
+DBusMessage *get_image_thumbnail(DBusConnection *connection,
+					DBusMessage *message, void *user_data);
+DBusMessage *get_image_attachment(DBusConnection *connection,
+					DBusMessage *message, void *user_data);
+DBusMessage *get_images_listing(DBusConnection *connection,
+					DBusMessage *message, void *user_data);
+DBusMessage *get_image_properties(DBusConnection *connection,
+					DBusMessage *message, void *user_data);
+DBusMessage *delete_image(DBusConnection *connection,
+					DBusMessage *message, void *user_data);

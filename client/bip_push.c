@@ -17,6 +17,7 @@
 #include "bip_util.h"
 #include "bip_push.h"
 #include "bip_pull.h"
+#include "bip_rd.h"
 #include "bip_arch.h"
 
 #define EOL_CHARS "\n"
@@ -318,7 +319,7 @@ cleanup:
 	return reply;
 }
 
-static DBusMessage *put_modified_image(DBusConnection *connection,
+DBusMessage *put_modified_image(DBusConnection *connection,
 		DBusMessage *message, void *user_data)
 {
 	struct session_data *session = user_data;
@@ -382,7 +383,7 @@ cleanup:
 	return result;
 }
 
-static DBusMessage *put_image(DBusConnection *connection,
+DBusMessage *put_image(DBusConnection *connection,
 					DBusMessage *message, void *user_data)
 {
 	struct session_data *session = user_data;
@@ -582,6 +583,16 @@ gboolean bip_register_interface(DBusConnection *connection, const char *path,
 							NULL, user_data,
 							destroy);
 	}
+	else if (memcmp(session->target, REMOTE_DISPLAY_UUID,
+				session->target_len) == 0) {
+		printf("REMOTE_DISPLAY_INTERFACE\n");
+		return g_dbus_register_interface(connection, path,
+							REMOTE_DISPLAY_INTERFACE,
+							remote_display_methods,
+							remote_display_signals,
+							NULL, user_data,
+							destroy);
+	}
 	else if (memcmp(session->target, ARCHIVED_OBJECTS_UUID,
 				session->target_len) == 0) {
 		printf("ARCHIVE_OBJECT_SERVICE_INTERFACE\n");
@@ -607,6 +618,8 @@ void bip_unregister_interface(DBusConnection *connection, const char *path,
 		g_dbus_unregister_interface(connection, path, IMAGE_PULL_INTERFACE);
 	else if (memcmp(session->target, ARCHIVE_UUID, session->target_len) == 0)
 		g_dbus_unregister_interface(connection, path, ARCHIVE_INTERFACE);
+	else if (memcmp(session->target, REMOTE_DISPLAY_UUID, session->target_len) == 0)
+		g_dbus_unregister_interface(connection, path, REMOTE_DISPLAY_INTERFACE);
 	else if (memcmp(session->target, ARCHIVED_OBJECTS_UUID, session->target_len) == 0)
 		g_dbus_unregister_interface(connection, path, IMAGE_PULL_INTERFACE);
 }

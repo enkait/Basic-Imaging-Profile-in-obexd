@@ -53,6 +53,7 @@
 #include "service.h"
 #include "imglisting.h"
 #include "image_pull.h"
+#include "remote_display.h"
 #include "filesystem.h"
 #include "bip_util.h"
 
@@ -106,7 +107,7 @@ struct img_listing *get_listing(GSList *images, int handle, int *err)
 }
 
 struct imglisting_data {
-	GSList * (*get_image_list) (void *context);
+	GSList * (*get_image_list) (void *context, int *err);
 	int count, offset;
 	struct img_hdesc *desc;
 	void *context;
@@ -448,11 +449,11 @@ static int feed_next_header (void *object, uint8_t hi, obex_headerdata_t hv,
 							uint32_t hv_size)
 {
 	struct imglisting_data *data = object;
+	int err;
 	printf("feed_next_header\n");
 
 	if (hi == OBEX_HDR_APPARAM) {
 		struct imglisting_aparam *aparam;
-		int err;
 		aparam = parse_aparam(hv.bs, hv_size, &err);
 
 		if (aparam == NULL) {
@@ -466,7 +467,6 @@ static int feed_next_header (void *object, uint8_t hi, obex_headerdata_t hv,
 	else if (hi == IMG_DESC_HDR) {
 		char *header;
 		unsigned int hdr_len;
-		int err;
 		if (data->desc != NULL)
 			return -EBADR;
 		if (!parse_bip_header(&header, &hdr_len, hi, hv.bs, hv_size))
@@ -481,7 +481,7 @@ static int feed_next_header (void *object, uint8_t hi, obex_headerdata_t hv,
 			return -EBADR;
 		}
 		g_assert(data->get_image_list != NULL);
-		image_list = data->get_image_list(data->context);
+		image_list = data->get_image_list(data->context, &err);
 		data->body = create_images_listing(image_list, data->count,
 					data->offset, &res_count, data->desc);
 		data->aparam = cr_imglist_aparam_r(res_count);
@@ -489,7 +489,7 @@ static int feed_next_header (void *object, uint8_t hi, obex_headerdata_t hv,
 	return 0;
 }
 
-static ssize_t imgimg_get_next_header(void *object, void *buf, size_t mtu,
+static ssize_t imglisting_get_next_header(void *object, void *buf, size_t mtu,
 								uint8_t *hi)
 {
 	struct imglisting_data *data = object;
@@ -522,9 +522,13 @@ static ssize_t imgimg_get_next_header(void *object, void *buf, size_t mtu,
 	return 0;
 }
 
-static GSList *pullcb(void *context) {
+static GSList *pullcb(void *context, int *err) {
 	struct image_pull_session *session = context;
 	printf("pullcb\n");
+
+	if (err != NULL)
+		*err = 0;
+
 	return session->image_list;
 }
 
@@ -535,6 +539,22 @@ static void *image_pull_open(const char *name, int oflag, mode_t mode,
 							context, size, err);
 	printf("image_pull_open\n");
 	data->get_image_list = pullcb;
+	return data;
+}
+
+static GSList *remote_display_cb(void *context, int *err) {
+	struct remote_display_session *session = context;
+	printf("remote_display_cb\n");
+	return get_image_list(session->dir, err);
+}
+
+static void *remote_display_open(const char *name, int oflag, mode_t mode,
+		void *context, size_t *size, int *err)
+{
+	struct imglisting_data *data = imglisting_open(name, oflag, mode,
+							context, size, err);
+	printf("remote_display_open\n");
+	data->get_image_list = remote_display_cb;
 	return data;
 }
 
@@ -560,7 +580,7 @@ static struct obex_mime_type_driver imglisting = {
 	.open = image_pull_open,
 	.close = imglisting_close,
 	.feed_next_header = feed_next_header,
-	.get_next_header = imgimg_get_next_header,
+	.get_next_header = imglisting_get_next_header,
 	.read = imglisting_read,
 };
 
@@ -571,7 +591,18 @@ static struct obex_mime_type_driver imglisting_aos = {
 	.open = image_pull_open,
 	.close = imglisting_close,
 	.feed_next_header = feed_next_header,
-	.get_next_header = imgimg_get_next_header,
+	.get_next_header = imglisting_get_next_header,
+	.read = imglisting_read,
+};
+
+static struct obex_mime_type_driver imglisting_rd = {
+	.target = REMOTE_DISPLAY_TARGET,
+	.target_size = TARGET_SIZE,
+	.mimetype = "x-bt/img-listing",
+	.open = remote_display_open,
+	.close = imglisting_close,
+	.feed_next_header = feed_next_header,
+	.get_next_header = imglisting_get_next_header,
 	.read = imglisting_read,
 };
 
@@ -580,6 +611,9 @@ static int imglisting_init(void)
 	int ret;
 	if ((ret = obex_mime_type_driver_register(&imglisting)) < 0)
 		return ret;
+	
+	if ((ret = obex_mime_type_driver_register(&imglisting_rd)) < 0)
+		return ret;
 
 	return obex_mime_type_driver_register(&imglisting_aos);
 }
@@ -587,6 +621,7 @@ static int imglisting_init(void)
 static void imglisting_exit(void)
 {
 	obex_mime_type_driver_unregister(&imglisting_aos);
+	obex_mime_type_driver_unregister(&imglisting_rd);
 	obex_mime_type_driver_unregister(&imglisting);
 }
 

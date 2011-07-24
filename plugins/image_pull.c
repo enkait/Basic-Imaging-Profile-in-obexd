@@ -180,13 +180,13 @@ static gboolean remove_image(struct image_pull_session *session, struct img_list
 	return TRUE;
 }
 
-static GSList *get_image_list(int *err) {
+GSList *get_image_list(const char *dir, int *err) {
 	struct dirent *file;
 	GSList *images = NULL;
 	struct img_listing *il = NULL;
 	struct stat file_stat;
 	int handle = 0;
-	DIR *img_dir = opendir(bip_dir);
+	DIR *img_dir = opendir(dir);
 
 	if (img_dir == NULL) {
 		printf("no folder, errno: %d\n", errno);
@@ -242,7 +242,7 @@ void *image_pull_connect(struct obex_session *os, int *err)
 
 	session = g_new0(struct image_pull_session, 1);
 	session->os = os;
-	session->image_list = get_image_list(&priv_err);
+	session->image_list = get_image_list(bip_dir, &priv_err);
 
 	if (priv_err < 0) {
 		if (err != NULL)

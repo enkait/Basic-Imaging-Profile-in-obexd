@@ -14,6 +14,7 @@
 #include "obex-priv.h"
 #include "wand/MagickWand.h"
 #include "bip_pull.h"
+#include "bip_push.h"
 #include "bip_util.h"
 
 #define EOL_CHARS "\n"
@@ -38,9 +39,6 @@
 #define FILTERING_PIXEL "pixel=\"%s\" "
 
 #define BIP_TEMP_FOLDER /tmp/bip/
-
-DBusMessage *get_imaging_capabilities(DBusConnection *connection,
-				DBusMessage *message, void *user_data);
 
 struct listing_object {
 	char *handle, *ctime, *mtime;
@@ -746,7 +744,7 @@ static gboolean append_prop(DBusMessageIter *args,
 }
 
 
-static DBusMessage *get_image_properties(DBusConnection *connection,
+DBusMessage *get_image_properties(DBusConnection *connection,
 		DBusMessage *message, void *user_data)
 {
 	struct session_data *session = user_data;
@@ -822,7 +820,7 @@ cleanup:
 	return reply;
 }
 
-static DBusMessage *delete_image(DBusConnection *connection,
+DBusMessage *delete_image(DBusConnection *connection,
 		DBusMessage *message, void *user_data)
 {
 	struct session_data *session = user_data;
@@ -993,7 +991,7 @@ static struct a_header *create_filtering_descriptor(char *created, char *modifie
 	return ah;
 }
 
-static DBusMessage *get_images_listing(DBusConnection *connection,
+DBusMessage *get_images_listing(DBusConnection *connection,
 					DBusMessage *message, void *user_data)
 {
 	struct session_data *session = user_data;
@@ -1145,7 +1143,7 @@ static void get_image_attachment_callback(struct session_data *session,
 }
 
 
-static DBusMessage *get_image_thumbnail(DBusConnection *connection,
+DBusMessage *get_image_thumbnail(DBusConnection *connection,
 					DBusMessage *message, void *user_data)
 {
 	struct session_data *session = user_data;
@@ -1199,7 +1197,7 @@ cleanup:
 	return reply;
 }
 ///////////////////////////////////////////////////////////////////
-static DBusMessage *get_image_attachment(DBusConnection *connection,
+DBusMessage *get_image_attachment(DBusConnection *connection,
 				DBusMessage *message, void *user_data)
 {
 	struct session_data *session = user_data;
@@ -1343,7 +1341,7 @@ failed:
 	return FALSE;
 }
 
-static DBusMessage *get_image(DBusConnection *connection,
+DBusMessage *get_image(DBusConnection *connection,
 				DBusMessage *message, void *user_data)
 {
 	struct session_data *session = user_data;

@@ -13,6 +13,11 @@
 /** Length of AUTOMATIC_ARCHIVE_UUID */
 #define ARCHIVE_UUID_LEN 16
 
+#define REMOTE_DISPLAY_UUID \
+    "\x94\xC7\xCD\x20\x46\x08\x11\xD5\x84\x1A\x00\x02\xA5\x32\x5B\x4E"
+/** Length of REMOTE_DISPLAY_UUID */
+#define REMOTE_DISPLAY_UUID_LEN 16
+
 #define ARCHIVED_OBJECTS_UUID \
     "\x8E\x61\xF9\x5E\x1A\x79\x11\xD4\x8E\xA4\x00\x80\x5F\x9B\x98\x34"
 /** Length of ARCHIVED_OBJECTS_UUID */
@@ -21,6 +26,7 @@
 #define IMAGE_PUSH_INTERFACE "org.openobex.ImagePush"
 #define IMAGE_PULL_INTERFACE "org.openobex.ImagePull"
 #define ARCHIVE_INTERFACE "org.openobex.Archive"
+#define REMOTE_DISPLAY_INTERFACE "org.openobex.RemoteDisplay"
 
 #define IMG_HANDLE_HDR (OBEX_HDR_TYPE_BYTES | 0x30)
 #define IMG_DESC_HDR (OBEX_HDR_TYPE_BYTES | 0x71)
@@ -45,3 +51,7 @@ void parse_client_user_headers(const struct session_data *session,
 				unsigned int *handle_hdr_len);
 DBusMessage *get_imaging_capabilities(DBusConnection *connection,
 				DBusMessage *message, void *user_data);
+DBusMessage *put_image(DBusConnection *connection,
+					DBusMessage *message, void *user_data);
+DBusMessage *put_modified_image(DBusConnection *connection,
+					DBusMessage *message, void *user_data);
