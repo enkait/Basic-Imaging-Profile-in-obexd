@@ -39,7 +39,7 @@ struct image_push_session {
     unsigned int handle_hdr_len;
     char *desc_hdr;
     unsigned int desc_hdr_len;
-    char *bip_root;
+    const char *bip_root;
     int next_handle;
     GSList *pushed_images;
 };

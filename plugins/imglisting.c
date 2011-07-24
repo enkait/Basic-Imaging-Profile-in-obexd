@@ -81,6 +81,38 @@ struct img_hdesc {
     gboolean fixed_ratio;
 };
 
+void img_listing_free(struct img_listing *listing)
+{
+	g_free(listing->image);
+	free_image_attributes(listing->attr);
+	g_free(listing);
+}
+
+struct img_listing *get_listing(GSList *images, int handle, int *err)
+{
+	if (err != NULL)
+		*err = 0;
+
+	while (images != NULL) {
+		struct img_listing *il = images->data;
+		if (il->handle == handle)
+			return il;
+		images = g_slist_next(images);
+	}
+	
+	if (err != NULL)
+		*err = -ENOENT;
+	return NULL;
+}
+
+struct imglisting_data {
+	GSList * (*get_image_list) (void *context);
+	int count, offset;
+	struct img_hdesc *desc;
+	void *context;
+	GString *aparam, *hdesc, *body;
+};
+
 static struct img_hdesc *get_hdesc()
 {
 	struct img_hdesc *hdesc = g_new0(struct img_hdesc, 1);
@@ -135,17 +167,14 @@ static gboolean filter_image(struct img_listing *il, const struct img_hdesc *hde
 	return TRUE;
 }
 
-static GString *create_images_listing(struct image_pull_session *session,
+static GString *create_images_listing(GSList *images,
 					int count, int offset,
 					int *res_count,
 					const struct img_hdesc *hdesc)
 {
-	GSList *images = NULL;
 	GString *listing_obj = g_string_new(IMG_LISTING_BEGIN);
 	char mtime[18], ctime[18];
 	char handle_str[8];
-
-	images = session->image_list;
 
 	if (res_count != NULL)
 		*res_count = 0;
@@ -406,96 +435,121 @@ static GString *create_hdesc_hdr(const char *data, unsigned int length)
 	return g_string_new_len((gchar *) encdata, encdata_len);
 }
 
-struct imglist_resp {
-	GString *aparam, *hdesc, *body;
-};
+static struct imglisting_data *imglisting_open(const char *name, int oflag,
+			mode_t mode, void *context, size_t *size, int *err)
+{
+	struct imglisting_data *data = g_new0(struct imglisting_data, 1);
+	printf("imglisting_open\n");
+	data->context = context;
+	return data;
+}
 
-static void *imglisting_open(const char *name, int oflag, mode_t mode,
+static int feed_next_header (void *object, uint8_t hi, obex_headerdata_t hv,
+							uint32_t hv_size)
+{
+	struct imglisting_data *data = object;
+	printf("feed_next_header\n");
+
+	if (hi == OBEX_HDR_APPARAM) {
+		struct imglisting_aparam *aparam;
+		int err;
+		aparam = parse_aparam(hv.bs, hv_size, &err);
+
+		if (aparam == NULL) {
+			return err;
+		}
+
+		data->count = aparam->nbreturnedhandles;
+		data->offset = aparam->liststartoffset;
+		g_free(aparam);
+	}
+	else if (hi == IMG_DESC_HDR) {
+		char *header;
+		unsigned int hdr_len;
+		int err;
+		if (data->desc != NULL)
+			return -EBADR;
+		if (!parse_bip_header(&header, &hdr_len, hi, hv.bs, hv_size))
+			return -EBADR;
+		data->desc = parse_handles_desc(header, hdr_len, &err);
+		data->hdesc = create_hdesc_hdr(header, hdr_len);
+	}
+	else if (hi == OBEX_HDR_EMPTY) {
+		int res_count;
+		GSList *image_list;
+		if (data->desc == NULL) {
+			return -EBADR;
+		}
+		g_assert(data->get_image_list != NULL);
+		image_list = data->get_image_list(data->context);
+		data->body = create_images_listing(image_list, data->count,
+					data->offset, &res_count, data->desc);
+		data->aparam = cr_imglist_aparam_r(res_count);
+	}
+	return 0;
+}
+
+static ssize_t imgimg_get_next_header(void *object, void *buf, size_t mtu,
+								uint8_t *hi)
+{
+	struct imglisting_data *data = object;
+	printf("imgimg_get_next_header\n");
+	if (data == NULL) {
+		return -EBADR;
+	}
+	if (data->aparam != NULL) {
+		ssize_t len;
+		if (data->aparam->len > mtu)
+			return -EBADR;
+		*hi = OBEX_HDR_APPARAM;
+		len = data->aparam->len;
+		g_memmove(buf, data->aparam->str, data->aparam->len);
+		g_string_free(data->aparam, TRUE);
+		data->aparam = NULL;
+		return len;
+	}
+	else if(data->hdesc) {
+		ssize_t len;
+		if (data->hdesc->len > mtu)
+			return -EBADR;
+		*hi = IMG_DESC_HDR;
+		len = data->hdesc->len;
+		g_memmove(buf, data->hdesc->str, data->hdesc->len);
+		g_string_free(data->hdesc, TRUE);
+		data->hdesc = NULL;
+		return len;
+	}
+	return 0;
+}
+
+static GSList *pullcb(void *context) {
+	struct image_pull_session *session = context;
+	printf("pullcb\n");
+	return session->image_list;
+}
+
+static void *image_pull_open(const char *name, int oflag, mode_t mode,
 		void *context, size_t *size, int *err)
 {
-	struct image_pull_session *session = context;
-	int res_count, count=0, offset=0;
-	struct img_hdesc *desc;
-	struct imglisting_aparam *aparam;
-	struct imglist_resp *resp;
-	int i;
-
-	if (err != NULL)
-		*err = 0;
-
-	if (session->aparam_data == NULL) {
-		if (err != NULL)
-			*err = -EBADR;
-		return NULL;
-	}
-
-	aparam = parse_aparam(session->aparam_data, session->aparam_data_len,
-			err);
-
-	if (aparam == NULL)
-		return NULL;
-
-	count = aparam->nbreturnedhandles;
-	offset = aparam->liststartoffset;
-
-	printf("object len: %u\n", session->desc_hdr_len);
-	for (i = 0; i < (signed int)session->desc_hdr_len; i++)
-		printf("%d: %c\n", i, session->desc_hdr[i]);
-
-	desc = parse_handles_desc(session->desc_hdr, session->desc_hdr_len,
-			err);
-
-	printf("%p\n", desc);
-
-	if (desc == NULL) {
-		g_free(aparam);
-		if (err != NULL)
-			*err = -EBADR;
-		return NULL;
-	}
-	printf("desc = %p\n", desc);
-
-	printf("imglisting_open\n");
-
-	resp = g_new0(struct imglist_resp, 1);
-	resp->body = create_images_listing(session, count, offset, &res_count,
-			desc);
-	resp->aparam = cr_imglist_aparam_r(res_count);
-	resp->hdesc = create_hdesc_hdr(session->desc_hdr, session->desc_hdr_len);
-
-	printf("response: %u %u %u\n", resp->body->len, resp->aparam->len,
-			resp->hdesc->len);
-
-	free_img_hdesc(desc);
-	g_free(aparam);
-	return resp;
+	struct imglisting_data *data = imglisting_open(name, oflag, mode,
+							context, size, err);
+	printf("image_pull_open\n");
+	data->get_image_list = pullcb;
+	return data;
 }
 
 static ssize_t imglisting_read(void *object, void *buf, size_t count)
 {
-	struct imglist_resp *resp = object;
-	GString *data;
-	/*if (resp->aparam->len > 0) {
-		data = resp->aparam;
-		*hi = OBEX_HDR_APPARAM;
-	}*/
-	/*if (resp->hdesc->len > 0) {
-		data = resp->hdesc;
-		*hi = IMG_DESC_HDR;
-	}*/
-	data = resp->body;
-	printf("imglisting_read %u\n", data->len);
-	return string_read(data, buf, count);
+	struct imglisting_data *data = object;
+	printf("imglisting_read\n");
+	if (data == NULL)
+		return -EBADR;
+	printf("imglisting_read %u\n", data->body->len);
+	return string_read(data->body, buf, count);
 }
 
 static int imglisting_close(void *object)
 {
-	struct imglist_resp *resp = object;
-
-	g_string_free(resp->aparam, TRUE);
-	g_string_free(resp->hdesc, TRUE);
-	g_string_free(resp->body, TRUE);
-
 	return 0;
 }
 
@@ -503,8 +557,10 @@ static struct obex_mime_type_driver imglisting = {
 	.target = IMAGE_PULL_TARGET,
 	.target_size = TARGET_SIZE,
 	.mimetype = "x-bt/img-listing",
-	.open = imglisting_open,
+	.open = image_pull_open,
 	.close = imglisting_close,
+	.feed_next_header = feed_next_header,
+	.get_next_header = imgimg_get_next_header,
 	.read = imglisting_read,
 };
 
@@ -512,8 +568,10 @@ static struct obex_mime_type_driver imglisting_aos = {
 	.target = IMAGE_AOS_TARGET,
 	.target_size = TARGET_SIZE,
 	.mimetype = "x-bt/img-listing",
-	.open = imglisting_open,
+	.open = image_pull_open,
 	.close = imglisting_close,
+	.feed_next_header = feed_next_header,
+	.get_next_header = imgimg_get_next_header,
 	.read = imglisting_read,
 };
 

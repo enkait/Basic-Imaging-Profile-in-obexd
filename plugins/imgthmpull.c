@@ -52,6 +52,7 @@
 #include "mimetype.h"
 #include "service.h"
 #include "imgthmpull.h"
+#include "imglisting.h"
 #include "image_pull.h"
 #include "filesystem.h"
 #include "bip_util.h"
@@ -100,7 +101,7 @@ static void *imgthmpull_open(const char *name, int oflag, mode_t mode,
 
 	printf("handle = %d\n", handle);
 	
-	if ((il = get_listing(session, handle, err)) == NULL)
+	if ((il = get_listing(session->image_list, handle, err)) == NULL)
 		return NULL;
 
 	if ((fd = get_thumbnail_fd(il->image, err)) < 0)

@@ -56,6 +56,7 @@
 #include "service.h"
 #include "obex-priv.h"
 #include "image_pull.h"
+#include "imglisting.h"
 #include "bip_util.h"
 
 #define AOS_SID "000102030405060708090A0B0C0D0E0F"
@@ -142,13 +143,6 @@
 
 static const char * bip_dir="/tmp/bip/";
 
-void img_listing_free(struct img_listing *listing)
-{
-	g_free(listing->image);
-	free_image_attributes(listing->attr);
-	g_free(listing);
-}
-
 static void free_image_pull_session(struct image_pull_session *session)
 {
 	GSList *image_list;
@@ -164,25 +158,6 @@ static void free_image_pull_session(struct image_pull_session *session)
 	g_free(session->handle_hdr);
 	g_free(session->desc_hdr);
 	g_free(session);
-}
-
-struct img_listing *get_listing(struct image_pull_session *session, int handle, int *err)
-{
-	GSList *images = session->image_list;
-
-	if (err != NULL)
-		*err = 0;
-
-	while (images != NULL) {
-		struct img_listing *il = images->data;
-		if (il->handle == handle)
-			return il;
-		images = g_slist_next(images);
-	}
-	
-	if (err != NULL)
-		*err = -ENOENT;
-	return NULL;
 }
 
 static gboolean remove_image(struct image_pull_session *session, struct img_listing *il, int *err) {
@@ -350,7 +325,7 @@ int image_pull_put(struct obex_session *os, obex_object_t *obj,
 	if (handle < 0)
 		return -EBADR;
 
-	if ((il = get_listing(session, handle, &err)) == NULL)
+	if ((il = get_listing(session->image_list, handle, &err)) == NULL)
 		return err;
 	
 	if (!remove_image(session, il, &err))

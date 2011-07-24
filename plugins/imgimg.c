@@ -89,6 +89,7 @@ static struct imgimg_data *imgimg_open(const char *name, int oflag, mode_t mode,
 	struct imgimg_data *data = g_new0(struct imgimg_data, 1);
 	printf("imgimg_open\n");
 	data->context = context;
+	data->handle = -1;
 
 	if (!name) {
 		if (err != NULL)
@@ -112,6 +113,7 @@ static int pushcb(void *context, char *path, int *handle_out) {
 	struct pushed_image *img = NULL;
 	char *new_path = NULL;
 	printf("pushcb %p %s\n", context, path);
+	printf("%s %s\n", session->os->name, session->bip_root);
 
 	if ((new_path = safe_rename(session->os->name, session->bip_root,
 								path)) == NULL)
@@ -136,62 +138,6 @@ static void *image_push_open(const char *name, int oflag, mode_t mode,
 	struct imgimg_data *data =
 		imgimg_open(name, oflag, mode, context, size, err);
 	data->finished_cb = pushcb;
-	return data;
-}
-
-//static int thmpushcb(void *context, char *path) {
-	/*
-	int handle = parse_handle(ips->handle_hdr, ips->handle_hdr_len);
-	char *new_path, *name;
-	GString *thmname = NULL;
-
-	if (handle < 0)
-		return -EBADR;
-	img = get_pushed_image(ips, handle);
-
-	if (img == NULL)
-		return -EEXIST;
-
-	printf("path: %s\n", img->image);
-	name = g_path_get_basename(img->image);
-	thmname = g_string_new(name);
-	thmname = g_string_append(thmname, "_thm");
-	g_free(name);
-
-	if ((new_path = safe_rename(thmname->str, bip_root, ips->file_path))
-								== NULL) {
-		g_string_free(thmname, TRUE);
-		return -errno;
-	}
-	g_string_free(thmname, TRUE);
-	printf("newpath: %s\n", new_path);
-
-	struct image_push_session *session = context;
-	struct pushed_image *img = NULL;
-	char *new_path = NULL;
-	printf("pushcb %p %s\n", context, path);
-	if ((new_path = safe_rename(session->os->name, session->bip_root, path)) == NULL)
-		return -errno;
-	img = g_new0(struct pushed_image, 1);
-	img->handle = get_new_handle(session);
-	if (img->handle < 0) {
-		g_free(img);
-		g_free(new_path);
-		return -EBADR;
-	}
-	img->image = new_path;
-	session->pushed_images = g_slist_append(session->pushed_images, img);
-	return 0;
-	*/
-//	return 0;
-//}
-
-static void *image_push_thm_open(const char *name, int oflag, mode_t mode,
-		void *context, size_t *size, int *err)
-{
-	struct imgimg_data *data =
-		imgimg_open(name, oflag, mode, context, size, err);
-//	data->finished_cb = thmpushcb;
 	return data;
 }
 
@@ -229,7 +175,7 @@ static ssize_t imgimg_get_next_header(void *object, void *buf, size_t mtu,
 								uint8_t *hi) {
 	struct imgimg_data *data = object;
 	ssize_t len;
-	printf("imgimg_get_next_header\n");
+	printf("imgimg_get_next_header %d\n", data->handle);
 	if (data->handle_sent)
 		return 0;
 	if ((len = add_reply_handle(buf, mtu, hi, data->handle)) < 0)
@@ -245,13 +191,16 @@ static int imgimg_flush(void *object)
 	printf("imgimg_flush\n");
 	if (data->finished_cb != NULL)
 		if ((err = data->finished_cb(data->context, data->path,
-								&handle)) < 0)
+								&handle)) < 0) {
+			printf("err = %d\n", err);
 			return err;
+		}
+	printf("handle = %d\n", handle);
 	data->handle = handle;
 	return 0;
 }
 
-static int imgimg_close(void *object)
+int imgimg_close(void *object)
 {
 	struct imgimg_data *data = object;
 	printf("imgimg_close\n");
@@ -262,7 +211,7 @@ static int imgimg_close(void *object)
 	return 0;
 }
 
-static ssize_t imgimg_write(void *object, const void *buf, size_t count)
+ssize_t imgimg_write(void *object, const void *buf, size_t count)
 {
 	struct imgimg_data *data = object;
 	ssize_t ret = write(data->fd, buf, count);
@@ -281,15 +230,6 @@ static struct obex_mime_type_driver imgimg = {
 	.write = imgimg_write,
 	.flush = imgimg_flush,
 	.get_next_header = imgimg_get_next_header,
-};
-
-static struct obex_mime_type_driver imgimgthm = {
-	.target = IMAGE_PUSH_TARGET,
-	.target_size = TARGET_SIZE,
-	.mimetype = "x-bt/img-thm",
-	.open = image_push_thm_open,
-	.close = imgimg_close,
-	.write = imgimg_write,
 };
 
 void *img_capabilities_open(const char *name, int oflag, mode_t mode,
@@ -326,16 +266,12 @@ static int imgimg_init(void)
 		return res;
 	}
 
-	if ((res = obex_mime_type_driver_register(&imgimgthm)) < 0) {
-		return res;
-	}
 	return obex_mime_type_driver_register(&imgimg);
 }
 
 static void imgimg_exit(void)
 {
 	obex_mime_type_driver_unregister(&imgimg);
-	obex_mime_type_driver_unregister(&imgimgthm);
 	obex_mime_type_driver_unregister(&img_capabilities);
 }
 

@@ -1013,11 +1013,6 @@ int obex_get_stream_start(struct obex_session *os, const char *filename)
 		return err;
 	}
 
-	if ((err = obex_feed_headers(os)) < 0) {
-		error("open(%s): %s (%d)", filename, strerror(-err), -err);
-		return err;
-	}
-
 	os->object = object;
 	os->offset = 0;
 	os->size = size;
@@ -1026,6 +1021,11 @@ int obex_get_stream_start(struct obex_session *os, const char *filename)
 		os->buf = g_malloc0(os->tx_mtu);
 
 	os->body_streamed = FALSE;
+
+	if ((err = obex_feed_headers(os)) < 0) {
+		error("obex_feed_headers(%p): %s (%d)", os, strerror(-err), -err);
+		return err;
+	}
 
 	return 0;
 }
@@ -1054,6 +1054,11 @@ int obex_put_stream_start(struct obex_session *os, const char *filename)
 		return 0;
 
 	os->body_streamed = FALSE;
+
+	if ((err = obex_feed_headers(os)) < 0) {
+		error("obex_feed_headers(%p): %s (%d)", os, strerror(-err), -err);
+		return err;
+	}
 
 	return obex_read_stream(os, os->obex, NULL);
 }
