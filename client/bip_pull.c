@@ -283,13 +283,6 @@ static struct images_listing_aparam *new_images_listing_aparam(uint16_t nb,
 	return aparam;
 }
 
-static struct a_header *create_handle(const char *handle) {
-	struct a_header *ah = g_new0(struct a_header, 1);
-	ah->hi = IMG_HANDLE_HDR;
-	ah->hv.bs = encode_img_handle(handle, strlen(handle), &ah->hv_size);
-	return ah;
-}
-
 struct native_prop {
 	char *encoding, *pixel, *size;
 };
