@@ -104,13 +104,6 @@ static void put_image_failed(struct session_data *session, char *err)
 				DBUS_TYPE_INVALID);
 }
 
-static struct a_header *create_handle(const char *handle) {
-	struct a_header *ah = g_try_new(struct a_header, 1);
-	ah->hi = IMG_HANDLE_HDR;
-	ah->hv.bs = encode_img_handle(handle, 7, &ah->hv_size);
-	return ah;
-}
-
 static void put_thumbnail_callback(struct session_data *session, GError *err,
 							void *user_data)
 {
@@ -196,7 +189,7 @@ static void put_image_callback(struct session_data *session, GError *err,
 	parse_client_user_headers(session, NULL, NULL, &handle, &length);
 	transfer_unregister(transfer);
 
-	printf("callback called %s\n", handle);
+	printf("callback called %s %d\n", handle, required);
 
 	if (handle == NULL) {
 		put_image_failed(session, "ImproperHandle");
@@ -586,9 +579,18 @@ gboolean bip_register_interface(DBusConnection *connection, const char *path,
 	else if (memcmp(session->target, REMOTE_DISPLAY_UUID,
 				session->target_len) == 0) {
 		printf("REMOTE_DISPLAY_INTERFACE\n");
-		return g_dbus_register_interface(connection, path,
+
+		if (!g_dbus_register_interface(connection, path,
 							REMOTE_DISPLAY_INTERFACE,
 							remote_display_methods,
+							NULL,
+							NULL, user_data,
+							destroy))
+			return FALSE;
+
+		return g_dbus_register_interface(connection, path,
+							IMAGE_PUSH_INTERFACE,
+							NULL,
 							remote_display_signals,
 							NULL, user_data,
 							destroy);

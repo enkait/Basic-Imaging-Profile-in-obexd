@@ -518,10 +518,10 @@ done:
 
 	size = transfer->size < UINT32_MAX ? transfer->size : 0;
 	transfer->xfer = gw_obex_put_async_with_aheaders(session->obex,
-            transfer->name, transfer->type,
-            apparam, apparam_size,
-            transfer->aheaders,
-            size, -1, NULL);
+					transfer->name, transfer->type,
+					apparam, apparam_size,
+					transfer->aheaders,
+					size, -1, NULL);
 	if (transfer->xfer == NULL)
 		return -ENOTCONN;
 

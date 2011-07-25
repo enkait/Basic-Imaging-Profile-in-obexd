@@ -22,6 +22,7 @@
 #include <openobex/obex_const.h>
 
 #include "log.h"
+#include "obex-xfer.h"
 #include "obex-priv.h"
 #include "bip_util.h"
 #include "wand/MagickWand.h"
@@ -509,6 +510,13 @@ static char *append_number(const char *path, unsigned int number) {
 	new_path = g_string_new(path);
 	g_string_append_printf(new_path, "_%u", number);
 	return g_string_free(new_path, FALSE);
+}
+
+struct a_header *create_handle(const char *handle) {
+	struct a_header *ah = g_new0(struct a_header, 1);
+	ah->hi = IMG_HANDLE_HDR;
+	ah->hv.bs = encode_img_handle(handle, strlen(handle), &ah->hv_size);
+	return ah;
 }
 
 char *safe_rename(const char *name, const char *folder,

@@ -1,0 +1,183 @@
+#!/usr/bin/python
+
+import gobject
+
+import sys
+import dbus
+import dbus.service
+import dbus.mainloop.glib
+import os.path
+from optparse import OptionParser
+
+class Agent(dbus.service.Object):
+    def __init__(self, conn=None, obj_path=None, verbose=False):
+        dbus.service.Object.__init__(self, conn, obj_path)
+        self.verbose = verbose
+
+    @dbus.service.method("org.openobex.Agent",
+                    in_signature="o", out_signature="s")
+    def Request(self, path):
+        return ""
+
+    @dbus.service.method("org.openobex.Agent",
+                    in_signature="ot", out_signature="")
+    def Progress(self, path, transferred):
+        if self.verbose:
+            print "Transfer progress (%d bytes)" % (transferred)
+        return
+
+    @dbus.service.method("org.openobex.Agent",
+                    in_signature="o", out_signature="")
+    def Complete(self, path):
+        if self.verbose:
+            print "Transfer finished"
+        mainloop.quit()
+
+    @dbus.service.method("org.openobex.Agent",
+                    in_signature="os", out_signature="")
+    def Error(self, path, error):
+        print "Transfer finished with an error: %s" % (error)
+        mainloop.quit()
+
+    @dbus.service.method("org.openobex.Agent",
+                    in_signature="", out_signature="")
+    def Release(self):
+        mainloop.quit()
+
+tasks = []
+
+def put_image_attachment_callback(option, opt, value, parser):
+        tasks.append(("attachment", value.split(',')))
+
+def put_image_callback(option, opt, value, parser):
+        tasks.append(("image", value.split(',')))
+
+def images_listing_callback(option, opt, value, parser):
+        tasks.append(("listing", 0))
+
+def cap_callback(option, opt, value, parser):
+        tasks.append(("capabilities", 0))
+
+def parse_options():
+    parser.add_option("-d", "--device", dest="device",
+                      help="Device to connect", metavar="DEVICE")
+    parser.add_option("-p", "--push", type="string", action="callback",
+                      callback=put_image_callback,
+                      help="Push image\nExample: -p [path to file]")
+    parser.add_option("-l", "--listing", action="callback",
+                      callback=images_listing_callback,
+                      help="Get images listing\nExample: -l")
+    parser.add_option("-c", "--capabilities", action="callback",
+                      callback=cap_callback,
+                      help="Get imaging capabilities\n")
+    parser.add_option("-v", "--verbose", action="store_true", dest="verbose")
+
+    return parser.parse_args()
+
+cur = 0
+bip = None
+
+def image_push(session, filename):
+    session.PutModifiedImage(os.path.abspath(filename),"BMP",1000,200,"fill")
+
+def image_attachment_push(session, filename, handle):
+    session.PutImageAttachment(os.path.abspath(filename),handle)
+    print "Push Attachment finished"
+
+def imaging_capabilities(session):
+    print session.GetImagingCapabilities()
+
+def images_listing(session):
+    print "listing\n"
+    print session.GetImagesListing({"count" : dbus.UInt16(1), "offset" : dbus.UInt16(1)})
+    print session.GetImagesListing({"count" : dbus.UInt16(2), "offset" : dbus.UInt16(2)})
+    print session.GetImagesListing({"count" : dbus.UInt16(3), "offset" : dbus.UInt16(3)})
+    print "pixel 100*200-400*400"
+    print session.GetImagesListing({"pixel" : "100*200-400*400"})
+    print "pixel 100*200-1600*1600"
+    print session.GetImagesListing({"pixel" : "100*200-1600*1600"})
+    print "pixel 1680*1050"
+    print session.GetImagesListing({"pixel" : "1680*1050"})
+    print "pixel 168**-3360*2100"
+    print session.GetImagesListing({"pixel" : "168**-3360*2100"})
+    print "encoding BMP"
+    print session.GetImagesListing({"encoding" : "BMP"})
+    print "created: 20110621T184115Z-20110621T184115Z"
+    print session.GetImagesListing({"created" : "20110621T184115Z-20110621T184115Z"})
+    print "created: 20110621T184116Z-20110621T184116Z"
+    print session.GetImagesListing({"created" : "20110621T184116Z-20110621T184116Z"})
+    print session.GetImagesListing({"latest" : True})
+
+def execute():
+    global tasks
+    if len(tasks) == 0:
+        return
+    entry = tasks[0]
+    tasks.pop(0)
+    if entry[0] == "image":
+        image_push(bip, entry[1][0])
+    if entry[0] == "listing":
+        images_listing(bip)
+    if entry[0] == "capabilities":
+        imaging_capabilities(bip)
+    print "method returned"
+
+def image_push_completed(handle):
+    print "Image pushed, received handle: "+handle
+    execute()
+
+def image_push_failed(reason):
+    print "Image push failed, reason: "+reason
+    execute()
+
+def attachment_push_completed():
+    print "Attachment push completed"
+    execute()
+
+def attachment_push_failed(reason):
+    print "Attachment push failed, reason: "+reason
+    execute()
+
+if  __name__ == '__main__':
+
+    dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+
+    parser = OptionParser()
+
+    (options, args) = parse_options()
+
+    if not options.device:
+        parser.print_help()
+        sys.exit(0)
+
+    bus = dbus.SessionBus()
+    mainloop = gobject.MainLoop()
+
+    path = "/test/agent"
+    agent = Agent(bus, path, options.verbose)
+	
+    bus.add_signal_receiver(image_push_completed,
+	dbus_interface="org.openobex.ImagePush",
+	signal_name="PutImageCompleted")
+    
+    bus.add_signal_receiver(image_push_failed,
+	dbus_interface="org.openobex.ImagePush",
+	signal_name="PutImageFailed")
+    
+    client = dbus.Interface(bus.get_object("org.openobex.client", "/"),
+                            "org.openobex.Client")
+
+    session_path = client.CreateSession({ "Destination": options.device,
+        "Target": "BIP:RD"})
+
+    session = dbus.Interface(bus.get_object("org.openobex.client", session_path),
+                 "org.openobex.Session")
+
+    session.AssignAgent(path)
+
+    bip = dbus.Interface(bus.get_object("org.openobex.client", session_path),
+                 "org.openobex.RemoteDisplay")
+    
+    execute()
+
+    mainloop.run()
