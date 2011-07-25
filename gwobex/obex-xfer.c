@@ -611,6 +611,7 @@ gboolean gw_obex_xfer_close(GwObexXfer *xfer, gint *err) {
     }
 
     /* Disassociate from the GwObex object */
+    ctx->xfer_running = FALSE;
     ctx->xfer = NULL;
     xfer->ctx = NULL;
 

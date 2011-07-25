@@ -165,6 +165,7 @@ struct gw_obex {
 
     /* Current object transfer handle */
     struct gw_obex_xfer     *xfer;
+    gboolean                xfer_running;
 };
 
 GwObex *make_context(obex_t *handle);

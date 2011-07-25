@@ -289,7 +289,7 @@ static inline void show_headers(obex_t *handle, obex_object_t *object) {}
 static void obex_abort_done(GwObex *ctx, obex_object_t *object,
                             int obex_cmd, int obex_rsp) {
     ctx->done = TRUE;
-    if (ctx->xfer)
+    if (ctx->xfer_running && ctx->xfer)
         ctx->xfer->do_cb = TRUE;
 
     if (obex_rsp != OBEX_RSP_SUCCESS)
@@ -344,7 +344,7 @@ static void get_non_body_headers(obex_t *handle, obex_object_t *object,
 static void obex_request_done(GwObex *ctx, obex_object_t *object,
                               int obex_cmd, int obex_rsp) {
     ctx->done = TRUE;
-    if (ctx->xfer)
+    if (ctx->xfer_running && ctx->xfer)
         ctx->xfer->do_cb = TRUE;
 
     ctx->obex_rsp = obex_rsp;
@@ -364,7 +364,7 @@ static void obex_request_done(GwObex *ctx, obex_object_t *object,
         return;
     }
 
-    if (ctx->xfer)
+    if(ctx->xfer_running && ctx->xfer)
         get_non_body_headers(ctx->handle, object, ctx->xfer);
 
     debug("%s command (0x%02x) succeeded.\n", optostr((uint8_t)obex_cmd),
@@ -384,7 +384,7 @@ static void obex_readstream(GwObex *ctx, obex_object_t *object) {
     const uint8_t *buf;
     int actual;
 
-    if (!xfer) {
+    if (!ctx->xfer_running || !ctx->xfer) {
         debug("Incomming data even though no xfer active!\n");
         /* Flush incomming stream */
         actual = OBEX_ObjectReadStream(ctx->handle, object, &buf);
@@ -453,7 +453,7 @@ static void obex_writestream(GwObex *ctx, obex_object_t *object) {
     obex_headerdata_t hv;
     int actual = -1;
 
-    if (!xfer) {
+    if (!ctx->xfer_running || !ctx->xfer) {
         debug("Request to provide data even though no active xfer!");
         hv.bs = NULL;
         OBEX_ObjectAddHeader(ctx->handle, object, OBEX_HDR_BODY,
@@ -583,7 +583,7 @@ gboolean gw_obex_set_error(GwObex *ctx) {
     if (!ctx->done)
         return FALSE;
 
-    if (ctx->xfer && ctx->xfer->abort)
+    if (ctx->xfer_running && ctx->xfer && ctx->xfer->abort)
         ctx->error = GW_OBEX_ERROR_ABORT;
     else if (ctx->conn_fd < 0 || ctx->link_err)
         ctx->error = GW_OBEX_ERROR_DISCONNECT;
@@ -618,7 +618,7 @@ void obex_link_error(GwObex *ctx) {
         g_source_destroy(ctx->gio_source);
         ctx->gio_source = NULL;
     }
-    if (ctx->xfer) {
+    if (ctx->xfer_running && ctx->xfer) {
         /* Check that buffer is owned by us */
         if (!(ctx->obex_op == OBEX_CMD_PUT && ctx->xfer->stream_fd < 0)) {
             g_free(ctx->xfer->buf);
@@ -664,7 +664,7 @@ gboolean gw_obex_cb(GIOChannel *chan, GIOCondition cond, gpointer data) {
         debug("gw_obex_cb: error or connection closed\n");
         obex_link_error(ctx);
         GW_OBEX_UNLOCK(ctx);
-        if (ctx->xfer && ctx->xfer->cb)
+        if (ctx->xfer_running && ctx->xfer && ctx->xfer->cb)
             ctx->xfer->cb(ctx->xfer, ctx->xfer->cb_data);
 	else if (ctx->dc_cb)
             ctx->dc_cb(ctx, ctx->dc_data);
@@ -675,7 +675,7 @@ gboolean gw_obex_cb(GIOChannel *chan, GIOCondition cond, gpointer data) {
     OBEX_HandleInput(ctx->handle, 0);
     debug("Returned from OBEX_HandleInput\n");
 
-    if (ctx->xfer && ctx->xfer->cb && ctx->xfer->do_cb) {
+    if (ctx->xfer_running && ctx->xfer && ctx->xfer->cb && ctx->xfer->do_cb) {
         ctx->xfer->do_cb = FALSE;
         GW_OBEX_UNLOCK(ctx);
         ctx->xfer->cb(ctx->xfer, ctx->xfer->cb_data);
@@ -690,7 +690,7 @@ gboolean gw_obex_cb(GIOChannel *chan, GIOCondition cond, gpointer data) {
 gboolean gw_obex_disconnect(GwObex *ctx) {
     obex_object_t *object;
 
-    g_assert(!ctx->xfer);
+    g_assert(!ctx->xfer_running);
 
     if (!ctx->done) {
         ctx->error = GW_OBEX_ERROR_BUSY;
@@ -712,7 +712,7 @@ gboolean gw_obex_connect(GwObex *ctx, const char *target, size_t target_len) {
     gboolean ret;
     obex_object_t *object;
 
-    g_assert(ctx->done && !ctx->xfer);
+    g_assert(ctx->done && !ctx->xfer_running);
 
     ctx->obex_op = OBEX_CMD_CONNECT;
 
@@ -755,7 +755,7 @@ gboolean gw_obex_action_op(GwObex *ctx, const gchar *src, const gchar *dst,
 
     g_assert(src && dst);
 
-    if (!ctx->done || ctx->xfer) {
+    if (!ctx->done || ctx->xfer_running) {
         ctx->error = GW_OBEX_ERROR_BUSY;
         return FALSE;
     }
@@ -805,7 +805,7 @@ gboolean gw_obex_setpath(GwObex *ctx, const gchar *path, int flags) {
     gunichar2 *uname;
     glong uname_len;
 
-    if (!ctx->done || ctx->xfer) {
+    if (!ctx->done || ctx->xfer_running) {
         ctx->error = GW_OBEX_ERROR_BUSY;
         return FALSE;
     }
@@ -876,14 +876,19 @@ gboolean gw_obex_get_with_aheaders(GwObex *ctx, const gchar *local,
     g_assert(local || buf || stream_fd > 0 || async);
     g_assert(remote || type);
 
-    if (!ctx->done || ctx->xfer) {
+    if (!ctx->done || ctx->xfer_running) {
         ctx->error = GW_OBEX_ERROR_BUSY;
         return ret;
     }
 
     ctx->obex_op = OBEX_CMD_GET;
 
+    if (ctx->xfer) {
+        _gw_obex_xfer_free(ctx->xfer);
+	ctx->xfer = NULL;
+    }
     ctx->xfer = gw_obex_xfer_new(ctx, async, stream_fd);
+    ctx->xfer_running = TRUE;
 
     object = OBEX_ObjectNew(ctx->handle, OBEX_CMD_GET);
 
@@ -983,8 +988,9 @@ gboolean gw_obex_get_with_aheaders(GwObex *ctx, const gchar *local,
     }
 
 out:
-    _gw_obex_xfer_free(ctx->xfer);
-    ctx->xfer = NULL;
+    //_gw_obex_xfer_free(ctx->xfer);
+    //ctx->xfer = NULL;
+    ctx->xfer_running = FALSE;
 
     ctx->report_progress = FALSE;
     ctx->obex_op = OBEX_CMD_NONE;
@@ -1019,7 +1025,7 @@ gboolean gw_obex_put_with_aheaders(GwObex *ctx,
 
     g_assert(remote || type);
 
-    if (!ctx->done || ctx->xfer) {
+    if (!ctx->done || ctx->xfer_running) {
         ctx->error = GW_OBEX_ERROR_BUSY;
         return FALSE;
     }
@@ -1033,7 +1039,13 @@ gboolean gw_obex_put_with_aheaders(GwObex *ctx,
     }
 
     ctx->obex_op = OBEX_CMD_PUT;
+
+    if (ctx->xfer) {
+        _gw_obex_xfer_free(ctx->xfer);
+	ctx->xfer = NULL;
+    }
     ctx->xfer = gw_obex_xfer_new(ctx, async, stream_fd);
+    ctx->xfer_running = TRUE;
 
     if (local) {
         if (file_is_dir(local)) {
@@ -1158,8 +1170,9 @@ out:
     if (buf)
         ctx->xfer->buf = NULL;
 
-    _gw_obex_xfer_free(ctx->xfer);
-    ctx->xfer = NULL;
+    //_gw_obex_xfer_free(ctx->xfer);
+    //ctx->xfer = NULL;
+    ctx->xfer_running = FALSE;
 
     ctx->report_progress = FALSE;
     ctx->obex_op = OBEX_CMD_NONE;
