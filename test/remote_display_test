@@ -46,11 +46,11 @@ class Agent(dbus.service.Object):
 
 tasks = []
 
-def put_image_attachment_callback(option, opt, value, parser):
-        tasks.append(("attachment", value.split(',')))
-
 def put_image_callback(option, opt, value, parser):
         tasks.append(("image", value.split(',')))
+
+def select_callback(option, opt, value, parser):
+        tasks.append(("select", value.split(',')))
 
 def images_listing_callback(option, opt, value, parser):
         tasks.append(("listing", 0))
@@ -64,6 +64,9 @@ def parse_options():
     parser.add_option("-p", "--push", type="string", action="callback",
                       callback=put_image_callback,
                       help="Push image\nExample: -p [path to file]")
+    parser.add_option("-s", "--select", type="string", action="callback",
+                      callback=select_callback,
+                      help="Select image\nExample: -s [handle]")
     parser.add_option("-l", "--listing", action="callback",
                       callback=images_listing_callback,
                       help="Get images listing\nExample: -l")
@@ -80,9 +83,9 @@ bip = None
 def image_push(session, filename):
     session.PutModifiedImage(os.path.abspath(filename),"BMP",1000,200,"fill")
 
-def image_attachment_push(session, filename, handle):
-    session.PutImageAttachment(os.path.abspath(filename),handle)
-    print "Push Attachment finished"
+def select(session, handle):
+    session.SelectImage(handle)
+    print "select returned"
 
 def imaging_capabilities(session):
     print session.GetImagingCapabilities()
@@ -120,6 +123,8 @@ def execute():
         images_listing(bip)
     if entry[0] == "capabilities":
         imaging_capabilities(bip)
+    if entry[0] == "select":
+        select(bip, entry[1][0])
     print "method returned"
 
 def image_push_completed(handle):
