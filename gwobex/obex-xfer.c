@@ -125,10 +125,13 @@ GwObexXfer *gw_obex_put_async(GwObex *ctx, const char *name, const char *type,
     return ret ? ctx->xfer : NULL;
 }
 
-GwObexXfer *gw_obex_put_async_with_aheaders(GwObex *ctx, const char *name, const char *type,
-		const guint8 *apparam, gint apparam_size,
-        const GSList *aheaders,
-        gint size, time_t time, gint *error) {
+GwObexXfer *gw_obex_put_async_with_aheaders(GwObex *ctx, const char *name,
+						const char *type,
+						const guint8 *apparam,
+						gint apparam_size,
+						const GSList *aheaders,
+						gint size, time_t time,
+						gint *error) {
     gboolean ret;
     GW_OBEX_LOCK(ctx);
     CHECK_DISCONNECT(NULL, error, ctx);
@@ -581,6 +584,7 @@ gboolean gw_obex_xfer_close(GwObexXfer *xfer, gint *err) {
     }
 
     /* Disassociate from the GwObex object */
+    ctx->xfer_running = FALSE;
     ctx->xfer = NULL;
     xfer->ctx = NULL;
 
