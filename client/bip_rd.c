@@ -28,7 +28,7 @@ static int remote_display(DBusConnection *conn, struct session_data *session,
 	GSList *aheaders = NULL;
 	int err;
 
-	printf("requested remote display\n");
+	printf("requested remote display %x\n", aparam->rd);
 
 	aheaders = g_slist_append(NULL, handles_desc);
 
@@ -68,7 +68,9 @@ static DBusMessage *select_image(DBusConnection *connection,
 	char *handle = NULL;
 	int ret_handle = 0;
 	DBusMessage *ret = NULL;
+	//DBusMessageIter iter;
 	struct rd_aparam *aparam = NULL;
+	printf("select_image\n");
 
 	if (dbus_message_get_args(message, NULL,
 				DBUS_TYPE_STRING, &handle,
@@ -96,6 +98,7 @@ static DBusMessage *select_image(DBusConnection *connection,
 
 	ret_handle = remote_display(connection, user_data, aparam, ah);
 	printf("%d\n", ret_handle);
+	ret = dbus_message_new_method_return(message);
 
 cleanup:
 	return ret;
@@ -107,8 +110,7 @@ GDBusMethodTable remote_display_methods[] = {
 	{ "PutModifiedImage", "ssuus", "", put_modified_image },
 	{ "GetImagesListing",	"a{sv}", "aa{ss}", get_images_listing,
 		G_DBUS_METHOD_FLAG_ASYNC },
-	{ "RemoteDisplay",	"a{sv}", "s", get_images_listing,
-		G_DBUS_METHOD_FLAG_ASYNC },
+	{ "RemoteDisplay",	"a{sv}", "s", get_images_listing },
 	{ }
 };
 
