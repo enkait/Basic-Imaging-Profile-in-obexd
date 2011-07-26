@@ -22,6 +22,13 @@ gwobex_sources = gwobex/gw-obex.h gwobex/gw-obex.c \
 
 btio_sources = btio/btio.h btio/btio.c
 
+gobex_sources = gobex/gobex.h gobex/gobex.c \
+			gobex/gobex-defs.h gobex/gobex-defs.c \
+			gobex/gobex-packet.c gobex/gobex-packet.h \
+			gobex/gobex-header.c gobex/gobex-header.h \
+			gobex/gobex-transfer.c
+
+noinst_PROGRAMS =
 libexec_PROGRAMS =
 
 if SERVER
@@ -110,7 +117,8 @@ builtin_nodist += plugins/messages.c
 libexec_PROGRAMS += src/obexd
 
 src_obexd_SOURCES = $(gdbus_sources) $(builtin_sources) $(btio_sources) \
-			src/main.c src/obexd.h src/plugin.h src/plugin.c \
+			$(gobex_sources) src/main.c src/obexd.h \
+			src/plugin.h src/plugin.c \
 			src/log.h src/log.c src/dbus.h src/manager.c \
 			src/obex.h src/obex.c src/obex-priv.h \
 			src/mimetype.h src/mimetype.c \
@@ -134,7 +142,7 @@ plugindir = $(libdir)/obex/plugins
 
 plugin_LTLIBRARIES =
 
-noinst_PROGRAMS = test/obex-test
+noinst_PROGRAMS += test/obex-test
 
 test_obex_test_SOURCES = $(gwobex_sources) test/main.c
 
@@ -152,7 +160,7 @@ service_in_files += client/obex-client.service.in
 
 libexec_PROGRAMS += client/obex-client
 
-client_obex_client_SOURCES = $(gdbus_sources) \
+client_obex_client_SOURCES = $(gdbus_sources) $(gobex_sources) \
 				$(gwobex_sources) $(btio_sources) \
 				client/main.c src/log.h src/log.c \
 				client/session.h client/session.c \
@@ -178,7 +186,7 @@ AM_CFLAGS = @OPENOBEX_CFLAGS@ @BLUEZ_CFLAGS@ @EBOOK_CFLAGS@ \
 
 INCLUDES = -I$(builddir)/src -I$(srcdir)/src -I$(srcdir)/plugins \
 				-I$(srcdir)/gdbus -I$(srcdir)/gwobex \
-				-I$(srcdir)/btio
+				-I$(srcdir)/btio -I$(srcdir)/gobex
 
 CLEANFILES = $(service_DATA) $(builtin_files)
 
@@ -202,3 +210,37 @@ plugins/phonebook.c: plugins/@PHONEBOOK_DRIVER@
 
 plugins/messages.c: plugins/@MESSAGES_DRIVER@
 	$(AM_V_GEN)$(LN_S) @abs_top_srcdir@/$< $@
+
+TESTS = unit/test-gobex-header unit/test-gobex-packet unit/test-gobex \
+						unit/test-gobex-transfer
+
+noinst_PROGRAMS += unit/test-gobex-header unit/test-gobex-packet \
+				unit/test-gobex unit/test-gobex-transfer
+
+unit_test_gobex_SOURCES = $(gobex_sources) unit/test-gobex.c \
+							unit/util.c unit/util.h
+unit_test_gobex_LDADD = @GLIB_LIBS@
+
+unit_test_gobex_packet_SOURCES = $(gobex_sources) unit/test-gobex-packet.c \
+							unit/util.c unit/util.h
+unit_test_gobex_packet_LDADD = @GLIB_LIBS@
+
+unit_test_gobex_header_SOURCES = $(gobex_sources) unit/test-gobex-header.c \
+							unit/util.c unit/util.h
+unit_test_gobex_header_LDADD = @GLIB_LIBS@
+
+unit_test_gobex_transfer_SOURCES = $(gobex_sources) unit/util.c unit/util.h \
+						unit/test-gobex-transfer.c
+unit_test_gobex_transfer_LDADD = @GLIB_LIBS@
+
+if READLINE
+noinst_PROGRAMS += tools/test-client
+tools_test_client_SOURCES = $(gobex_sources) $(btio_sources) \
+							tools/test-client.c
+tools_test_client_LDADD = @GLIB_LIBS@ @BLUEZ_LIBS@ @READLINE_LIBS@
+endif
+
+noinst_PROGRAMS += tools/test-server
+tools_test_server_SOURCES = $(gobex_sources) $(btio_sources) \
+							tools/test-server.c
+tools_test_server_LDADD = @GLIB_LIBS@ @BLUEZ_LIBS@
