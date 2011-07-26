@@ -19,14 +19,17 @@
 #include "bip_util.h"
 #include "bip_arch.h"
 
-
-
-static int remote_display(DBusConnection *conn, struct session_data *session,
+static char *remote_display(DBusConnection *conn, struct session_data *session,
 						struct rd_aparam *aparam,
-						struct a_header *handles_desc)
+						struct a_header *handles_desc,
+						int *err)
 {
 	GSList *aheaders = NULL;
-	int err;
+	char *handle = NULL, *ret = NULL;
+	unsigned int handle_len = 0;
+
+	if (err != NULL)
+		*err = 0;
 
 	printf("requested remote display %x\n", aparam->rd);
 
@@ -37,18 +40,33 @@ static int remote_display(DBusConnection *conn, struct session_data *session,
 						(const guint8 *)aparam,
 						sizeof(struct rd_aparam),
 						aheaders,
-						NULL, 0, -1, &err)) {
-		return err;
+						NULL, 0, -1, err)) {
+		goto cleanup;
 	}
 
-	if (session->obex->xfer != NULL) {
-		printf("win\n");
+	g_assert(session->obex->xfer != NULL);
+
+	parse_client_user_headers(session->obex->xfer, NULL, NULL,
+					&handle, &handle_len);
+
+	printf("parse_client_user_headers\n");
+	printf("GOT HANDLE LEN: %d\n", handle_len);
+
+	if (handle_len == 0) {
+		ret = g_strdup("");
 	}
-	else {
-		printf("fail\n");
+	else if (parse_handle(handle, handle_len) < 0) {
+		if (err != NULL)
+			*err = -EINVAL;
+		goto cleanup;
 	}
 
-	return 0;
+	printf("get_null_terminated %u\n", handle_len);
+	ret = get_null_terminated(handle, handle_len);
+	printf("%d %s\n", handle_len, ret);
+cleanup:
+	g_free(handle);
+	return ret;
 }
 
 static struct rd_aparam *new_rd_aparam(int operation) {
@@ -62,20 +80,82 @@ static struct rd_aparam *new_rd_aparam(int operation) {
 	return aparam;
 }
 
+static DBusMessage *rd_operation(DBusConnection *connection,
+					DBusMessage *message,
+					void *user_data, int operation)
+{
+	struct a_header *ah = NULL;
+	char *ret_handle = 0;
+	int err = 0;
+	DBusMessage *reply = NULL;
+	DBusMessageIter iter;
+	struct rd_aparam *aparam = NULL;
+	printf("select_image\n");
+
+	ah = create_handle("");
+
+	if (ah == NULL) {
+		reply = g_dbus_create_error(message,
+				"org.openobex.Error", "Failed");
+		goto cleanup;
+	}
+
+	aparam = new_rd_aparam(operation);
+
+	if (aparam == NULL) {
+		reply = g_dbus_create_error(message,
+				"org.openobex.Error.InvalidArguments", NULL);
+		goto cleanup;
+	}
+
+	ret_handle = remote_display(connection, user_data, aparam, ah, &err);
+	printf("%s\n", ret_handle);
+	reply = dbus_message_new_method_return(message);
+	dbus_message_iter_init_append(reply, &iter);
+	if (!dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &ret_handle)) {
+		reply = g_dbus_create_error(message,
+				"org.openobex.Error", "Failed");
+		goto cleanup;
+	}
+
+cleanup:
+	return reply;
+}
+
+static DBusMessage *next_image(DBusConnection *connection,
+				DBusMessage *message, void *user_data)
+{
+	return rd_operation(connection, message, user_data, RD_OP_NEXT);
+}
+
+static DBusMessage *previous_image(DBusConnection *connection,
+				DBusMessage *message, void *user_data)
+{
+	return rd_operation(connection, message, user_data, RD_OP_PREVIOUS);
+}
+
+static DBusMessage *current_image(DBusConnection *connection,
+				DBusMessage *message, void *user_data)
+{
+	return rd_operation(connection, message, user_data, RD_OP_CURRENT);
+}
+
 static DBusMessage *select_image(DBusConnection *connection,
-				DBusMessage *message, void *user_data) {
+				DBusMessage *message, void *user_data)
+{
 	struct a_header *ah = NULL;
 	char *handle = NULL;
-	int ret_handle = 0;
-	DBusMessage *ret = NULL;
-	//DBusMessageIter iter;
+	char *ret_handle = 0;
+	int err = 0;
+	DBusMessage *reply = NULL;
+	DBusMessageIter iter;
 	struct rd_aparam *aparam = NULL;
 	printf("select_image\n");
 
 	if (dbus_message_get_args(message, NULL,
 				DBUS_TYPE_STRING, &handle,
 				DBUS_TYPE_INVALID) == FALSE) {
-		ret = g_dbus_create_error(message,
+		reply = g_dbus_create_error(message,
 				"org.openobex.Error.InvalidArguments", NULL);
 		goto cleanup;
 	}
@@ -83,7 +163,7 @@ static DBusMessage *select_image(DBusConnection *connection,
 	ah = create_handle(handle);
 
 	if (ah == NULL) {
-		ret = g_dbus_create_error(message,
+		reply = g_dbus_create_error(message,
 				"org.openobex.Error.InvalidArguments", NULL);
 		goto cleanup;
 	}
@@ -91,21 +171,37 @@ static DBusMessage *select_image(DBusConnection *connection,
 	aparam = new_rd_aparam(RD_OP_SELECT);
 
 	if (aparam == NULL) {
-		ret = g_dbus_create_error(message,
+		reply = g_dbus_create_error(message,
 				"org.openobex.Error.InvalidArguments", NULL);
 		goto cleanup;
 	}
 
-	ret_handle = remote_display(connection, user_data, aparam, ah);
-	printf("%d\n", ret_handle);
-	ret = dbus_message_new_method_return(message);
+	if ((ret_handle = remote_display(connection, user_data,
+						aparam, ah, &err)) == NULL) {
+		reply = g_dbus_create_error(message,
+				"org.openobex.Error", "Failed");
+		goto cleanup;
+	}
+
+	printf("remote_display returned\n");
+	printf("%p\n", ret_handle);
+	reply = dbus_message_new_method_return(message);
+	dbus_message_iter_init_append(reply, &iter);
+	if (!dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &ret_handle)) {
+		reply = g_dbus_create_error(message,
+				"org.openobex.Error", "Failed");
+		goto cleanup;
+	}
 
 cleanup:
-	return ret;
+	return reply;
 }
 
 GDBusMethodTable remote_display_methods[] = {
-	{ "SelectImage", "s", "", select_image },
+	{ "SelectImage", "s", "s", select_image },
+	{ "NextImage", "s", "s", next_image },
+	{ "PreviousImage", "s", "s", previous_image },
+	{ "CurrentImage", "s", "s", current_image },
 	{ "PutImage", "s", "", put_image },
 	{ "PutModifiedImage", "ssuus", "", put_modified_image },
 	{ "GetImagesListing",	"a{sv}", "aa{ss}", get_images_listing,

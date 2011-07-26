@@ -45,14 +45,12 @@
 
 #define BIP_TEMP_FOLDER /tmp/bip/
 
-void parse_client_user_headers(const struct session_data *session,
+void parse_client_user_headers(GwObexXfer *xfer,
 				char **desc_hdr,
 				unsigned int *desc_hdr_len,
 				char **handle_hdr,
 				unsigned int *handle_hdr_len)
 {
-	struct transfer_data *transfer = session->pending->data;
-	GwObexXfer *xfer = transfer->xfer;
 	struct a_header *ah;
 	
 	if (desc_hdr != NULL && desc_hdr_len != NULL) {
@@ -71,13 +69,20 @@ void parse_client_user_headers(const struct session_data *session,
 		return;
 
 	ah = a_header_find(xfer->aheaders, IMG_HANDLE_HDR);
-	
+	printf("ah->hv_size = %u\n", ah->hv_size);
+
 	if (ah != NULL) {
+		int i;
 		printf("handle: %u\n", ah->hv_size);
+		for (i = 0; i < (int)ah->hv_size; i++)
+			printf("%c %x\n", ah->hv.bs[i], ah->hv.bs[i]);
 		*handle_hdr = decode_img_handle(ah->hv.bs, ah->hv_size,
 							handle_hdr_len);
+		printf("handle: %u\n", *handle_hdr_len);
+		for (i = 0; i < (int)*handle_hdr_len; i++)
+			printf("%c %x\n", (*handle_hdr)[i], (*handle_hdr)[i]);
 	}
-	
+
 	ah = a_header_find(xfer->aheaders, IMG_DESC_HDR);
 
 	if (ah != NULL) {
@@ -186,7 +191,8 @@ static void put_image_callback(struct session_data *session, GError *err,
 		return;
 	}
 	required = (session->obex->obex_rsp == OBEX_RSP_PARTIAL_CONTENT)?(1):(0);
-	parse_client_user_headers(session, NULL, NULL, &handle, &length);
+	parse_client_user_headers(transfer->xfer, NULL, NULL, &handle,
+								&length);
 	transfer_unregister(transfer);
 
 	printf("callback called %s %d\n", handle, required);
@@ -399,20 +405,6 @@ DBusMessage *put_image(DBusConnection *connection,
 	result = put_transformed_image(message, session, image_path, image_path, NULL);
 cleanup:
 	return result;
-}
-
-static char *get_null_terminated(char *buffer, int len) {
-	char *newbuffer;
-	if (buffer[len-1] != '\0') {
-		newbuffer = g_try_malloc(len + 1);
-		g_memmove(newbuffer, buffer, len);
-		newbuffer[len]='\0';
-		printf("null terminating\n");
-	}
-	else {
-		newbuffer = g_memdup(buffer, len);
-	}
-	return newbuffer;
 }
 
 static void get_imaging_capabilities_callback(

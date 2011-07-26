@@ -52,6 +52,15 @@ def put_image_callback(option, opt, value, parser):
 def select_callback(option, opt, value, parser):
         tasks.append(("select", value.split(',')))
 
+def next_callback(option, opt, value, parser):
+        tasks.append(("next", value.split(',')))
+
+def previous_callback(option, opt, value, parser):
+        tasks.append(("previous", value.split(',')))
+
+def current_callback(option, opt, value, parser):
+        tasks.append(("current", value.split(',')))
+
 def images_listing_callback(option, opt, value, parser):
         tasks.append(("listing", 0))
 
@@ -67,6 +76,15 @@ def parse_options():
     parser.add_option("-s", "--select", type="string", action="callback",
                       callback=select_callback,
                       help="Select image\nExample: -s [handle]")
+    parser.add_option("-n", "--next", type="string", action="callback",
+                      callback=next_callback,
+                      help="Next image\nExample: -n")
+    parser.add_option("-r", "--prev", type="string", action="callback",
+                      callback=previous_callback,
+                      help="Previous image\nExample: -r")
+    parser.add_option("-t", "--current", type="string", action="callback",
+                      callback=current_callback,
+                      help="Current image\nExample: -t")
     parser.add_option("-l", "--listing", action="callback",
                       callback=images_listing_callback,
                       help="Get images listing\nExample: -l")
@@ -84,11 +102,26 @@ def image_push(session, filename):
     session.PutModifiedImage(os.path.abspath(filename),"BMP",1000,200,"fill")
 
 def select(session, handle):
-    session.SelectImage(handle)
-    print "select returned"
+    print "calling selectimage"
+    print session.SelectImage(handle)
+    print "Lol"
+    execute()
 
 def imaging_capabilities(session):
     print session.GetImagingCapabilities()
+    execute()
+
+def next_image(session):
+    print session.NextImage()
+    execute()
+
+def previous_image(session):
+    print session.PreviousImage()
+    execute()
+
+def current_image(session):
+    print session.CurrentImage()
+    execute()
 
 def images_listing(session):
     print "listing\n"
@@ -112,6 +145,7 @@ def images_listing(session):
     print session.GetImagesListing({"latest" : True})
 
 def execute():
+    print "execute"
     global tasks
     if len(tasks) == 0:
         return
@@ -119,13 +153,18 @@ def execute():
     tasks.pop(0)
     if entry[0] == "image":
         image_push(bip, entry[1][0])
-    if entry[0] == "listing":
+    elif entry[0] == "listing":
         images_listing(bip)
-    if entry[0] == "capabilities":
+    elif entry[0] == "capabilities":
         imaging_capabilities(bip)
-    if entry[0] == "select":
+    elif entry[0] == "select":
         select(bip, entry[1][0])
-    print "method returned"
+    elif entry[0] == "next":
+        next_image(bip)
+    elif entry[0] == "previous":
+        previous_image(bip)
+    elif entry[0] == "current":
+        current_image(bip)
 
 def image_push_completed(handle):
     print "Image pushed, received handle: "+handle
