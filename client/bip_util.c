@@ -59,7 +59,11 @@ uint8_t *encode_img_handle(const char *data, unsigned int length, unsigned int *
 char *decode_img_handle(const uint8_t *data, unsigned int length, unsigned int *newsize) {
 	glong size;
 	char *handle;
+	unsigned int i;
+	for (i = 0; i < length - 3; i++)
+		printf("(data+2)[i] = (%c,%x)\n", (data+2)[i], (data+2)[i]);
 	handle = g_utf16_to_utf8((gunichar2 *) (data + 2), length - 3, NULL, &size, NULL);
+	printf("size of decoded image handle: %ld\n", size);
 	*newsize = size;
 	return handle;
 }
@@ -552,5 +556,22 @@ cleanup:
 	g_free(new_name);
 	g_free(new_path);
 	return test_path;
+}
+
+char *get_null_terminated(char *buffer, int len) {
+	char *newbuffer;
+	if (len <= 0) {
+		newbuffer = g_strdup("");
+	}
+	else if (buffer[len-1] != '\0') {
+		newbuffer = g_try_malloc(len + 1);
+		g_memmove(newbuffer, buffer, len);
+		newbuffer[len]='\0';
+		printf("null terminating\n");
+	}
+	else {
+		newbuffer = g_memdup(buffer, len);
+	}
+	return newbuffer;
 }
 
