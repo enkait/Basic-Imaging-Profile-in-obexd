@@ -53,13 +53,13 @@ def select_callback(option, opt, value, parser):
         tasks.append(("select", value.split(',')))
 
 def next_callback(option, opt, value, parser):
-        tasks.append(("next", value.split(',')))
+        tasks.append(("next", 0))
 
 def previous_callback(option, opt, value, parser):
-        tasks.append(("previous", value.split(',')))
+        tasks.append(("previous", 0))
 
 def current_callback(option, opt, value, parser):
-        tasks.append(("current", value.split(',')))
+        tasks.append(("current", 0))
 
 def images_listing_callback(option, opt, value, parser):
         tasks.append(("listing", 0))
@@ -76,13 +76,13 @@ def parse_options():
     parser.add_option("-s", "--select", type="string", action="callback",
                       callback=select_callback,
                       help="Select image\nExample: -s [handle]")
-    parser.add_option("-n", "--next", type="string", action="callback",
+    parser.add_option("-n", "--next", action="callback",
                       callback=next_callback,
                       help="Next image\nExample: -n")
-    parser.add_option("-r", "--prev", type="string", action="callback",
+    parser.add_option("-r", "--prev", action="callback",
                       callback=previous_callback,
                       help="Previous image\nExample: -r")
-    parser.add_option("-t", "--current", type="string", action="callback",
+    parser.add_option("-t", "--current", action="callback",
                       callback=current_callback,
                       help="Current image\nExample: -t")
     parser.add_option("-l", "--listing", action="callback",
