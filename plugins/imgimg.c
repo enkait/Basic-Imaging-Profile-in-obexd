@@ -51,7 +51,9 @@
 #include "mimetype.h"
 #include "service.h"
 #include "imgimg.h"
+#include "imglisting.h"
 #include "image_push.h"
+#include "remote_display.h"
 #include "filesystem.h"
 #include "bip_util.h"
 
@@ -141,17 +143,55 @@ static void *image_push_open(const char *name, int oflag, mode_t mode,
 	return data;
 }
 
-static ssize_t add_reply_handle(void *buf, size_t mtu, uint8_t *hi, int handle)
+static int remote_display_cb(void *context, char *path, int *handle_out) {
+	struct remote_display_session *session = context;
+	struct img_listing *il = NULL;
+	int err = 0, handle;
+	printf("pushcb %p %s\n", context, path);
+	printf("%s %s\n", session->os->name, session->dir);
+
+	handle = get_new_handle_rd(session);
+
+	if (handle < 0) {
+		err = -EBADR;
+		goto cleanup;
+	}
+
+	il = get_img_listing(path, handle, &err);
+
+	if (il == NULL) {
+		err = -EBADR;
+		goto cleanup;
+	}
+	session->image_list = g_slist_append(session->image_list, il);
+	*handle_out = il->handle;
+	printf("handle: %d\n", *handle_out);
+cleanup:
+	return err;
+}
+
+static void *remote_display_open(const char *name, int oflag, mode_t mode,
+		void *context, size_t *size, int *err)
+{
+	struct imgimg_data *data =
+		imgimg_open(name, oflag, mode, context, size, err);
+	data->finished_cb = remote_display_cb;
+	return data;
+}
+
+ssize_t add_reply_handle(void *buf, size_t mtu, uint8_t *hi, int handle)
 {
 	GString *handle_str = g_string_new("");
 	uint8_t *handle_hdr;
 	unsigned int handle_hdr_len;
 
-	if (handle < 0 || handle >= HANDLE_LIMIT) {
+	if (handle < -1 || handle >= HANDLE_LIMIT) {
 		g_string_free(handle_str, TRUE);
 		return -EBADR;
 	}
-	g_string_append_printf(handle_str, "%07d", handle);
+	if (handle != -1) {
+		g_string_append_printf(handle_str, "%07d", handle);
+	}
 	handle_hdr = encode_img_handle(handle_str->str, handle_str->len,
 							&handle_hdr_len);
 	g_string_free(handle_str, TRUE);
@@ -176,10 +216,16 @@ static ssize_t imgimg_get_next_header(void *object, void *buf, size_t mtu,
 	struct imgimg_data *data = object;
 	ssize_t len;
 	printf("imgimg_get_next_header %d\n", data->handle);
-	if (data->handle_sent)
+
+	if (data->handle_sent) {
+		*hi = OBEX_HDR_EMPTY;
 		return 0;
-	if ((len = add_reply_handle(buf, mtu, hi, data->handle)) < 0)
+	}
+
+	if ((len = add_reply_handle(buf, mtu, hi, data->handle)) < 0) {
+		printf("LEN = %d\n", len);
 		return len;
+	}
 	data->handle_sent = TRUE;
 	return len;
 }
@@ -232,6 +278,17 @@ static struct obex_mime_type_driver imgimg = {
 	.get_next_header = imgimg_get_next_header,
 };
 
+static struct obex_mime_type_driver imgimg_rd = {
+	.target = REMOTE_DISPLAY_TARGET,
+	.target_size = TARGET_SIZE,
+	.mimetype = "x-bt/img-img",
+	.open = remote_display_open,
+	.close = imgimg_close,
+	.write = imgimg_write,
+	.flush = imgimg_flush,
+	.get_next_header = imgimg_get_next_header,
+};
+
 void *img_capabilities_open(const char *name, int oflag, mode_t mode,
 		void *context, size_t *size, int *err)
 {
@@ -266,12 +323,17 @@ static int imgimg_init(void)
 		return res;
 	}
 
+	if ((res = obex_mime_type_driver_register(&imgimg_rd)) < 0) {
+		return res;
+	}
+
 	return obex_mime_type_driver_register(&imgimg);
 }
 
 static void imgimg_exit(void)
 {
 	obex_mime_type_driver_unregister(&imgimg);
+	obex_mime_type_driver_unregister(&imgimg_rd);
 	obex_mime_type_driver_unregister(&img_capabilities);
 }
 

@@ -40,16 +40,19 @@ uint8_t *encode_img_handle(const char *data, unsigned int length, unsigned int *
 	uint8_t *utf16buf = (uint8_t *) g_convert(data, length,
 					"UTF16BE", "UTF8", NULL, &newlen, NULL);
 	uint8_t *res;
+	newlen += 2;
 
 	if (utf16buf == NULL)
 		return NULL;
 
-	res = g_malloc(newlen+1);
-	g_memmove(res, utf16buf, newlen+1);
+	res = g_malloc(newlen);
+	g_memmove(res, utf16buf, newlen);
+	res[newlen-2] = '\0';
+	res[newlen-1] = '\0';
 	g_free(utf16buf);
 
 	printf("encode_img_handle newlen = %d\n", newlen);
-	*newsize = newlen + 1;
+	*newsize = newlen;
 	return (uint8_t *) res;
 }
 

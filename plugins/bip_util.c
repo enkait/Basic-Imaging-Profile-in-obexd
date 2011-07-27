@@ -22,6 +22,7 @@
 #include <openobex/obex_const.h>
 
 #include "log.h"
+#include "obex-xfer.h"
 #include "obex-priv.h"
 #include "bip_util.h"
 #include "wand/MagickWand.h"
@@ -35,34 +36,57 @@ static const gchar *valid_name_chars="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP
 static const gchar rep_char='_';
 
 uint8_t *encode_img_handle(const char *data, unsigned int length, unsigned int *newsize) {
-	glong newlen;
-	gunichar2 *utf16buf = g_utf8_to_utf16(data,length,NULL,&newlen,NULL);
-	guint8 *buf;
-	uint16_t len;
+	gsize newlen;
+	uint8_t *utf16buf = (uint8_t *) g_convert(data, length,
+					"UTF16BE", "UTF8", NULL, &newlen, NULL);
+	uint8_t *res;
+	newlen += 2;
 
 	if (utf16buf == NULL)
 		return NULL;
-	
-	buf = g_try_malloc(3+sizeof(gunichar2) * newlen);
-	len = sizeof(gunichar2) * newlen;
-	len = GUINT16_TO_BE(len);
-	if (buf == NULL)
-		return NULL;
-	g_memmove(buf, &len, 2);
-	g_memmove(buf + 2, utf16buf, sizeof(gunichar2) * length);
-	buf[sizeof(gunichar2) * length + 2] = '\0';
-	*newsize = sizeof(gunichar2) * length + 3;
-	return buf;
+
+	res = g_malloc(newlen);
+	g_memmove(res, utf16buf, newlen);
+	res[newlen-2] = '\0';
+	res[newlen-1] = '\0';
+	g_free(utf16buf);
+
+	printf("encode_img_handle newlen = %d\n", newlen);
+	*newsize = newlen;
+	return (uint8_t *) res;
 }
 
 char *decode_img_handle(const uint8_t *data, unsigned int length, unsigned int *newsize) {
-	glong size;
+	gsize size;
 	char *handle;
-	handle = g_utf16_to_utf8((gunichar2 *) (data + 2), length - 3, NULL, &size, NULL);
+	unsigned int i;
+	//for (j = 0; j <= length - 3; j++) {
+	//	for (i = 0; i < j; i++) {
+	//		printf("(data+2)[i] = (%c,%x)\n", (data+2)[i], (data+2)[i]);
+	//	}
+	//	handle = g_utf16_to_utf8((gunichar2 *) (data + 2), j, NULL, &size, NULL);
+		/*
+		printf("size of decoded image handle: %ld\n", size);
+		handle = g_convert((char *) data + 2, j,
+					"UTF8", "UTF16BE", NULL, NULL, NULL);
+		if (handle != NULL) {
+			printf("handle = %p\n", handle);
+			size = strlen(handle);
+			printf("size of decoded image handle: %ld\n", size);
+		}*/
+	//}
+	handle = g_convert((char *) data, length,
+					"UTF8", "UTF16BE", NULL, &size, NULL);
+	if (handle == NULL) {
+		return NULL;
+	}
+	printf("result data %d\n", size);
+	for (i = 0; i < (unsigned int)size; i++) {
+		printf("handle[%d] = (%c,%x)\n", i, handle[i], handle[i]);
+	}
 	*newsize = size;
 	return handle;
 }
-
 
 uint8_t *encode_img_descriptor(const char *data, unsigned int length, unsigned int *newsize) {
 	uint16_t len = length;
@@ -511,6 +535,13 @@ static char *append_number(const char *path, unsigned int number) {
 	return g_string_free(new_path, FALSE);
 }
 
+struct a_header *create_handle(const char *handle) {
+	struct a_header *ah = g_new0(struct a_header, 1);
+	ah->hi = IMG_HANDLE_HDR;
+	ah->hv.bs = encode_img_handle(handle, strlen(handle), &ah->hv_size);
+	return ah;
+}
+
 char *safe_rename(const char *name, const char *folder,
 							const char *orig_path)
 {
@@ -544,5 +575,22 @@ cleanup:
 	g_free(new_name);
 	g_free(new_path);
 	return test_path;
+}
+
+char *get_null_terminated(char *buffer, int len) {
+	char *newbuffer;
+	if (len <= 0) {
+		newbuffer = g_strdup("");
+	}
+	else if (buffer[len-1] != '\0') {
+		newbuffer = g_try_malloc(len + 1);
+		g_memmove(newbuffer, buffer, len);
+		newbuffer[len]='\0';
+		printf("null terminating\n");
+	}
+	else {
+		newbuffer = g_memdup(buffer, len);
+	}
+	return newbuffer;
 }
 

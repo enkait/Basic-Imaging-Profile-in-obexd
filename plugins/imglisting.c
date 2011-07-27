@@ -519,7 +519,39 @@ static ssize_t imglisting_get_next_header(void *object, void *buf, size_t mtu,
 		data->hdesc = NULL;
 		return len;
 	}
+	*hi = OBEX_HDR_EMPTY;
 	return 0;
+}
+
+struct img_listing *get_img_listing(const char *path, int handle, int *err) {
+	struct image_attributes *attr = NULL;
+	struct img_listing *il = NULL;
+	struct stat file_stat;
+
+	if (lstat(path, &file_stat) < 0) {
+		if (err != NULL)
+			*err = -EBADR;
+		return NULL;
+	}
+	if (!(file_stat.st_mode & S_IFREG)) {
+		if (err != NULL)
+			*err = -EBADR;
+		return NULL;
+	}
+	if ((attr = get_image_attributes(path, err)) == NULL) {
+		if (err != NULL)
+			*err = -EBADR;
+		return NULL;
+	}
+	printf("passed verification: %s\n", path);
+	il = g_new0(struct img_listing, 1);
+	il->image = g_strdup(path);
+	il->mtime = file_stat.st_mtime;
+	il->ctime = file_stat.st_ctime;
+	il->handle = handle;
+	il->attr = attr;
+	printf("image added: %s\n", il->image);
+	return il;
 }
 
 static GSList *pullcb(void *context, int *err) {
@@ -545,7 +577,7 @@ static void *image_pull_open(const char *name, int oflag, mode_t mode,
 static GSList *remote_display_cb(void *context, int *err) {
 	struct remote_display_session *session = context;
 	printf("remote_display_cb\n");
-	return get_image_list(session->dir, err);
+	return session->image_list;
 }
 
 static void *remote_display_open(const char *name, int oflag, mode_t mode,

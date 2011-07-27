@@ -742,8 +742,10 @@ static int obex_write(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 	if (os->buf == NULL)
 		os->buf = g_malloc0(os->tx_mtu);
 
-	while ((len = os->driver->get_next_header(os->object, os->buf,
-					os->tx_mtu, &hi)) != 0) {
+	while (TRUE) {
+		len = os->driver->get_next_header(os->object, os->buf,
+					os->tx_mtu, &hi);
+
 		if (len < 0) {
 			error("get_next_header(): %s (%zd)", strerror(-len),
 								-len);
@@ -756,6 +758,9 @@ static int obex_write(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 
 			return len;
 		}
+
+		if (hi == OBEX_HDR_EMPTY)
+			break;
 
 		hd.bs = os->buf;
 		OBEX_ObjectAddHeader(obex, obj, hi, hd, len, 0);
@@ -1045,6 +1050,11 @@ int obex_put_stream_start(struct obex_session *os, const char *filename)
 
 	os->path = g_strdup(filename);
 
+	if ((err = obex_feed_headers(os)) < 0) {
+		error("obex_feed_headers(%p): %s (%d)", os, strerror(-err), -err);
+		return err;
+	}
+
 	if (!os->buf) {
 		DBG("PUT request checked, no buffered data");
 		return 0;
@@ -1054,11 +1064,6 @@ int obex_put_stream_start(struct obex_session *os, const char *filename)
 		return 0;
 
 	os->body_streamed = FALSE;
-
-	if ((err = obex_feed_headers(os)) < 0) {
-		error("obex_feed_headers(%p): %s (%d)", os, strerror(-err), -err);
-		return err;
-	}
 
 	return obex_read_stream(os, os->obex, NULL);
 }
