@@ -736,7 +736,6 @@ static gboolean append_prop(DBusMessageIter *args,
 	return TRUE;
 }
 
-
 DBusMessage *get_image_properties(DBusConnection *connection,
 		DBusMessage *message, void *user_data)
 {
