@@ -103,8 +103,11 @@ def image_push(session, filename):
 
 def select(session, handle):
     print "calling selectimage"
-    print session.SelectImage(handle)
-    print "Lol"
+    try:
+        print session.SelectImage(handle)
+        print "Lol"
+    except Exception:
+        print "DBUSEXCEPTION"
     execute()
 
 def imaging_capabilities(session):
@@ -112,14 +115,23 @@ def imaging_capabilities(session):
     execute()
 
 def next_image(session):
-    print session.NextImage()
+    print "calling nextimage"
+    try:
+        print session.NextImage()
+    except Exception:
+        print "DBUSEXCEPTION"
     execute()
 
 def previous_image(session):
-    print session.PreviousImage()
+    print "calling previousimage"
+    try:
+        print session.PreviousImage()
+    except Exception:
+        print "DBUSEXCEPTION"
     execute()
 
 def current_image(session):
+    print "calling currentimage"
     print session.CurrentImage()
     execute()
 

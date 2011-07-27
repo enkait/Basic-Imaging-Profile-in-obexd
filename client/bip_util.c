@@ -36,38 +36,45 @@ static const gchar *valid_name_chars="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP
 static const gchar rep_char='_';
 
 uint8_t *encode_img_handle(const char *data, unsigned int length, unsigned int *newsize) {
-	glong newlen;
-	gunichar2 *utf16buf = g_utf8_to_utf16(data,length,NULL,&newlen,NULL);
-	guint8 *buf;
-	uint16_t len;
-
+	gsize newlen;
+	uint8_t *utf16buf = (uint8_t *) g_convert(data, length,
+					"UTF16BE", "UTF8", NULL, &newlen, NULL);
 	if (utf16buf == NULL)
 		return NULL;
-	
-	buf = g_try_malloc(3+sizeof(gunichar2) * newlen);
-	len = sizeof(gunichar2) * newlen;
-	len = GUINT16_TO_BE(len);
-	if (buf == NULL)
-		return NULL;
-	g_memmove(buf, &len, 2);
-	g_memmove(buf + 2, utf16buf, sizeof(gunichar2) * length);
-	buf[sizeof(gunichar2) * length + 2] = '\0';
-	*newsize = sizeof(gunichar2) * length + 3;
-	return buf;
+
+	printf("encode_img_handle newlen = %d\n", newlen);
+	*newsize = newlen + 1;
+	return (uint8_t *) utf16buf;
 }
 
 char *decode_img_handle(const uint8_t *data, unsigned int length, unsigned int *newsize) {
-	glong size;
+	gsize size;
 	char *handle;
 	unsigned int i;
-	for (i = 0; i < length - 3; i++)
-		printf("(data+2)[i] = (%c,%x)\n", (data+2)[i], (data+2)[i]);
-	handle = g_utf16_to_utf8((gunichar2 *) (data + 2), length - 3, NULL, &size, NULL);
-	printf("size of decoded image handle: %ld\n", size);
+	//for (j = 0; j <= length - 3; j++) {
+	//	for (i = 0; i < j; i++) {
+	//		printf("(data+2)[i] = (%c,%x)\n", (data+2)[i], (data+2)[i]);
+	//	}
+	//	handle = g_utf16_to_utf8((gunichar2 *) (data + 2), j, NULL, &size, NULL);
+		/*
+		printf("size of decoded image handle: %ld\n", size);
+		handle = g_convert((char *) data + 2, j,
+					"UTF8", "UTF16BE", NULL, NULL, NULL);
+		if (handle != NULL) {
+			printf("handle = %p\n", handle);
+			size = strlen(handle);
+			printf("size of decoded image handle: %ld\n", size);
+		}*/
+	//}
+	handle = g_convert((char *) data, length,
+					"UTF8", "UTF16BE", NULL, &size, NULL);
+	printf("result data\n");
+	for (i = 0; i < (unsigned int)size; i++) {
+		printf("handle[%d] = (%c,%x)\n", i, handle[i], handle[i]);
+	}
 	*newsize = size;
 	return handle;
 }
-
 
 uint8_t *encode_img_descriptor(const char *data, unsigned int length, unsigned int *newsize) {
 	uint16_t len = length;

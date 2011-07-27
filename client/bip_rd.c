@@ -104,11 +104,16 @@ static DBusMessage *rd_operation(DBusConnection *connection,
 
 	if (aparam == NULL) {
 		reply = g_dbus_create_error(message,
-				"org.openobex.Error.InvalidArguments", NULL);
+				"org.openobex.Error", "InvalidArguments");
 		goto cleanup;
 	}
 
 	ret_handle = remote_display(connection, user_data, aparam, ah, &err);
+	if (ret_handle == NULL) {
+		reply = g_dbus_create_error(message,
+				"org.openobex.Error", "Failed");
+		goto cleanup;
+	}
 	printf("%s\n", ret_handle);
 	reply = dbus_message_new_method_return(message);
 	dbus_message_iter_init_append(reply, &iter);
@@ -125,18 +130,21 @@ cleanup:
 static DBusMessage *next_image(DBusConnection *connection,
 				DBusMessage *message, void *user_data)
 {
+	printf("NEXT IMAGE\n");
 	return rd_operation(connection, message, user_data, RD_OP_NEXT);
 }
 
 static DBusMessage *previous_image(DBusConnection *connection,
 				DBusMessage *message, void *user_data)
 {
+	printf("PREVIOUS IMAGE\n");
 	return rd_operation(connection, message, user_data, RD_OP_PREVIOUS);
 }
 
 static DBusMessage *current_image(DBusConnection *connection,
 				DBusMessage *message, void *user_data)
 {
+	printf("CURRENT IMAGE\n");
 	return rd_operation(connection, message, user_data, RD_OP_CURRENT);
 }
 
@@ -199,9 +207,9 @@ cleanup:
 
 GDBusMethodTable remote_display_methods[] = {
 	{ "SelectImage", "s", "s", select_image },
-	{ "NextImage", "s", "s", next_image },
-	{ "PreviousImage", "s", "s", previous_image },
-	{ "CurrentImage", "s", "s", current_image },
+	{ "NextImage", "", "s", next_image },
+	{ "PreviousImage", "", "s", previous_image },
+	{ "CurrentImage", "", "s", current_image },
 	{ "PutImage", "s", "", put_image },
 	{ "PutModifiedImage", "ssuus", "", put_modified_image },
 	{ "GetImagesListing",	"a{sv}", "aa{ss}", get_images_listing,
