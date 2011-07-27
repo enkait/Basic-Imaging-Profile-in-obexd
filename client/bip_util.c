@@ -39,12 +39,18 @@ uint8_t *encode_img_handle(const char *data, unsigned int length, unsigned int *
 	gsize newlen;
 	uint8_t *utf16buf = (uint8_t *) g_convert(data, length,
 					"UTF16BE", "UTF8", NULL, &newlen, NULL);
+	uint8_t *res;
+
 	if (utf16buf == NULL)
 		return NULL;
 
+	res = g_malloc(newlen+1);
+	g_memmove(res, utf16buf, newlen+1);
+	g_free(utf16buf);
+
 	printf("encode_img_handle newlen = %d\n", newlen);
 	*newsize = newlen + 1;
-	return (uint8_t *) utf16buf;
+	return (uint8_t *) res;
 }
 
 char *decode_img_handle(const uint8_t *data, unsigned int length, unsigned int *newsize) {
@@ -68,7 +74,10 @@ char *decode_img_handle(const uint8_t *data, unsigned int length, unsigned int *
 	//}
 	handle = g_convert((char *) data, length,
 					"UTF8", "UTF16BE", NULL, &size, NULL);
-	printf("result data\n");
+	if (handle == NULL) {
+		return NULL;
+	}
+	printf("result data %d\n", size);
 	for (i = 0; i < (unsigned int)size; i++) {
 		printf("handle[%d] = (%c,%x)\n", i, handle[i], handle[i]);
 	}
