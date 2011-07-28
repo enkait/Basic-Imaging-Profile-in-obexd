@@ -75,7 +75,19 @@ char *decode_img_handle(const uint8_t *data, unsigned int length, unsigned int *
 			printf("size of decoded image handle: %ld\n", size);
 		}*/
 	//}
-	handle = g_convert((char *) data, length,
+
+	if (length == 0) {
+		*newsize = 0;
+		return g_strdup("");
+	}
+
+	if (length < 2)
+		return NULL;
+
+	if (data[length-1] != '\0' || data[length-2] != '\0')
+		return NULL;
+
+	handle = g_convert((char *) data, length - 2,
 					"UTF8", "UTF16BE", NULL, &size, NULL);
 	if (handle == NULL) {
 		return NULL;

@@ -225,9 +225,13 @@ static int imgdisplay_flush(void *object)
 		break;
 	case RD_OP_SELECT:
 		new_handle = data->handle;
+		il = get_listing(session->image_list, new_handle, &err);
+
+		if (il == NULL)
+			return -EBADR;
 		break;
 	case RD_OP_CURRENT:
-		new_handle = data->handle;
+		new_handle = session->displayed_handle;
 	}
 	printf("IMGDISPLAY ------------------------------------------------------------\n");
 	printf("next displayed handle: %d\n", new_handle);
