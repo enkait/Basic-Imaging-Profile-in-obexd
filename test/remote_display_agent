@@ -7,17 +7,21 @@ import dbus
 import dbus.service
 import dbus.mainloop.glib
 import os.path
+import time
+import subprocess
 from optparse import OptionParser
 
 class Agent(dbus.service.Object):
-    def __init__(self, conn=None, obj_path=None, verbose=False):
+    def __init__(self, conn=None, obj_path=None):
         dbus.service.Object.__init__(self, conn, obj_path)
-        self.verbose = verbose
+        self.okular = subprocess.Popen(["okular"])
+        self.iface = dbus.Interface(bus.get_object("org.kde.okular-"+str(self.okular.pid), "/okular"), "org.kde.okular")
 
     @dbus.service.method("org.openobex.DisplayImage",
                     in_signature="su", out_signature="")
     def DisplayImage(self, path, id):
         print "Display Image: path = " + str(path) + ", id = " + str(id)
+        iface.openDocument(path)
         return
 
 tasks = []
@@ -30,13 +34,11 @@ if  __name__ == '__main__':
     mainloop = gobject.MainLoop()
 
     path = "/test/rdagent"
-    agent = Agent(bus, path, True)
+    agent = Agent(bus, path)
 	
-    client = dbus.Interface(bus.get_object("org.openobex.RDManager",
+    obexd = dbus.Interface(bus.get_object("org.openobex.RDManager",
                             "/rdmanager"), "org.openobex.RDManager.RDManager")
 
-    print client
-
-    session_path = client.RegisterAgent(path)
+    session_path = obexd.RegisterAgent(path)
 
     mainloop.run()
