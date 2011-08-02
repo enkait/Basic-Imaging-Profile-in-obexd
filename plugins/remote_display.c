@@ -91,6 +91,18 @@
       </sequence>							\
     </sequence>								\
   </attribute>								\
+									\
+  <attribute id=\"0x0310\">						\
+    <uint8 value=\"0x0008\"/>						\
+  </attribute>								\
+									\
+  <attribute id=\"0x0311\">						\
+    <uint16 value=\"0x0100\"/>						\
+  </attribute>								\
+									\
+  <attribute id=\"0x0312\">						\
+    <uint32 value=\"0x003b\"/>						\
+  </attribute>								\
 </record>"
 
 #define HANDLE_LIMIT 10000000
