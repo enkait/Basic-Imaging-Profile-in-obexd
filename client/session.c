@@ -1426,7 +1426,7 @@ int session_get(struct session_data *session, const char *type,
 	}
 
 	transfer = transfer_register(session, filename, targetname, type,
-					params);
+					params, NULL);
 	if (transfer == NULL) {
 		if (params != NULL) {
 			g_free(params->data);
