@@ -35,6 +35,7 @@ struct session_data {
 	gint refcount;
 	bdaddr_t src;
 	bdaddr_t dst;
+	uint32_t supp_feat;
 	uint8_t channel;
 	char *service;		/* Service friendly name */
 	const char *target;	/* OBEX Target UUID */
