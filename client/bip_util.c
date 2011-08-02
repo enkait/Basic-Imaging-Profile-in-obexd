@@ -60,21 +60,6 @@ char *decode_img_handle(const uint8_t *data, unsigned int length, unsigned int *
 	gsize size;
 	char *handle;
 	unsigned int i;
-	//for (j = 0; j <= length - 3; j++) {
-	//	for (i = 0; i < j; i++) {
-	//		printf("(data+2)[i] = (%c,%x)\n", (data+2)[i], (data+2)[i]);
-	//	}
-	//	handle = g_utf16_to_utf8((gunichar2 *) (data + 2), j, NULL, &size, NULL);
-		/*
-		printf("size of decoded image handle: %ld\n", size);
-		handle = g_convert((char *) data + 2, j,
-					"UTF8", "UTF16BE", NULL, NULL, NULL);
-		if (handle != NULL) {
-			printf("handle = %p\n", handle);
-			size = strlen(handle);
-			printf("size of decoded image handle: %ld\n", size);
-		}*/
-	//}
 
 	if (length == 0) {
 		*newsize = 0;
