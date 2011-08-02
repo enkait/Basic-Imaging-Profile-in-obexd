@@ -184,6 +184,7 @@ struct transfer_data *transfer_register(struct session_data *session,
 						const char *filename,
 						const char *name,
 						const char *type,
+	                    struct transfer_params *params;
 						GSList *aheaders)
 {
 	struct transfer_data *transfer;
@@ -194,6 +195,7 @@ struct transfer_data *transfer_register(struct session_data *session,
 	transfer->name = g_strdup(name);
 	transfer->type = g_strdup(type);
 	transfer->params = params;
+	transfer->aheaders = aheaders;
 
 	/* for OBEX specific mime types we don't need to register a transfer */
 	if (type != NULL &&
