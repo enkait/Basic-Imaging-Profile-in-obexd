@@ -72,6 +72,9 @@ builtin_sources += plugins/mas.c plugins/messages.h
 builtin_modules += irmc
 builtin_sources += plugins/irmc.c
 
+builtin_modules += image_push
+builtin_sources += plugins/image_push.c
+
 builtin_modules += syncevolution
 builtin_sources += plugins/syncevolution.c
 
