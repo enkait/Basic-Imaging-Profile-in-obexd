@@ -426,6 +426,17 @@ static void search_callback(uint8_t type, uint16_t status,
 			break;
 		}
 
+		if (session->supp_feat != 0) {
+			uint32_t supp_feat = 0;
+
+			if (sdp_get_int_attr(rec, SDP_ATTR_SUPPORTED_FEATURES,
+						(int *) &supp_feat) < 0)
+				goto pass;
+
+			if (!(supp_feat & session->supp_feat))
+				goto pass;
+		}
+
 		if (!sdp_get_access_protos(rec, &protos)) {
 			ch = sdp_get_proto_port(protos, RFCOMM_UUID);
 			sdp_list_foreach(protos,
@@ -434,6 +445,7 @@ static void search_callback(uint8_t type, uint16_t status,
 			protos = NULL;
 		}
 
+pass:
 		sdp_record_free(rec);
 
 		if (ch > 0) {
