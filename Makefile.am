@@ -9,7 +9,8 @@ doc_files = doc/obexd-api.txt doc/agent-api.txt doc/client-api.txt
 
 test_files = test/simple-agent test/send-files \
 		test/pull-business-card test/exchange-business-cards \
-		test/list-folders test/pbap-client test/ftp-client
+		test/list-folders test/pbap-client test/ftp-client \
+		test/image_push_test
 
 gdbus_sources = gdbus/gdbus.h gdbus/mainloop.c gdbus/watch.c \
 					gdbus/object.c gdbus/polkit.c
