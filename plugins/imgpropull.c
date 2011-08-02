@@ -44,7 +44,6 @@
 
 #include <openobex/obex.h>
 #include <openobex/obex_const.h>
-#include "wand/MagickWand.h"
 
 #include "plugin.h"
 #include "log.h"
@@ -68,6 +67,13 @@
 #define ATTACHMENT_ELEMENT "<attachment content-type=\"application/octet-stream\" name=\"%s\" size=\"%jd\" created=\"%s\" modified=\"%s\"/>" EOL_CHARS
 
 #define IMG_PROPERTIES_END "</image-properties>" EOL_CHARS
+
+struct imgpropull_data {
+	void *context;
+	struct img_listing * (*get_img_listing) (void *context, int handle);
+	int handle;
+	GString *object;
+};
 
 static GString *append_attachments(GString *object, char *image_path) {
 	char *att_dir_path = get_att_dir(image_path);
@@ -106,8 +112,8 @@ done:
 	return object;
 }
 
-static GString *create_image_properties(struct image_pull_session *session,
-						struct img_listing *il) {
+static GString *create_image_properties(struct img_listing *il)
+{
 	struct encconv_pair * ep = encconv_table;
 	char *image_name = g_path_get_basename(il->image);
 
@@ -134,53 +140,95 @@ static GString *create_image_properties(struct image_pull_session *session,
 static void *imgpropull_open(const char *name, int oflag, mode_t mode,
 					void *context, size_t *size, int *err)
 {
-	struct image_pull_session *session = context;
-	int handle;
-	GString *object = NULL;
-	struct img_listing *il;
+	struct imgpropull_data *data = g_new0(struct imgpropull_data, 1);
 	
-	printf("imgpropull_open\n");
+	data->handle = -1;
 
 	if (err != NULL)
 		*err = 0;
 
-	handle = parse_handle(session->handle_hdr, session->handle_hdr_len);
+	return data;
+}
 
-	if (handle < 0) {
-		if (err != NULL)
-			*err = -EINVAL;
-		return NULL;
+static struct img_listing *image_pull_cb(void *context, int handle)
+{
+	struct image_pull_session *session = context;
+	int err;
+	return get_listing(session->image_list, handle, &err);
+}
+
+static void *image_pull_open(const char *name, int oflag, mode_t mode,
+					void *context, size_t *size, int *err)
+{
+	struct imgpropull_data *data = imgpropull_open(name, oflag, mode,
+							context, size, err);
+
+	data->get_img_listing = image_pull_cb;
+
+	return data;
+}
+
+static int feed_next_header(void *object, uint8_t hi, obex_headerdata_t hv,
+							uint32_t hv_size)
+{
+	struct imgpropull_data *data = object;
+	char *header;
+	unsigned int hdr_len;
+	int handle;
+	if (data == NULL)
+		return -EBADR;
+	printf("feed_next_header\n");
+
+	if (hi == IMG_HANDLE_HDR) {
+		if (!parse_bip_header(&header, &hdr_len, hi, hv.bs, hv_size))
+			return -EBADR;
+		handle = parse_handle(header, hdr_len);
+
+		if (handle < 0)
+			return -EBADR;
+
+		data->handle = handle;
 	}
-	
-	if ((il = get_listing(session->image_list, handle, err)) == NULL)
-		return NULL;
+	else if (hi == OBEX_HDR_EMPTY) {
+		struct img_listing *il;
+		
+		il = data->get_img_listing(data->context, data->handle);
+		if (il == NULL)
+			return -EBADR;
 
-	object = create_image_properties(session, il);
-	return object;
+		data->object = create_image_properties(il);
+
+		if (data->object == NULL)
+			return -EBADR;
+	}
+	return 0;
 }
 
 static ssize_t imgpropull_read(void *object, void *buf, size_t count)
 {
+	struct imgpropull_data *data = object;
 	printf("imgpropull_read\n");
-	return string_read(object, buf, count);
+	return string_read(data->object, buf, count);
 }
 
 static struct obex_mime_type_driver imgpropull = {
 	.target = IMAGE_PULL_TARGET,
 	.target_size = TARGET_SIZE,
 	.mimetype = "x-bt/img-properties",
-	.open = imgpropull_open,
+	.open = image_pull_open,
 	.close = string_free,
 	.read = imgpropull_read,
+	.feed_next_header = feed_next_header,
 };
 
 static struct obex_mime_type_driver imgpropull_aos = {
 	.target = IMAGE_AOS_TARGET,
 	.target_size = TARGET_SIZE,
 	.mimetype = "x-bt/img-properties",
-	.open = imgpropull_open,
+	.open = image_pull_open,
 	.close = string_free,
 	.read = imgpropull_read,
+	.feed_next_header = feed_next_header,
 };
 
 static int imgpropull_init(void)

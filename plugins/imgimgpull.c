@@ -44,7 +44,6 @@
 
 #include <openobex/obex.h>
 #include <openobex/obex_const.h>
-#include "wand/MagickWand.h"
 
 #include "plugin.h"
 #include "log.h"
@@ -76,6 +75,15 @@ struct image_desc {
 	gboolean fixed_ratio;
 	unsigned int maxsize;
 	char *transform;
+};
+
+struct imgimgpull_data {
+	void *context;
+	char * (*get_image_path) (void *context, int handle);
+	int fd, handle;
+	size_t size;
+	gboolean size_sent;
+	struct image_desc *desc;
 };
 
 static struct image_desc *create_image_desc() {
@@ -159,7 +167,6 @@ static void image_element(GMarkupParseContext *ctxt,
 		if (!parse_attr(desc, *key, *values, gerr))
 			return;
 }
-
 
 static const GMarkupParser image_desc_parser = {
 	image_element,
@@ -249,61 +256,116 @@ static int get_image_fd(char *image_path, struct image_desc *desc, int *err)
 	return fd;
 }
 
-static void *imgimgpull_open(const char *name, int oflag, mode_t mode,
+static struct imgimgpull_data *imgimgpull_open(const char *name, int oflag, mode_t mode,
 		void *context, size_t *size, int *err)
 {
-	struct image_pull_session *session = context;
-	struct image_desc *desc;
-	int handle, fd = -1;
-	struct img_listing *il;
+	struct imgimgpull_data *data = g_new0(struct imgimgpull_data, 1);
 
-	if (err)
+	if (err != NULL)
 		*err = 0;
 
-	handle = parse_handle(session->handle_hdr, session->handle_hdr_len);
+	data->context = context;
 
-	if (handle == -1) {
-		if (err)
-			*err = -ENOENT;
-		return NULL;
+	return data;
+}
+
+static void *image_pull_open(const char *name, int oflag, mode_t mode,
+		void *context, size_t *size, int *err)
+{
+	struct imgimgpull_data *data = imgimgpull_open(name, oflag, mode,
+							context, size, err);
+
+	data->get_image_path = image_pull_get_image_path;
+
+	return data;
+}
+
+static ssize_t get_next_header(void *object, void *buf, size_t mtu,
+								uint8_t *hi)
+{
+	struct imgimgpull_data *data = object;
+	printf("imgimg_get_next_header\n");
+
+	if (data == NULL) {
+		return -EBADR;
 	}
 
-	printf("handle = %d\n", handle);
+	*hi = OBEX_HDR_EMPTY;
+	return 0;
+}
 
-	il = get_listing(session->image_list, handle, err);
+static int feed_next_header(void *object, uint8_t hi, obex_headerdata_t hv,
+							uint32_t hv_size)
+{
+	struct imgimgpull_data *data = object;
+	char *header;
+	unsigned int hdr_len;
+	int err, handle;
+	if (data == NULL)
+		return -EBADR;
+	printf("feed_next_header\n");
 
-	if (il == NULL)
-		return NULL;
-	
-	desc = parse_image_desc(session->desc_hdr, session->desc_hdr_len, err);
+	if (hi == IMG_HANDLE_HDR) {
+		if (!parse_bip_header(&header, &hdr_len, hi, hv.bs, hv_size))
+			return -EBADR;
+		handle = parse_handle(header, hdr_len);
 
-	if (desc == NULL)
-		return NULL;
+		if (handle < 0)
+			return -EBADR;
 
-	fd = get_image_fd(il->image, desc, err);
-	free_image_desc(desc);
-	printf("fd = %d\n", fd);
-
-	if (fd == -1)
-		return NULL;
-	
-	if (!get_file_size(fd, size, err)) {
-		close(fd);
-		return NULL;
+		data->handle = handle;
 	}
+	else if (hi == IMG_DESC_HDR) {
+		if (data->desc != NULL)
+			return -EBADR;
 
-	printf("imgimgpull_open\n");
+		if (!parse_bip_header(&header, &hdr_len, hi, hv.bs, hv_size))
+			return -EBADR;
 
-	return GINT_TO_POINTER(fd);
+		data->desc = parse_image_desc(header, hdr_len, &err);
+
+		if (data->desc == NULL)
+			return -EBADR;
+	}
+	else if (hi == OBEX_HDR_EMPTY) {
+		size_t size = 0;
+		char *image_path;
+
+		if (data->handle < 0)
+			return -EBADR;
+
+		if (data->desc == NULL)
+			return -EBADR;
+
+		image_path = data->get_image_path(data->context, data->handle);
+
+		if (image_path == NULL)
+			return -EBADR;
+
+		data->fd = get_image_fd(image_path, data->desc, &err);
+		printf("fd = %d\n", data->fd);
+
+		if (data->fd == -1)
+			return -EBADR;
+
+		if (!get_file_size(data->fd, &size, &err)) {
+			close(data->fd);
+			return -EBADR;
+		}
+
+		data->size = size;
+	}
+	return 0;
 }
 
 static ssize_t imgimgpull_read(void *object, void *buf, size_t count)
 {
+	struct imgimgpull_data *data = object;
 	ssize_t ret;
-	
+
 	printf("imgimgpull_read %p %p %u\n", object, buf, count);
 
-	ret = read(GPOINTER_TO_INT(object), buf, count);
+	ret = read(data->fd, buf, count);
 	printf("read %u\n", ret);
 	if (ret < 0)
 		return -errno;
@@ -313,7 +375,8 @@ static ssize_t imgimgpull_read(void *object, void *buf, size_t count)
 
 static int imgimgpull_close(void *object)
 {
-	if (close(GPOINTER_TO_INT(object)) < 0)
+	struct imgimgpull_data *data = object;
+	if (close(data->fd) < 0)
 		return -errno;
 
 	return 0;
@@ -323,18 +386,21 @@ static struct obex_mime_type_driver imgimgpull = {
 	.target = IMAGE_PULL_TARGET,
 	.target_size = TARGET_SIZE,
 	.mimetype = "x-bt/img-img",
-	.open = imgimgpull_open,
+	.open = image_pull_open,
 	.close = imgimgpull_close,
 	.read = imgimgpull_read,
+	.feed_next_header = feed_next_header,
+	.get_next_header = get_next_header,
 };
 
 static struct obex_mime_type_driver imgimgpull_aos = {
 	.target = IMAGE_AOS_TARGET,
 	.target_size = TARGET_SIZE,
 	.mimetype = "x-bt/img-img",
-	.open = imgimgpull_open,
+	.open = image_pull_open,
 	.close = imgimgpull_close,
 	.read = imgimgpull_read,
+	.get_next_header = get_next_header,
 };
 
 static struct obex_mime_type_driver img_capabilities_pull = {

@@ -44,7 +44,6 @@
 
 #include <openobex/obex.h>
 #include <openobex/obex_const.h>
-#include "wand/MagickWand.h"
 
 #include "plugin.h"
 #include "log.h"
@@ -56,6 +55,12 @@
 #include "image_pull.h"
 #include "filesystem.h"
 #include "bip_util.h"
+
+struct imgthmpull_data {
+	void *context;
+	char * (*get_image_path) (void *context, int handle);
+	int fd, handle;
+};
 
 static int get_thumbnail_fd(char *image_path, int *err) {
 	char *thm_path;
@@ -79,46 +84,73 @@ static int get_thumbnail_fd(char *image_path, int *err) {
 	return fd;
 }
 
-static void *imgthmpull_open(const char *name, int oflag, mode_t mode,
-		void *context, size_t *size, int *err)
+static struct imgthmpull_data *imgthmpull_open(const char *name, int oflag,
+		mode_t mode, void *context, size_t *size, int *err)
 {
-	struct image_pull_session *session = context;
-	int handle, fd = -1;
-	struct img_listing *il;
+	struct imgthmpull_data *data = g_new0(struct imgthmpull_data, 1);
+	data->fd = -1;
+	data->handle = -1;
+	return data;
+}
 
-	if (err != NULL)
-		*err = 0;
-	
-	printf("imgthmpull_open\n");
+static void *image_pull_open(const char *name, int oflag,
+		mode_t mode, void *context, size_t *size, int *err)
+{
+	struct imgthmpull_data *data = imgthmpull_open(name, oflag, mode,
+							context, size, err);
+	data->get_image_path = image_pull_get_image_path;
+	return data;
+}
 
-	handle = parse_handle(session->handle_hdr, session->handle_hdr_len);
+static int feed_next_header(void *object, uint8_t hi, obex_headerdata_t hv,
+							uint32_t hv_size)
+{
+	struct imgthmpull_data *data = object;
+	char *header;
+	unsigned int hdr_len;
+	int err, handle;
+	if (data == NULL)
+		return -EBADR;
+	printf("feed_next_header\n");
 
-	if (handle == -1) {
-		if (err != NULL)
-			*err = -ENOENT;
-		return NULL;
+	if (hi == IMG_HANDLE_HDR) {
+		if (!parse_bip_header(&header, &hdr_len, hi, hv.bs, hv_size))
+			return -EBADR;
+		handle = parse_handle(header, hdr_len);
+
+		if (handle < 0)
+			return -EBADR;
+
+		data->handle = handle;
 	}
+	else if (hi == OBEX_HDR_EMPTY) {
+		char *image_path;
 
-	printf("handle = %d\n", handle);
-	
-	if ((il = get_listing(session->image_list, handle, err)) == NULL)
-		return NULL;
+		if (data->handle < 0)
+			return -EBADR;
 
-	if ((fd = get_thumbnail_fd(il->image, err)) < 0)
-		return NULL;
+		image_path = data->get_image_path(data->context, data->handle);
 
-	printf("fd = %d\n", fd);
+		if (image_path == NULL)
+			return -EBADR;
 
-	return GINT_TO_POINTER(fd);
+		data->fd = get_thumbnail_fd(image_path, &err);
+		printf("fd = %d\n", data->fd);
+
+		if (data->fd == -1)
+			return -EBADR;
+	}
+	return 0;
 }
 
 static ssize_t imgthmpull_read(void *object, void *buf, size_t count)
 {
+	struct imgthmpull_data *data = object;
 	ssize_t ret;
 	
 	printf("imgthmpull_read %p %p %u\n", object, buf, count);
 
-	ret = read(GPOINTER_TO_INT(object), buf, count);
+	ret = read(data->fd, buf, count);
 	printf("read %u\n", ret);
 	if (ret < 0)
 		return -errno;
@@ -128,7 +160,8 @@ static ssize_t imgthmpull_read(void *object, void *buf, size_t count)
 
 static int imgthmpull_close(void *object)
 {
-	if (close(GPOINTER_TO_INT(object)) < 0)
+	struct imgthmpull_data *data = object;
+	if (close(data->fd) < 0)
 		return -errno;
 
 	return 0;
@@ -138,18 +171,20 @@ static struct obex_mime_type_driver imgthmpull = {
 	.target = IMAGE_PULL_TARGET,
 	.target_size = TARGET_SIZE,
 	.mimetype = "x-bt/img-thm",
-	.open = imgthmpull_open,
+	.open = image_pull_open,
 	.close = imgthmpull_close,
 	.read = imgthmpull_read,
+	.feed_next_header = feed_next_header,
 };
 
 static struct obex_mime_type_driver imgthmpull_aos = {
 	.target = IMAGE_AOS_TARGET,
 	.target_size = TARGET_SIZE,
 	.mimetype = "x-bt/img-thm",
-	.open = imgthmpull_open,
+	.open = image_pull_open,
 	.close = imgthmpull_close,
 	.read = imgthmpull_read,
+	.feed_next_header = feed_next_header,
 };
 
 static int imgthmpull_init(void)
