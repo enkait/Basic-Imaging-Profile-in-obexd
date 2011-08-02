@@ -1449,6 +1449,46 @@ int session_get(struct session_data *session, const char *type,
 	return 0;
 }
 
+int session_get_with_aheaders(struct session_data *session, const char *type,
+		const char *filename, const char *targetname,
+		const GSList *aheaders, session_callback_t func)
+{
+	struct transfer_data *transfer;
+    GSList *aheaders_dst = NULL, *aheaders_src = aheaders;
+	int err;
+
+	if (session->obex == NULL)
+		return -ENOTCONN;
+	
+    while (aheaders_src != NULL) {
+		aheaders_dst = g_slist_append(aheaders_dst, a_header_copy(aheaders->data));
+        aheaders_src = g_slist_next(aheaders_src);
+	}
+
+	transfer = transfer_register(session, filename, targetname, type,
+					params);
+	if (transfer == NULL) {
+		if (params != NULL) {
+			g_free(params->data);
+			g_free(params);
+		}
+		return -EIO;
+	}
+
+	if (func != NULL) {
+		struct session_callback *callback;
+		callback = g_new0(struct session_callback, 1);
+		callback->func = func;
+		session->callback = callback;
+	}
+
+	err = session_request(session, session_prepare_get, transfer);
+	if (err < 0)
+		return err;
+
+	return 0;
+}
+
 static DBusMessage *change_folder(DBusConnection *connection,
 				DBusMessage *message, void *user_data)
 {
