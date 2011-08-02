@@ -34,6 +34,7 @@
 #include <glib.h>
 #include <gdbus.h>
 #include <gw-obex.h>
+#include <obex-xfer.h>
 
 #include "log.h"
 #include "transfer.h"
