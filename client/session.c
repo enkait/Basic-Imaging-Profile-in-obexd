@@ -169,6 +169,10 @@ static void session_unregistered(struct session_data *session)
 		g_dbus_unregister_interface(session->conn, session->path,
 						FTP_INTERFACE);
 		break;
+	case IMAGING_RESPONDER_SVCLASS_ID:
+        bip_unregister_interface(session->conn, session->path,
+                        session);
+		break;
 	case PBAP_PSE_SVCLASS_ID:
 		pbap_unregister_interface(session->conn, session->path,
 						session);
@@ -794,6 +798,11 @@ struct session_data *session_create(const char *source,
 
 	if (!g_ascii_strncasecmp(service, "OPP", 3)) {
 		sdp_uuid16_create(&session->uuid, OBEX_OBJPUSH_SVCLASS_ID);
+	} else if (!g_ascii_strncasecmp(service, "BIP:PUSH", 8)) {
+        //based on: http://bluez-libs.sourcearchive.com/documentation/2.15-2/sdp_8h-source.html
+		sdp_uuid16_create(&session->uuid, IMAGING_RESPONDER_SVCLASS_ID);
+		session->target = IMAGE_PUSH_UUID;
+		session->target_len = IMAGE_PUSH_UUID_LEN;
 	} else if (!g_ascii_strncasecmp(service, "FTP", 3)) {
 		sdp_uuid16_create(&session->uuid, OBEX_FILETRANS_SVCLASS_ID);
 		session->target = OBEX_FTP_UUID;
@@ -1731,6 +1740,10 @@ int session_register(struct session_data *session)
 					session->path, FTP_INTERFACE,
 					ftp_methods, NULL, NULL, session, NULL);
 		break;
+	case IMAGING_RESPONDER_SVCLASS_ID:
+        result = bip_register_interface(session->conn,
+                    session->path, session, NULL);
+        break;
 	case PBAP_PSE_SVCLASS_ID:
 		result = pbap_register_interface(session->conn,
 						session->path, session, NULL);
