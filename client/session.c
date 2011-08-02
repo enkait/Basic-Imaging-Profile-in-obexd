@@ -1661,7 +1661,7 @@ int session_send(struct session_data *session, const char *filename,
 		return -ENOTCONN;
 
 	transfer = transfer_register(session, filename, targetname, NULL,
-					NULL);
+					NULL, NULL);
 	if (transfer == NULL)
 		return -EINVAL;
 
@@ -1691,7 +1691,7 @@ int session_pull(struct session_data *session,
 	if (session->obex == NULL)
 		return -ENOTCONN;
 
-	transfer = transfer_register(session, NULL, filename, type, NULL);
+	transfer = transfer_register(session, NULL, filename, type, NULL, NULL);
 	if (transfer == NULL) {
 		return -EIO;
 	}
@@ -1791,7 +1791,7 @@ int session_put(struct session_data *session, char *buf, const char *targetname)
 	if (session->pending != NULL)
 		return -EISCONN;
 
-	transfer = transfer_register(session, NULL, targetname, NULL, NULL);
+	transfer = transfer_register(session, NULL, targetname, NULL, NULL, NULL);
 	if (transfer == NULL)
 		return -EIO;
 
