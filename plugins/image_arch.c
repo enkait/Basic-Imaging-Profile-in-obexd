@@ -96,6 +96,18 @@
       </sequence>							\
     </sequence>								\
   </attribute>								\
+									\
+  <attribute id=\"0x0310\">						\
+    <uint8 value=\"0x0001\"/>						\
+  </attribute>								\
+									\
+  <attribute id=\"0x0311\">						\
+    <uint16 value=\"0x0040\"/>						\
+  </attribute>								\
+									\
+  <attribute id=\"0x0312\">						\
+    <uint32 value=\"0x12000\"/>						\
+  </attribute>								\
 </record>"
 
 static const uint8_t IMAGE_ARCH_TARGET[TARGET_SIZE] = {
