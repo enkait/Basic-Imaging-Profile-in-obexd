@@ -49,3 +49,4 @@ int image_pull_chkput(struct obex_session *os, void *user_data);
 int image_pull_put(struct obex_session *os, obex_object_t *obj, void *user_data);
 void image_pull_disconnect(struct obex_session *os, void *user_data);
 struct image_handles_desc *new_hdesc();
+char *image_pull_get_image_path(void *context, int handle);

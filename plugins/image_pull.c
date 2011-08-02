@@ -279,6 +279,23 @@ int image_pull_chkput(struct obex_session *os, void *user_data)
 	return -EBADR;
 }
 
+char *image_pull_get_image_path(void *context, int handle)
+{
+	int err = 0;
+	struct image_pull_session *session = context;
+	struct img_listing *il = NULL;
+
+	if (session == NULL)
+		return NULL;
+
+	il = get_listing(session->image_list, handle, &err);
+
+	if (il == NULL)
+		return NULL;
+
+	return g_strdup(il->image);
+}
+
 int image_pull_put(struct obex_session *os, obex_object_t *obj,
 							void *user_data)
 {

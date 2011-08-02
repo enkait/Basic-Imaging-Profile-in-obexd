@@ -20,12 +20,12 @@
 
 #include <openobex/obex.h>
 #include <openobex/obex_const.h>
+#include <wand/MagickWand.h>
 
 #include "log.h"
 #include "obex-xfer.h"
 #include "obex-priv.h"
 #include "bip_util.h"
-#include "wand/MagickWand.h"
 
 #define HANDLE_LEN 7
 #define HANDLE_MAX 10000000

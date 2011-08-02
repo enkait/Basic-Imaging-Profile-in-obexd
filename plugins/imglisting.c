@@ -44,7 +44,7 @@
 
 #include <openobex/obex.h>
 #include <openobex/obex_const.h>
-#include "wand/MagickWand.h"
+//#include <wand/MagickWand.h>
 
 #include "plugin.h"
 #include "log.h"
