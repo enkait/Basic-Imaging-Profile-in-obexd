@@ -44,6 +44,7 @@
 #include "log.h"
 #include "pbap.h"
 #include "sync.h"
+#include "bip.h"
 #include "transfer.h"
 #include "session.h"
 #include "btio.h"
