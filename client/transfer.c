@@ -145,6 +145,7 @@ static GDBusMethodTable transfer_methods[] = {
 static void transfer_free(struct transfer_data *transfer)
 {
 	struct session_data *session = transfer->session;
+    GSList *aheaders = transfer->aheaders;
 
 	DBG("%p", transfer);
 
@@ -171,6 +172,11 @@ static void transfer_free(struct transfer_data *transfer)
 	g_free(transfer->type);
 	g_free(transfer->path);
 	g_free(transfer->buffer);
+    while (aheaders) {
+        a_header_free(aheaders->data);
+        aheaders = g_slist_next(aheaders);
+    }
+    g_slist_free(transfer->aheaders);
 	g_free(transfer);
 }
 
