@@ -57,7 +57,8 @@ struct transfer_data *transfer_register(struct session_data *session,
 						const char *filename,
 						const char *name,
 						const char *type,
-						struct transfer_params *params);
+						struct transfer_params *params,
+                        GSList *aheaders);
 
 void transfer_unregister(struct transfer_data *transfer);
 
