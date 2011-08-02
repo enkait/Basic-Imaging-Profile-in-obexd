@@ -1805,6 +1805,53 @@ int session_put(struct session_data *session, char *buf, const char *targetname)
 	return 0;
 }
 
+int session_put_with_aheaders(struct session_data *session, const char *type,
+		const char *filename, const char *targetname,
+		const GSList *aheaders,
+		session_callback_t func)
+{
+	struct transfer_data *transfer;
+    GSList *aheaders_copy = NULL;
+    int err;
+
+	if (session->obex == NULL)
+		return -ENOTCONN;
+
+	if (session->pending != NULL)
+		return -EISCONN;
+
+    if (aheaders) {
+        const GSList *aheaders_src = aheaders;
+        while(aheaders_src) {
+            aheaders_copy = g_slist_append(aheaders_copy,
+                    a_header_copy(aheaders_src->data));
+            aheaders_src = g_slist_next(aheaders_src);
+        }
+    }
+
+	transfer = transfer_register(session, filename, targetname, type, NULL, aheaders_copy);
+	if (transfer == NULL) {
+        while(aheaders_copy) {
+            a_header_free(aheaders_copy->data);
+        }
+        g_slist_free(aheaders_copy);
+		return -EIO;
+    }
+	
+    if (func != NULL) {
+		struct session_callback *callback;
+		callback = g_new0(struct session_callback, 1);
+		callback->func = func;
+		session->callback = callback;
+	}
+
+	err = session_request(session, session_prepare_put, transfer);
+	if (err < 0)
+		return err;
+
+	return 0;
+}
+
 int session_set_agent(struct session_data *session, const char *name,
 							const char *path)
 {
