@@ -1915,6 +1915,7 @@ int session_put_with_aheaders(struct session_data *session, const char *type,
 		struct session_callback *callback;
 		callback = g_new0(struct session_callback, 1);
 		callback->func = func;
+		callback->data = user_data;
 		session->callback = callback;
 	}
 
