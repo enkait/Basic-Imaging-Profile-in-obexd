@@ -132,7 +132,8 @@ client_obex_client_SOURCES = $(gdbus_sources) $(gobex_sources) \
 				client/session.h client/session.c \
 				client/pbap.h client/pbap.c \
 				client/sync.h client/sync.c \
-				client/transfer.h client/transfer.c
+				client/transfer.h client/transfer.c \
+				client/bip.h client/bip.c
 
 client_obex_client_LDADD = @GLIB_LIBS@ @DBUS_LIBS@ @OPENOBEX_LIBS@ @BLUEZ_LIBS@
 endif
