@@ -38,6 +38,7 @@ struct transfer_data {
 	gchar *filename;	/* Transfer file location */
 	char *name;		/* Transfer object name */
 	char *type;		/* Transfer object type */
+    GSList *aheaders; /* Additional headers */
 	int fd;
 	GwObexXfer *xfer;
 	char *buffer;
