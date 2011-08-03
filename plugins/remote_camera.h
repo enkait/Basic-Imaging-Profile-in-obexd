@@ -32,4 +32,4 @@ struct remote_camera_session {
 	int next_handle;
 };
 
-int get_new_handle_rc(struct remote_display_session *session);
+int get_new_handle_rc(struct remote_camera_session *session);
