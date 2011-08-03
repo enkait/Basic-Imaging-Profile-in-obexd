@@ -51,3 +51,5 @@ struct image_push_session {
 void free_image_descriptor(struct image_descriptor *id);
 void free_request_data(struct request_data *rd);
 void free_image_push_session(struct image_push_session *session);
+int obex_handle_write(struct obex_session *os, obex_object_t *obj, const char *data, unsigned int size);
+gpointer *encode_length_prefix(const gunichar2 *data, unsigned int length, unsigned int *newsize);

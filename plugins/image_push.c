@@ -91,6 +91,8 @@
   </attribute>								\
 </record>"
 
+#define IMG_HANDLE_HDR OBEX_HDR_TYPE_BYTES|0x30
+
 static const uint8_t IMAGE_PUSH_TARGET[TARGET_SIZE] = {
 			0xE3, 0x3D, 0x95, 0x45, 0x83, 0x74, 0x4A, 0xD7,
 			0x9E, 0xC5, 0xC1, 0x6B, 0xE3, 0x1E, 0xDE, 0x8E };
@@ -155,6 +157,30 @@ int image_push_chkput(struct obex_session *os, void *user_data)
 	return 0;
 }
 
+gpointer *encode_length_prefix(const gunichar2 *data, unsigned int length, unsigned int *newsize) {
+    guint16 len = length*2;
+    gpointer *buf = g_try_malloc(2+2*length);
+    len = GUINT16_TO_BE(len);
+    if(!buf)
+        return NULL;
+    g_memmove(buf,&len,2);
+    g_memmove(buf+2,data,2*length);
+    *newsize = 2*length+2+2;
+    return buf;
+}
+
+int obex_handle_write(struct obex_session *os, obex_object_t *obj, const char *data, unsigned int size) {
+    obex_headerdata_t hd;
+    glong newlen;
+    unsigned int headersize;
+
+    gunichar2 *buf = g_utf8_to_utf16(data,size,NULL,&newlen,NULL);
+    hd.bs = (guint8 *) encode_length_prefix(buf, newlen, &headersize);
+
+    return OBEX_ObjectAddHeader(os->obex, obj,
+            IMG_HANDLE_HDR, hd, headersize, 0);
+}
+
 int image_push_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 {
     //struct image_push_session *ips = user_data;
@@ -165,6 +191,7 @@ int image_push_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 	while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen)) {
         printf("header numer=%d\n", hi);
     }
+    obex_handle_write(os, obj, "0000000", 7);
 	return 0;
 }
 
