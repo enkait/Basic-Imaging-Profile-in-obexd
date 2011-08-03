@@ -32,5 +32,8 @@ struct remote_camera_session {
 	int next_handle;
 };
 
+typedef void (*monit_image_cb) (void *user_data, char *monit_image,
+							char *image, int err);
+
 int get_new_handle_rc(struct remote_camera_session *session);
 int get_monitoring_image(gboolean store, monit_image_cb cb, void *user_data);

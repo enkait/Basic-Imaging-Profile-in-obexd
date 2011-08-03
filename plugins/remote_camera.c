@@ -116,9 +116,6 @@
 #define RC_MANAGER_INTERFACE RC_MANAGER_SERVICE ".RCManager"
 #define RC_MANAGER_ERROR_INTERFACE RC_MANAGER_SERVICE ".RCManagerError"
 
-typedef void (*monit_image_cb) (void *user_data, char *monit_image,
-							char *image, int err);
-
 struct rc_agent {
 	char *bus_name;
 	char *path;
