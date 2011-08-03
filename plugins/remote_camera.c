@@ -316,7 +316,7 @@ int get_monitoring_image(gboolean store, monit_image_cb cb, void *user_data)
 {
 	DBusMessage *msg = NULL;
 	DBusPendingCall *call = NULL;
-	struct monitoring_image_data *data = NULL;
+	struct monit_image_data *data = NULL;
 
 	if (agent == NULL) {
 		printf("Get monitoring image Failed\n");
