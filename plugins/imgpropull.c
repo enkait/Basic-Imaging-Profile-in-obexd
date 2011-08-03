@@ -53,6 +53,7 @@
 #include "imgpropull.h"
 #include "imglisting.h"
 #include "image_pull.h"
+#include "remote_camera.h"
 #include "filesystem.h"
 #include "bip_util.h"
 
@@ -168,6 +169,24 @@ static void *image_pull_open(const char *name, int oflag, mode_t mode,
 	return data;
 }
 
+static struct img_listing *remote_camera_cb(void *context, int handle)
+{
+	struct remote_camera_session *session = context;
+	int err;
+	return get_listing(session->image_list, handle, &err);
+}
+
+static void *remote_camera_open(const char *name, int oflag, mode_t mode,
+					void *context, size_t *size, int *err)
+{
+	struct imgpropull_data *data = imgpropull_open(name, oflag, mode,
+							context, size, err);
+
+	data->get_img_listing = remote_camera_cb;
+
+	return data;
+}
+
 static int feed_next_header(void *object, uint8_t hi, obex_headerdata_t hv,
 							uint32_t hv_size)
 {
@@ -221,6 +240,16 @@ static struct obex_mime_type_driver imgpropull = {
 	.feed_next_header = feed_next_header,
 };
 
+static struct obex_mime_type_driver imgpropull_rc = {
+	.target = IMAGE_PULL_TARGET,
+	.target_size = TARGET_SIZE,
+	.mimetype = "x-bt/img-properties",
+	.open = remote_camera_open,
+	.close = string_free,
+	.read = imgpropull_read,
+	.feed_next_header = feed_next_header,
+};
+
 static struct obex_mime_type_driver imgpropull_aos = {
 	.target = IMAGE_AOS_TARGET,
 	.target_size = TARGET_SIZE,
@@ -237,12 +266,16 @@ static int imgpropull_init(void)
 	if ((ret = obex_mime_type_driver_register(&imgpropull)) < 0)
 		return ret;
 
+	if ((ret = obex_mime_type_driver_register(&imgpropull_rc)) < 0)
+		return ret;
+
 	return obex_mime_type_driver_register(&imgpropull_aos);
 }
 
 static void imgpropull_exit(void)
 {
 	obex_mime_type_driver_unregister(&imgpropull_aos);
+	obex_mime_type_driver_unregister(&imgpropull_rc);
 	obex_mime_type_driver_unregister(&imgpropull);
 }
 
