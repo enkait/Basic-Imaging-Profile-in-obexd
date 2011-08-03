@@ -51,6 +51,9 @@ endif
 builtin_modules += filesystem
 builtin_sources += plugins/filesystem.c plugins/filesystem.h
 
+builtin_modules += imgimg
+builtin_sources += plugins/imgimg.c plugins/imgimg.h
+
 if NOKIA_PCSUITE
 builtin_modules += pcsuite
 builtin_sources += plugins/pcsuite.c
