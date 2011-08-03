@@ -112,7 +112,7 @@ builtin_modules += image_arch
 builtin_sources += plugins/image_arch.c plugins/image_arch.h
 
 builtin_modules += image_pull
-builtin_sources += plugins/image_pull.c
+builtin_sources += plugins/image_pull.c plugins/image_pull.h
 
 builtin_modules += syncevolution
 builtin_sources += plugins/syncevolution.c
