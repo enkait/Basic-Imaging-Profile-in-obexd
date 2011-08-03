@@ -105,6 +105,9 @@ builtin_sources += plugins/image_push.c
 builtin_modules += remote_display
 builtin_sources += plugins/remote_display.c
 
+builtin_modules += remote_camera
+builtin_sources += plugins/remote_camera.c plugins/remote_camera.h
+
 builtin_modules += image_arch
 builtin_sources += plugins/image_arch.c
 
