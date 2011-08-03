@@ -100,7 +100,7 @@ builtin_modules += irmc
 builtin_sources += plugins/irmc.c
 
 builtin_modules += image_push
-builtin_sources += plugins/image_push.c
+builtin_sources += plugins/image_push.c plugins/image_push.h
 
 builtin_modules += remote_display
 builtin_sources += plugins/remote_display.c
