@@ -243,7 +243,7 @@ static DBusMessage *rc_register_agent(DBusConnection *conn,
 		return invalid_args(msg);
 
 	sender = dbus_message_get_sender(msg);
-	agent = g_new0(struct rd_agent, 1);
+	agent = g_new0(struct rc_agent, 1);
 	agent->bus_name = g_strdup(sender);
 	agent->path = g_strdup(path);
 
@@ -275,7 +275,7 @@ static DBusMessage *rc_unregister_agent(DBusConnection *conn,
 	if (strcmp(agent->bus_name, sender) != 0)
 		return not_authorized(msg);
 
-	rd_agent_free(agent);
+	rc_agent_free(agent);
 	agent = NULL;
 
 	DBG("Agent unregistered");
