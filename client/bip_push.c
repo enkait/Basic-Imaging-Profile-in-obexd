@@ -8,6 +8,9 @@
 #include <unistd.h>
 #include <sys/stat.h>
 
+#include <bluetooth/sdp.h>
+#include <bluetooth/sdp_lib.h>
+
 #include "log.h"
 #include "transfer.h"
 #include "session.h"
@@ -589,4 +592,16 @@ void bip_unregister_interface(DBusConnection *connection, const char *path,
 						session->target_len) == 0)
 		g_dbus_unregister_interface(connection, path,
 							IMAGE_PULL_INTERFACE);
+}
+
+gboolean bip_sdp_filter(const void *user_data, const sdp_record_t *record)
+{
+	const uint32_t *expected_feat = user_data;
+	uint32_t supp_feat;
+	if (sdp_get_int_attr(record, SDP_ATTR_SUPPORTED_FEATURES,
+				(int *) &supp_feat) < 0)
+		return FALSE;
+	if (!(supp_feat & (*expected_feat)))
+		return FALSE;
+	return TRUE;
 }

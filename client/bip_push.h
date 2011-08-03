@@ -3,24 +3,28 @@
 /** Length of IMAGE_PUSH_UUID */
 #define IMAGE_PUSH_UUID_LEN 16
 
+static const uint32_t image_push_supp_feat = 0xf;
 
 #define IMAGE_PULL_UUID \
     "\x8E\xE9\xB3\xD0\x46\x08\x11\xD5\x84\x1A\x00\x02\xA5\x32\x5B\x4E"
 /** Length of IMAGE_PULL_UUID */
 #define IMAGE_PULL_UUID_LEN 16
 
+static const uint32_t image_pull_supp_feat = 0x10;
 
 #define ARCHIVE_UUID \
     "\x94\x01\x26\xC0\x46\x08\x11\xD5\x84\x1A\x00\x02\xA5\x32\x5B\x4E"
 /** Length of AUTOMATIC_ARCHIVE_UUID */
 #define ARCHIVE_UUID_LEN 16
 
+static const uint32_t archive_supp_feat = 0x40;
 
 #define REMOTE_DISPLAY_UUID \
     "\x94\xC7\xCD\x20\x46\x08\x11\xD5\x84\x1A\x00\x02\xA5\x32\x5B\x4E"
 /** Length of REMOTE_DISPLAY_UUID */
 #define REMOTE_DISPLAY_UUID_LEN 16
 
+static const uint32_t remote_display_supp_feat = 0x100;
 
 #define ARCHIVED_OBJECTS_UUID \
     "\x8E\x61\xF9\x5E\x1A\x79\x11\xD4\x8E\xA4\x00\x80\x5F\x9B\x98\x34"
@@ -56,3 +60,5 @@ DBusMessage *put_image(DBusConnection *connection,
 					DBusMessage *message, void *user_data);
 DBusMessage *put_modified_image(DBusConnection *connection,
 					DBusMessage *message, void *user_data);
+
+gboolean bip_sdp_filter(const void *user_data, const sdp_record_t *record);
