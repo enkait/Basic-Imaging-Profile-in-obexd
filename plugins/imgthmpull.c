@@ -93,12 +93,29 @@ static struct imgthmpull_data *imgthmpull_open(const char *name, int oflag,
 	return data;
 }
 
+static char *image_pull_cb(void *context, int handle)
+{
+	int err = 0;
+	struct image_pull_session *session = context;
+	struct img_listing *il = NULL;
+
+	if (session == NULL)
+		return NULL;
+
+	il = get_listing(session->image_list, handle, &err);
+
+	if (il == NULL)
+		return NULL;
+
+	return g_strdup(il->image);
+}
+
 static void *image_pull_open(const char *name, int oflag,
 		mode_t mode, void *context, size_t *size, int *err)
 {
 	struct imgthmpull_data *data = imgthmpull_open(name, oflag, mode,
 							context, size, err);
-	data->get_image_path = image_pull_get_image_path;
+	data->get_image_path = image_pull_cb;
 	return data;
 }
 
