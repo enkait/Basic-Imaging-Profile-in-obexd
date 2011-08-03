@@ -52,7 +52,7 @@
 #include "mimetype.h"
 #include "service.h"
 #include "obex-priv.h"
-#include "remote_display.h"
+#include "remote_camera.h"
 #include "bip_util.h"
 
 #define REMOTE_CAMERA_CHANNEL 27
