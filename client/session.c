@@ -818,19 +818,19 @@ struct session_data *session_create(const char *source,
 		session->target_len = IMAGE_PULL_UUID_LEN;
 		session->sdp_filter = bip_sdp_filter;
 		session->sdp_filter_data = &image_pull_supp_feat;
-	} else if (!g_ascii_strncasecmp(service, "BIP:AA", 8)) {
+	} else if (!g_ascii_strncasecmp(service, "BIP:AA", 6)) {
 		sdp_uuid16_create(&session->uuid, IMAGING_RESPONDER_SVCLASS_ID);
 		session->target = ARCHIVE_UUID;
 		session->target_len = ARCHIVE_UUID_LEN;
 		session->sdp_filter = bip_sdp_filter;
 		session->sdp_filter_data = &archive_supp_feat;
-	} else if (!g_ascii_strncasecmp(service, "BIP:RD", 8)) {
+	} else if (!g_ascii_strncasecmp(service, "BIP:RD", 6)) {
 		sdp_uuid16_create(&session->uuid, IMAGING_RESPONDER_SVCLASS_ID);
 		session->target = REMOTE_DISPLAY_UUID;
 		session->target_len = REMOTE_DISPLAY_UUID_LEN;
 		session->sdp_filter = bip_sdp_filter;
 		session->sdp_filter_data = &remote_display_supp_feat;
-	} else if (!g_ascii_strncasecmp(service, "BIP:AOS", 8)) {
+	} else if (!g_ascii_strncasecmp(service, "BIP:AOS", 7)) {
 		sdp_uuid16_create(&session->uuid, IMAGING_ARCHIVE_SVCLASS_ID);
 		session->target = ARCHIVED_OBJECTS_UUID;
 		session->target_len = ARCHIVED_OBJECTS_UUID_LEN;
