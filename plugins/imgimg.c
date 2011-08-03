@@ -179,38 +179,6 @@ static void *remote_display_open(const char *name, int oflag, mode_t mode,
 	return data;
 }
 
-ssize_t add_reply_handle(void *buf, size_t mtu, uint8_t *hi, int handle)
-{
-	GString *handle_str = g_string_new("");
-	uint8_t *handle_hdr;
-	unsigned int handle_hdr_len;
-
-	if (handle < -1 || handle >= HANDLE_LIMIT) {
-		g_string_free(handle_str, TRUE);
-		return -EBADR;
-	}
-	if (handle != -1) {
-		g_string_append_printf(handle_str, "%07d", handle);
-	}
-	handle_hdr = encode_img_handle(handle_str->str, handle_str->len,
-							&handle_hdr_len);
-	g_string_free(handle_str, TRUE);
-
-	if (handle_hdr == NULL)
-		return -ENOMEM;
-
-	*hi = IMG_HANDLE_HDR;
-
-	if (handle_hdr_len > mtu) {
-		g_free(handle_hdr);
-		return -ENOMEM;
-	}
-	printf("%p %p %d\n", buf, handle_hdr, handle_hdr_len);
-	g_memmove(buf, handle_hdr, handle_hdr_len);
-	g_free(handle_hdr);
-	return handle_hdr_len;
-}
-
 static ssize_t imgimg_get_next_header(void *object, void *buf, size_t mtu,
 								uint8_t *hi) {
 	struct imgimg_data *data = object;

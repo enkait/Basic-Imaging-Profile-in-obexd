@@ -28,7 +28,7 @@
 #include "bip_util.h"
 
 #define HANDLE_LEN 7
-#define HANDLE_MAX 10000000
+#define HANDLE_LIMIT 10000000
 
 const char *att_suf = "_att";
 const char *default_name = "image";
@@ -314,7 +314,7 @@ int parse_handle(const char *data, unsigned int length)
 	handle = strtol(data, &ptr, 10);
 	if (ptr != data + 7)
 		return -1;
-	if (handle < 0 || handle >= HANDLE_MAX)
+	if (handle < 0 || handle >= HANDLE_LIMIT)
 		return -1;
 	return handle;
 }
@@ -604,5 +604,37 @@ char *get_null_terminated(char *buffer, int len) {
 		newbuffer = g_memdup(buffer, len);
 	}
 	return newbuffer;
+}
+
+ssize_t add_reply_handle(void *buf, size_t mtu, uint8_t *hi, int handle)
+{
+	GString *handle_str = g_string_new("");
+	uint8_t *handle_hdr;
+	unsigned int handle_hdr_len;
+
+	if (handle < -1 || handle >= HANDLE_LIMIT) {
+		g_string_free(handle_str, TRUE);
+		return -EBADR;
+	}
+	if (handle != -1) {
+		g_string_append_printf(handle_str, "%07d", handle);
+	}
+	handle_hdr = encode_img_handle(handle_str->str, handle_str->len,
+							&handle_hdr_len);
+	g_string_free(handle_str, TRUE);
+
+	if (handle_hdr == NULL)
+		return -ENOMEM;
+
+	*hi = IMG_HANDLE_HDR;
+
+	if (handle_hdr_len > mtu) {
+		g_free(handle_hdr);
+		return -ENOMEM;
+	}
+	printf("%p %p %d\n", buf, handle_hdr, handle_hdr_len);
+	g_memmove(buf, handle_hdr, handle_hdr_len);
+	g_free(handle_hdr);
+	return handle_hdr_len;
 }
 
