@@ -60,3 +60,8 @@ char *safe_rename(const char *name, const char *folder,
 							const char *orig_path);
 struct a_header *create_handle(const char *handle);
 char *get_null_terminated(char *buffer, int len);
+void parse_client_user_headers(GwObexXfer *xfer,
+				char **desc_hdr,
+				unsigned int *desc_hdr_len,
+				char **handle_hdr,
+				unsigned int *handle_hdr_len);

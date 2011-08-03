@@ -462,6 +462,53 @@ gboolean parse_bip_header(char **header, unsigned int *hdr_len,
 	return TRUE;
 }
 
+void parse_client_user_headers(GwObexXfer *xfer,
+				char **desc_hdr,
+				unsigned int *desc_hdr_len,
+				char **handle_hdr,
+				unsigned int *handle_hdr_len)
+{
+	struct a_header *ah;
+
+	if (desc_hdr != NULL && desc_hdr_len != NULL) {
+		g_free(*desc_hdr);
+		*desc_hdr = NULL;
+		*desc_hdr_len = 0;
+	}
+
+	if (handle_hdr != NULL && handle_hdr_len != NULL) {
+		g_free(*handle_hdr);
+		*handle_hdr = NULL;
+		*handle_hdr_len = 0;
+	}
+
+	if (!xfer)
+		return;
+
+	ah = a_header_find(xfer->aheaders, IMG_HANDLE_HDR);
+	printf("ah->hv_size = %u\n", ah->hv_size);
+
+	if (ah != NULL) {
+		int i;
+		printf("handle: %u\n", ah->hv_size);
+		for (i = 0; i < (int)ah->hv_size; i++)
+			printf("%c %x\n", ah->hv.bs[i], ah->hv.bs[i]);
+		*handle_hdr = decode_img_handle(ah->hv.bs, ah->hv_size,
+							handle_hdr_len);
+		printf("handle: %u\n", *handle_hdr_len);
+		for (i = 0; i < (int)*handle_hdr_len; i++)
+			printf("%c %x\n", (*handle_hdr)[i], (*handle_hdr)[i]);
+	}
+
+	ah = a_header_find(xfer->aheaders, IMG_DESC_HDR);
+
+	if (ah != NULL) {
+		printf("desc: %u\n", ah->hv_size);
+		*desc_hdr = decode_img_descriptor(ah->hv.bs, ah->hv_size,
+							desc_hdr_len);
+	}
+}
+
 void parse_bip_user_headers(const struct obex_session *os,
 		obex_object_t *obj, char **desc_hdr, unsigned int *desc_hdr_len,
 		char **handle_hdr, unsigned int *handle_hdr_len)

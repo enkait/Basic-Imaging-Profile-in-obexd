@@ -35,6 +35,8 @@
 #define IMAGE_PULL_INTERFACE "org.openobex.ImagePull"
 #define ARCHIVE_INTERFACE "org.openobex.Archive"
 #define REMOTE_DISPLAY_INTERFACE "org.openobex.RemoteDisplay"
+#define BIP_SIGNAL_INTERFACE "org.openobex.BipSignal"
+#define ERROR_INTERFACE "org.openobex.Error"
 
 #define IMG_HANDLE_HDR (OBEX_HDR_TYPE_BYTES | 0x30)
 #define IMG_DESC_HDR (OBEX_HDR_TYPE_BYTES | 0x71)
@@ -52,11 +54,6 @@ gboolean bip_register_interface(DBusConnection *connection, const char *path,
 				void *user_data, GDBusDestroyFunction destroy);
 void bip_unregister_interface(DBusConnection *connection, const char *path,
 				void *user_data);
-void parse_client_user_headers(GwObexXfer *xfer,
-				char **desc_hdr,
-				unsigned int *desc_hdr_len,
-				char **handle_hdr,
-				unsigned int *handle_hdr_len);
 DBusMessage *get_imaging_capabilities(DBusConnection *connection,
 				DBusMessage *message, void *user_data);
 DBusMessage *put_image(DBusConnection *connection,

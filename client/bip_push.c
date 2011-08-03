@@ -35,78 +35,58 @@
 	"</image-handles-descriptor>" EOL_CHARS
 
 #define FILTERING_CREATED " created=\"%s\""
+
 #define FILTERING_MODIFIED " modified=\"%s\""
+
 #define FILTERING_ENCODING " encoding=\"%s\""
+
 #define FILTERING_PIXEL " pixel=\"%s\""
 
 #define ATT_DESC "<attachment-descriptor version=\"1.0\">" EOL_CHARS \
 	"<attachment name=\"%s\" size=\"%lu\" created=\"%s\"/>" EOL_CHARS \
 	"</attachment-descriptor>" EOL_CHARS
 
-#define BIP_TEMP_FOLDER /tmp/bip/
-
-void parse_client_user_headers(GwObexXfer *xfer,
-				char **desc_hdr,
-				unsigned int *desc_hdr_len,
-				char **handle_hdr,
-				unsigned int *handle_hdr_len)
+static gboolean put_image_completed(struct session_data *session, char *handle)
 {
-	struct a_header *ah;
-	
-	if (desc_hdr != NULL && desc_hdr_len != NULL) {
-		g_free(*desc_hdr);
-		*desc_hdr = NULL;
-		*desc_hdr_len = 0;
-	}
-
-	if (handle_hdr != NULL && handle_hdr_len != NULL) {
-		g_free(*handle_hdr);
-		*handle_hdr = NULL;
-		*handle_hdr_len = 0;
-	}
-
-	if (!xfer)
-		return;
-
-	ah = a_header_find(xfer->aheaders, IMG_HANDLE_HDR);
-	printf("ah->hv_size = %u\n", ah->hv_size);
-
-	if (ah != NULL) {
-		int i;
-		printf("handle: %u\n", ah->hv_size);
-		for (i = 0; i < (int)ah->hv_size; i++)
-			printf("%c %x\n", ah->hv.bs[i], ah->hv.bs[i]);
-		*handle_hdr = decode_img_handle(ah->hv.bs, ah->hv_size,
-							handle_hdr_len);
-		printf("handle: %u\n", *handle_hdr_len);
-		for (i = 0; i < (int)*handle_hdr_len; i++)
-			printf("%c %x\n", (*handle_hdr)[i], (*handle_hdr)[i]);
-	}
-
-	ah = a_header_find(xfer->aheaders, IMG_DESC_HDR);
-
-	if (ah != NULL) {
-		printf("desc: %u\n", ah->hv_size);
-		*desc_hdr = decode_img_descriptor(ah->hv.bs, ah->hv_size,
-							desc_hdr_len);
-	}
-}
-
-static void put_image_completed(struct session_data *session, char *handle)
-{
-	gboolean ret = g_dbus_emit_signal(session->conn, session->path,
-			IMAGE_PUSH_INTERFACE, "PutImageCompleted",
+	return g_dbus_emit_signal(session->conn, session->path,
+			BIP_SIGNAL_INTERFACE, "PutImageCompleted",
 			DBUS_TYPE_STRING, &handle,
 			DBUS_TYPE_INVALID);
-	printf("%d\n", ret);
 }
 
 static void put_image_failed(struct session_data *session, char *err)
 {
-	g_dbus_emit_signal(session->conn, session->path,
-				IMAGE_PUSH_INTERFACE, "PutImageFailed",
+	return g_dbus_emit_signal(session->conn, session->path,
+				BIP_SIGNAL_INTERFACE, "PutImageFailed",
 				DBUS_TYPE_STRING, &err,
 				DBUS_TYPE_INVALID);
+}
+
+static gboolean put_attachment_completed(struct session_data *session)
+{
+	return g_dbus_emit_signal(session->conn, session->path,
+			BIP_SIGNAL_INTERFACE, "PutAttachmentCompleted",
+			DBUS_TYPE_INVALID);
+}
+
+static void put_attachment_failed(struct session_data *session, char *err)
+{
+	return g_dbus_emit_signal(session->conn, session->path,
+				BIP_SIGNAL_INTERFACE, "PutAttachmentFailed",
+				DBUS_TYPE_STRING, &err,
+				DBUS_TYPE_INVALID);
+}
+
+static DBusMessage *failed(DBusMessage *message)
+{
+	return g_dbus_create_error(message, ERROR_INTERFACE,
+				"Failed");
+}
+
+static DBusMessage *invalid_argument(DBusMessage *message)
+{
+	return g_dbus_create_error(message, ERROR_INTERFACE,
+				"InvalidArgument");
 }
 
 static void put_thumbnail_callback(struct session_data *session, GError *err,
@@ -115,15 +95,12 @@ static void put_thumbnail_callback(struct session_data *session, GError *err,
 	struct transfer_data *transfer = session->pending->data;
 	char *handle = user_data;
 	transfer_unregister(transfer);
-	printf("thumbnail callback called\n");
 
-	if (err) {
-		printf("Error\n");
+	if (err != NULL) {
 		put_image_failed(session, err->message);
 		goto cleanup;
 	}
 
-	printf("Win\n");
 	put_image_completed(session, handle);
 cleanup:
 	g_free(handle);
@@ -136,29 +113,26 @@ static DBusMessage *put_thumbnail(struct session_data *session,
 	struct a_header *ah = NULL;
 	GSList *aheaders = NULL;
 	DBusMessage *reply = NULL;
-	int fd, err;
-	printf("requested put_thumbnail from %s\n", thm_path);
+	int fd = -1, err = 0;
 
 	ah = create_handle(handle);
 	aheaders = g_slist_append(NULL, ah);
 
 	if (ah == NULL || aheaders == NULL) {
-		put_image_failed(session, "Out of memory");
+		put_image_failed(session, "Failed");
 		goto cleanup;
 	}
 
 	fd = g_file_open_tmp(NULL, &thm_path, NULL);
 
 	if (fd < 0) {
-		put_image_failed(session, "Can not open temporary file");
+		put_image_failed(session, "Failed");
 		goto cleanup;
 	}
 	close(fd);
 
-	printf("new path: %s\n", thm_path);
-
 	if (!make_thumbnail(image_path, thm_path, &err)) {
-		put_image_failed(session, "Can not create thumbnail");
+		put_image_failed(session, "Failed");
 		goto cleanup;
 	}
 
@@ -174,6 +148,7 @@ static DBusMessage *put_thumbnail(struct session_data *session,
 cleanup:
 	a_header_free(ah);
 	g_slist_free(aheaders);
+	g_free(thm_path);
 	return reply;
 }
 
@@ -182,23 +157,24 @@ static void put_image_callback(struct session_data *session, GError *err,
 {
 	struct transfer_data *transfer = session->pending->data;
 	unsigned int length = 0;
-	char *image_path = user_data;
-	char *handle = NULL;
-	int required;
-	if (err) {
+	char *image_path = user_data, *handle = NULL;
+	gboolean required = FALSE;
+
+	if (err != NULL) {
 		put_image_failed(session, err->message);
 		transfer_unregister(transfer);
 		return;
 	}
-	required = (session->obex->obex_rsp == OBEX_RSP_PARTIAL_CONTENT)?(1):(0);
+
+	if (session->obex->obex_rsp)
+		required = TRUE;
+
 	parse_client_user_headers(transfer->xfer, NULL, NULL, &handle,
 								&length);
 	transfer_unregister(transfer);
 
-	printf("callback called %s %d\n", handle, required);
-
 	if (handle == NULL) {
-		put_image_failed(session, "ImproperHandle");
+		put_image_failed(session, "Failed");
 		return;
 	}
 
@@ -210,31 +186,23 @@ static void put_image_callback(struct session_data *session, GError *err,
 }
 
 static void put_attachment_callback(struct session_data *session, GError *err,
-		void *user_data)
+							void *user_data)
 {
 	struct transfer_data *transfer = session->pending->data;
-	printf("attachment callback called\n");
+	transfer_unregister(transfer);
 
-	if (err) {
-		g_dbus_emit_signal(session->conn, session->path,
-				IMAGE_PUSH_INTERFACE, "PutAttachmentFailed",
-				DBUS_TYPE_STRING, &err->message,
-				DBUS_TYPE_INVALID);
-		transfer_unregister(transfer);
+	if (err != NULL) {
+		put_attachment_failed(session, err->message);
 		return;
 	}
 	
-	g_dbus_emit_signal(session->conn, session->path,
-			IMAGE_PUSH_INTERFACE, "PutAttachmentCompleted",
-			DBUS_TYPE_INVALID);
-	transfer_unregister(transfer);
-	return;
+	put_attachment_completed(session);
 }
 
 static struct a_header *create_image_descriptor(const struct image_attributes *attr, const char *transform) {
 	GString *descriptor = g_string_new(IMG_DESC_BEGIN);
 	struct a_header *ah;
-	if (transform) {
+	if (transform != NULL) {
 		g_string_append_printf(descriptor,
 				IMG_DESC_WITH_TRANSFORM_FORMAT,
 				attr->encoding, attr->width, attr->height, attr->length, transform);
@@ -256,9 +224,9 @@ static struct a_header *create_att_descriptor(const char *att_path) {
 	char ctime[18], *name;
 	struct stat file_stat;
 	unsigned long size;
-	struct a_header *ah = g_try_new(struct a_header, 1);
+	struct a_header *ah = NULL;
 	GString *descriptor = g_string_new("");
-	
+
 	if (lstat(att_path, &file_stat) < 0) {
 		return NULL;
 	}
@@ -267,14 +235,15 @@ static struct a_header *create_att_descriptor(const char *att_path) {
 		return NULL;
 	}
 
-	strftime(ctime, 17, "%Y%m%dT%H%M%SZ", gmtime(&file_stat.st_ctime));
+	strftime(ctime, 18, "%Y%m%dT%H%M%SZ", gmtime(&file_stat.st_ctime));
 	name = g_path_get_basename(att_path);
 	size = file_stat.st_size;
-	
+
 	g_string_append_printf(descriptor, ATT_DESC, name, size, ctime);
-	
+
 	g_free(name);
 
+	ah = g_new0(struct a_header, 1);
 	ah->hi = IMG_DESC_HDR;
 	ah->hv.bs = encode_img_descriptor(descriptor->str, descriptor->len, &ah->hv_size);
 	g_string_free(descriptor, TRUE);
@@ -589,7 +558,6 @@ gboolean bip_register_interface(DBusConnection *connection, const char *path,
 	}
 	else if (memcmp(session->target, ARCHIVED_OBJECTS_UUID,
 				session->target_len) == 0) {
-		printf("ARCHIVE_OBJECT_SERVICE_INTERFACE\n");
 		return g_dbus_register_interface(connection, path,
 							IMAGE_PULL_INTERFACE,
 							image_pull_methods,
@@ -598,22 +566,30 @@ gboolean bip_register_interface(DBusConnection *connection, const char *path,
 							destroy);
 	}
 
-	printf("FALSE\n");
 	return FALSE;
 }
 
 void bip_unregister_interface(DBusConnection *connection, const char *path,
-		void *user_data)
+								void *user_data)
 {
 	struct session_data * session = user_data;
 	if (memcmp(session->target, IMAGE_PUSH_UUID, session->target_len) == 0)
-		g_dbus_unregister_interface(connection, path, IMAGE_PUSH_INTERFACE);
-	else if (memcmp(session->target, IMAGE_PULL_UUID, session->target_len) == 0)
-		g_dbus_unregister_interface(connection, path, IMAGE_PULL_INTERFACE);
-	else if (memcmp(session->target, ARCHIVE_UUID, session->target_len) == 0)
-		g_dbus_unregister_interface(connection, path, ARCHIVE_INTERFACE);
-	else if (memcmp(session->target, REMOTE_DISPLAY_UUID, session->target_len) == 0)
-		g_dbus_unregister_interface(connection, path, REMOTE_DISPLAY_INTERFACE);
-	else if (memcmp(session->target, ARCHIVED_OBJECTS_UUID, session->target_len) == 0)
-		g_dbus_unregister_interface(connection, path, IMAGE_PULL_INTERFACE);
+		g_dbus_unregister_interface(connection, path,
+							IMAGE_PUSH_INTERFACE);
+	else if (memcmp(session->target, IMAGE_PULL_UUID,
+						session->target_len) == 0)
+		g_dbus_unregister_interface(connection, path,
+							IMAGE_PULL_INTERFACE);
+	else if (memcmp(session->target, ARCHIVE_UUID,
+						session->target_len) == 0)
+		g_dbus_unregister_interface(connection, path,
+							ARCHIVE_INTERFACE);
+	else if (memcmp(session->target, REMOTE_DISPLAY_UUID,
+						session->target_len) == 0)
+		g_dbus_unregister_interface(connection, path,
+						REMOTE_DISPLAY_INTERFACE);
+	else if (memcmp(session->target, ARCHIVED_OBJECTS_UUID,
+						session->target_len) == 0)
+		g_dbus_unregister_interface(connection, path,
+							IMAGE_PULL_INTERFACE);
 }
