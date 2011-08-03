@@ -53,6 +53,7 @@
 #include "imgimgpull.h"
 #include "imglisting.h"
 #include "image_pull.h"
+#include "remote_camera.h"
 #include "filesystem.h"
 #include "bip_util.h"
 #include "imgimg.h"
@@ -280,7 +281,7 @@ static void *image_pull_open(const char *name, int oflag, mode_t mode,
 	return data;
 }
 
-char *remote_camera_cb(void *context, int handle)
+static char *remote_camera_cb(void *context, int handle)
 {
 	int err = 0;
 	struct remote_camera_session *session = context;
