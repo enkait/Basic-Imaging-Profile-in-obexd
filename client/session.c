@@ -808,6 +808,14 @@ struct session_data *session_create(const char *source,
 		sdp_uuid16_create(&session->uuid, IMAGING_RESPONDER_SVCLASS_ID);
 		session->target = IMAGE_PULL_UUID;
 		session->target_len = IMAGE_PULL_UUID_LEN;
+	} else if (!g_ascii_strncasecmp(service, "BIP:AA", 8)) {
+		sdp_uuid16_create(&session->uuid, IMAGING_RESPONDER_SVCLASS_ID);
+		session->target = ARCHIVE_UUID;
+		session->target_len = ARCHIVE_UUID_LEN;
+	} else if (!g_ascii_strncasecmp(service, "BIP:AOS", 8)) {
+		sdp_uuid16_create(&session->uuid, IMAGING_ARCHIVE_SVCLASS_ID);
+		session->target = ARCHIVED_OBJECTS_UUID;
+		session->target_len = ARCHIVED_OBJECTS_UUID_LEN;
 	} else if (!g_ascii_strncasecmp(service, "FTP", 3)) {
 		sdp_uuid16_create(&session->uuid, OBEX_FILETRANS_SVCLASS_ID);
 		session->target = OBEX_FTP_UUID;
@@ -1806,9 +1814,13 @@ int session_register(struct session_data *session)
 					ftp_methods, NULL, NULL, session, NULL);
 		break;
 	case IMAGING_RESPONDER_SVCLASS_ID:
-        result = bip_register_interface(session->conn,
-                    session->path, session, NULL);
-        break;
+		result = bip_register_interface(session->conn,
+					    session->path, session, NULL);
+		break;
+	case IMAGING_ARCHIVE_SVCLASS_ID:
+		result = bip_register_interface(session->conn, session->path,
+						session, NULL);
+		break;
 	case PBAP_PSE_SVCLASS_ID:
 		result = pbap_register_interface(session->conn,
 						session->path, session, NULL);
@@ -1914,13 +1926,13 @@ int session_put_with_aheaders(struct session_data *session, const char *type,
 		const GSList *aheaders_src = aheaders;
 		while(aheaders_src) {
 			aheaders_copy = g_slist_append(aheaders_copy,
-				a_header_copy(aheaders_src->data));
+					a_header_copy(aheaders_src->data));
 			aheaders_src = g_slist_next(aheaders_src);
 		}
 	}
 
 	transfer = transfer_register(session, filename, targetname, type, params,
-                                                              aheaders_copy);
+			aheaders_copy);
 	if (transfer == NULL) {
 		if (aheaders_copy != NULL) {
 			while (aheaders_copy)
