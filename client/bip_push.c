@@ -54,7 +54,7 @@ static gboolean put_image_completed(struct session_data *session, char *handle)
 			DBUS_TYPE_INVALID);
 }
 
-static void put_image_failed(struct session_data *session, char *err)
+static gboolean put_image_failed(struct session_data *session, char *err)
 {
 	return g_dbus_emit_signal(session->conn, session->path,
 				BIP_SIGNAL_INTERFACE, "PutImageFailed",
@@ -69,7 +69,7 @@ static gboolean put_attachment_completed(struct session_data *session)
 			DBUS_TYPE_INVALID);
 }
 
-static void put_attachment_failed(struct session_data *session, char *err)
+static gboolean put_attachment_failed(struct session_data *session, char *err)
 {
 	return g_dbus_emit_signal(session->conn, session->path,
 				BIP_SIGNAL_INTERFACE, "PutAttachmentFailed",
