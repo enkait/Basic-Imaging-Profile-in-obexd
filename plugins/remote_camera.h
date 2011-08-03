@@ -33,3 +33,4 @@ struct remote_camera_session {
 };
 
 int get_new_handle_rc(struct remote_camera_session *session);
+int get_monitoring_image(gboolean store, monit_image_cb cb, void *user_data);
