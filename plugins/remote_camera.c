@@ -320,26 +320,19 @@ int get_monitoring_image(gboolean store, monit_image_cb cb, void *user_data)
 
 	if (agent == NULL) {
 		printf("Get monitoring image Failed\n");
-		if (err != NULL)
-			*err = -EBADR;
-		return NULL;
+		return -EBADR;
 	}
 
 	msg = dbus_message_new_method_call(agent->bus_name, agent->path,
 					"org.openobex.GetMonitoringImage",
 					"GetMonitoringImage");
 
-	if (msg == NULL) {
-		if (err != NULL)
-			*err = -ENOMEM;
-		return NULL;
-	}
+	if (msg == NULL)
+		return -ENOMEM;
+
 	if (!dbus_connection_send_with_reply(connection, msg, &call, -1)) {
 		dbus_message_unref(msg);
-
-		if (err != NULL)
-			*err = -ENOMEM;
-		return NULL;
+		return -ENOMEM;
 	}
 
 	data = g_new0(struct monit_image_data, 1);
