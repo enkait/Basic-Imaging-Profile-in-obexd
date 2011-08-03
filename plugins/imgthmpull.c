@@ -53,6 +53,7 @@
 #include "imgthmpull.h"
 #include "imglisting.h"
 #include "image_pull.h"
+#include "remote_camera.h"
 #include "filesystem.h"
 #include "bip_util.h"
 
@@ -116,6 +117,32 @@ static void *image_pull_open(const char *name, int oflag,
 	struct imgthmpull_data *data = imgthmpull_open(name, oflag, mode,
 							context, size, err);
 	data->get_image_path = image_pull_cb;
+	return data;
+}
+
+static char *remote_camera_cb(void *context, int handle)
+{
+	int err = 0;
+	struct remote_camera_session *session = context;
+	struct img_listing *il = NULL;
+
+	if (session == NULL)
+		return NULL;
+
+	il = get_listing(session->image_list, handle, &err);
+
+	if (il == NULL)
+		return NULL;
+
+	return g_strdup(il->image);
+}
+
+static void *remote_camera_open(const char *name, int oflag,
+		mode_t mode, void *context, size_t *size, int *err)
+{
+	struct imgthmpull_data *data = imgthmpull_open(name, oflag, mode,
+							context, size, err);
+	data->get_image_path = remote_camera_cb;
 	return data;
 }
 
@@ -194,6 +221,16 @@ static struct obex_mime_type_driver imgthmpull = {
 	.feed_next_header = feed_next_header,
 };
 
+static struct obex_mime_type_driver imgthmpull_rc = {
+	.target = IMAGE_PULL_TARGET,
+	.target_size = TARGET_SIZE,
+	.mimetype = "x-bt/img-thm",
+	.open = remote_camera_open,
+	.close = imgthmpull_close,
+	.read = imgthmpull_read,
+	.feed_next_header = feed_next_header,
+};
+
 static struct obex_mime_type_driver imgthmpull_aos = {
 	.target = IMAGE_AOS_TARGET,
 	.target_size = TARGET_SIZE,
@@ -210,12 +247,16 @@ static int imgthmpull_init(void)
 	if ((ret = obex_mime_type_driver_register(&imgthmpull)) < 0)
 		return ret;
 
+	if ((ret = obex_mime_type_driver_register(&imgthmpull_rc)) < 0)
+		return ret;
+
 	return obex_mime_type_driver_register(&imgthmpull_aos);
 }
 
 static void imgthmpull_exit(void)
 {
 	obex_mime_type_driver_unregister(&imgthmpull_aos);
+	obex_mime_type_driver_unregister(&imgthmpull_rc);
 	obex_mime_type_driver_unregister(&imgthmpull);
 }
 
