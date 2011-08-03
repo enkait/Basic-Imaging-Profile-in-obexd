@@ -94,15 +94,38 @@ static const uint8_t IMAGE_PUSH_TARGET[TARGET_SIZE] = {
 			0xE3, 0x3D, 0x95, 0x45, 0x83, 0x74, 0x4A, 0xD7,
 			0x9E, 0xC5, 0xC1, 0x6B, 0xE3, 0x1E, 0xDE, 0x8E };
 
+void free_image_descriptor(struct image_descriptor *id) {
+    if(!id)
+        return;
+    g_free(id->version);
+    g_free(id->encoding);
+    g_free(id->pixel);
+    g_free(id->size);
+    g_free(id->maxsize);
+    g_free(id->transformation);
+    g_free(id);
+}
+
+void free_request_data(struct request_data *rd) {
+    if(!rd)
+        return;
+    free_image_descriptor(rd->imgdesc);
+    g_free(rd);
+}
+
 void *image_push_connect(struct obex_session *os, int *err)
 {
+    struct image_push_session *ips;
     printf("IMAGE PUSH CONNECT\n");
 	manager_register_session(os);
+
+    ips = g_new0(struct image_push_session, 1);
+    ips->os = os;
 
     if (err)
         *err = 0;
 
-	return NULL;
+	return ips;
 }
 
 int image_push_get(struct obex_session *os, obex_object_t *obj, gboolean *stream,
@@ -114,7 +137,14 @@ int image_push_get(struct obex_session *os, obex_object_t *obj, gboolean *stream
 
 int image_push_chkput(struct obex_session *os, void *user_data)
 {
+    struct image_push_session *ips = user_data;
     printf("IMAGE PUSH CHKPUT\n");
+    
+    g_free(ips->reqdata);
+    ips->reqdata = g_new0(struct request_data, 1);
+    ips->reqdata->imgdesc = g_new0(struct image_descriptor, 1);
+    
+
 	return 0;
 }
 
