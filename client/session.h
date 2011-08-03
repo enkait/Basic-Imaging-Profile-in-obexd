@@ -31,11 +31,13 @@
 struct agent_data;
 struct session_callback;
 
+typedef gboolean (*sdp_filter_func) (const void *user_data,
+					const sdp_record_t *record);
+
 struct session_data {
 	gint refcount;
 	bdaddr_t src;
 	bdaddr_t dst;
-	uint32_t supp_feat;
 	uint8_t channel;
 	char *service;		/* Service friendly name */
 	const char *target;	/* OBEX Target UUID */
@@ -55,6 +57,8 @@ struct session_data {
 	GSList *pending_calls;
 	void *priv;
 	char *adapter;
+	sdp_filter_func sdp_filter;
+	const void *sdp_filter_data;
 };
 
 typedef void (*session_callback_t) (struct session_data *session,
