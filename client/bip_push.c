@@ -260,8 +260,7 @@ static DBusMessage *put_transformed_image(DBusMessage *message, struct session_d
 	GSList * aheaders = NULL;
 
 	if ((attr = get_image_attributes(local_image, &err)) == NULL) {
-		reply = g_dbus_create_error(message,
-				"org.openobex.Error.InvalidArguments", NULL);
+		reply = invalid_argument(message);
 		goto cleanup;
 	}
 
@@ -273,9 +272,7 @@ static DBusMessage *put_transformed_image(DBusMessage *message, struct session_d
 						NULL, 0, aheaders,
 						put_image_callback,
 						g_strdup(local_image))) < 0) {
-		reply = g_dbus_create_error(message,
-				"org.openobex.Error.Failed",
-				"Failed");
+		reply = failed(message);
 		goto cleanup;
 	}
 
