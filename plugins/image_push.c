@@ -50,6 +50,7 @@
 #include "dbus.h"
 #include "mimetype.h"
 #include "service.h"
+#include "obex-priv.h"
 #include "image_push.h"
 
 #define IMAGE_PUSH_CHANNEL 20
@@ -150,7 +151,14 @@ int image_push_chkput(struct obex_session *os, void *user_data)
 
 int image_push_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 {
+	obex_headerdata_t hd;
+	unsigned int hlen;
+	uint8_t hi;
     printf("IMAGE PUSH PUT\n");
+	while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen)) {
+        printf("header numer=%d\n", hi);
+    }
+
 	return 0;
 }
 
