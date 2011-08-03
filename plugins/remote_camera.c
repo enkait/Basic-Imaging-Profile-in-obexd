@@ -56,7 +56,7 @@
 #include "bip_util.h"
 
 #define REMOTE_CAMERA_CHANNEL 27
-#define REMOTE_DISPLAY_RECORD "<?xml version=\"1.0\" encoding=\"UTF-8\" ?> \
+#define REMOTE_CAMERA_RECORD "<?xml version=\"1.0\" encoding=\"UTF-8\" ?> \
 <record>								\
   <attribute id=\"0x0001\">						\
     <sequence>								\
@@ -133,7 +133,7 @@ static void free_remote_camera_session(struct remote_camera_session *session) {
 	g_free(session);
 }
 
-int get_new_handle_rc(struct remote_display_session *session) {
+int get_new_handle_rc(struct remote_camera_session *session) {
 	if (session->next_handle >= HANDLE_LIMIT) {
 		return -1;
 	}
@@ -142,10 +142,10 @@ int get_new_handle_rc(struct remote_display_session *session) {
 
 static void *remote_camera_connect(struct obex_session *os, int *err)
 {
-	struct remote_display_session *session;
+	struct remote_camera_session *session;
 	manager_register_session(os);
 
-	session = g_new0(struct remote_display_session, 1);
+	session = g_new0(struct remote_camera_session, 1);
 	session->os = os;
 
 	if (err != NULL)
