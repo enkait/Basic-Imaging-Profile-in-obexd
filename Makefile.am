@@ -117,6 +117,9 @@ builtin_sources += plugins/image_pull.c plugins/image_pull.h
 builtin_modules += syncevolution
 builtin_sources += plugins/syncevolution.c
 
+builtin_modules += imgmonitoring
+builtin_sources += plugins/imgmonitoring.c
+
 builtin_nodist += plugins/phonebook.c
 builtin_nodist += plugins/messages.c
 
