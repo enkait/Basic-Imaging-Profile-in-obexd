@@ -421,6 +421,17 @@ static struct obex_mime_type_driver imgimgpull = {
 	.get_next_header = get_next_header,
 };
 
+static struct obex_mime_type_driver imgimgpull_rc = {
+	.target = IMAGE_PULL_TARGET,
+	.target_size = TARGET_SIZE,
+	.mimetype = "x-bt/img-img",
+	.open = remote_camera_open,
+	.close = imgimgpull_close,
+	.read = imgimgpull_read,
+	.feed_next_header = feed_next_header,
+	.get_next_header = get_next_header,
+};
+
 static struct obex_mime_type_driver imgimgpull_aos = {
 	.target = IMAGE_AOS_TARGET,
 	.target_size = TARGET_SIZE,
@@ -462,12 +473,16 @@ static int imgimgpull_init(void)
 	if ((ret = obex_mime_type_driver_register(&imgimgpull)) < 0)
 		return ret;
 
+	if ((ret = obex_mime_type_driver_register(&imgimgpull_rc)) < 0)
+		return ret;
+
 	return obex_mime_type_driver_register(&imgimgpull_aos);
 }
 
 static void imgimgpull_exit(void)
 {
 	obex_mime_type_driver_unregister(&imgimgpull_aos);
+	obex_mime_type_driver_unregister(&imgimgpull_rc);
 	obex_mime_type_driver_unregister(&imgimgpull);
 	obex_mime_type_driver_unregister(&img_capabilities_pull_aos);
 	obex_mime_type_driver_unregister(&img_capabilities_pull);
