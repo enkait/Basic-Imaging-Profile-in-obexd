@@ -44,7 +44,6 @@ static void get_monit_image_callback(struct session_data *session, GError *err,
 	struct transfer_data *transfer = session->pending->data;
 	unsigned int length = 0;
 	char *handle = NULL;
-	gboolean required = FALSE;
 	printf("get_monit_image_callback\n");
 
 	if (err != NULL) {
@@ -57,9 +56,11 @@ static void get_monit_image_callback(struct session_data *session, GError *err,
 
 	parse_client_user_headers(transfer->xfer, NULL, NULL, &handle,
 								&length);
-
-	if (handle == NULL) {
-		put_image_failed(session, "Failed");
+	if (handle == NULL || parse_handle(handle, length) < 0) {
+		g_dbus_emit_signal(session->conn, session->path,
+				IMAGE_PULL_INTERFACE, "GetMonitImageFailed",
+				DBUS_TYPE_STRING, "ImproperHandle",
+				DBUS_TYPE_INVALID);
 		return;
 	}
 
@@ -72,14 +73,12 @@ cleanup:
 	g_free(handle);
 }
 
-DBusMessage *get_monit_image(DBusConnection *connection,
+static DBusMessage *get_monit_image(DBusConnection *connection,
 					DBusMessage *message, void *user_data)
 {
 	struct session_data *session = user_data;
 	DBusMessage *reply = NULL;
 	struct monit_image_aparam *aparam = NULL;
-	struct a_header *hdesc = NULL;
-	GSList *aheaders = NULL;
 	gboolean sf;
 
 	printf("requested get monitoring image\n");
@@ -92,47 +91,44 @@ DBusMessage *get_monit_image(DBusConnection *connection,
 		goto cleanup;
 	}
 
-	hdesc = create_handle(handle);
-
-	aheaders = g_slist_append(NULL, hdesc);
-
 	aparam = new_monit_image_aparam(sf);
 
 	session->msg = dbus_message_ref(message);
-	if (hdesc == NULL || aheaders == NULL || aparam == NULL) {
+	if (aparam == NULL) {
 		reply = g_dbus_create_error(message,
 				"org.openobex.Error", "Out of memory");
 		goto cleanup;
 	}
 
-	if ((err=session_get_with_aheaders(session, "x-bt/img-monitoring", NULL,
+	if (session_get_with_aheaders(session, "x-bt/img-monitoring", NULL,
 					NULL, (const guint8 *) aparam,
 					sizeof(struct monit_image_aparam),
-					aheaders, get_monit_image_callback,
-								NULL)) < 0) {
+					NULL, get_monit_image_callback,
+								NULL) < 0) {
 		reply = g_dbus_create_error(message, "org.openobex.Error",
 								"Failed");
 		goto cleanup;
 	}
 
 cleanup:
-	a_header_free(hdesc);
-	g_slist_free(aheaders);
 	g_free(aparam);
 
 	return reply;
 }
 
-GDBusMethodTable remote_display_methods[] = {
+GDBusMethodTable remote_camera_methods[] = {
 	{ "GetImage",	"ssa{ss}", "", get_image },
 	{ "GetImageThumbnail",	"ss", "", get_image_thumbnail },
+	{ "GetMonitoringImage",	"s", "", get_monit_image },
 	{ "GetImageProperties",	"s", "aa{ss}", get_image_properties },
 	{ }
 };
 
-GDBusSignalTable remote_display_signals[] = {
+GDBusSignalTable remote_camera_signals[] = {
 	{ "GetImageCompleted", "" },
 	{ "GetImageFailed", "s" },
+	{ "GetMonitImageCompleted", "s" },
+	{ "GetMonitImageFailed", "s" },
 	{ "GetImageThumbnailCompleted", "" },
 	{ "GetImageThumbnailFailed", "s" },
 	{ }
