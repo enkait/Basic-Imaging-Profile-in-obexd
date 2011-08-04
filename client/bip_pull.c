@@ -1188,7 +1188,7 @@ cleanup:
 	dbus_message_unref(message);
 	return reply;
 }
-///////////////////////////////////////////////////////////////////
+
 DBusMessage *get_image_attachment(DBusConnection *connection,
 				DBusMessage *message, void *user_data)
 {
