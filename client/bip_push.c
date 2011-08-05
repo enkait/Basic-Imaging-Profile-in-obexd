@@ -415,8 +415,8 @@ DBusMessage *get_imaging_capabilities(DBusConnection *connection,
 
 	printf("requested get imaging capabilities\n");
 
-	if ((err=session_get(session, "x-bt/img-capabilities", NULL, NULL, NULL, 0, get_imaging_capabilities_callback)) < 0) {
-	}
+	if ((err=session_get(session, "x-bt/img-capabilities", NULL, NULL,
+			NULL, 0, get_imaging_capabilities_callback)) < 0)
 		return failed(message);
 
 	session->msg = dbus_message_ref(message);
