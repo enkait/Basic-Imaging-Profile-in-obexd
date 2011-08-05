@@ -1,0 +1,202 @@
+#!/usr/bin/python
+
+import gobject
+
+import sys
+import dbus
+import dbus.service
+import dbus.mainloop.glib
+import os.path
+from optparse import OptionParser
+
+class Agent(dbus.service.Object):
+    def __init__(self, conn=None, obj_path=None, verbose=False):
+        dbus.service.Object.__init__(self, conn, obj_path)
+        self.verbose = verbose
+
+    @dbus.service.method("org.openobex.Agent",
+                    in_signature="o", out_signature="s")
+    def Request(self, path):
+        return ""
+
+    @dbus.service.method("org.openobex.Agent",
+                    in_signature="ot", out_signature="")
+    def Progress(self, path, transferred):
+        if self.verbose:
+            print "Transfer progress (%d bytes)" % (transferred)
+        return
+
+    @dbus.service.method("org.openobex.Agent",
+                    in_signature="o", out_signature="")
+    def Complete(self, path):
+        if self.verbose:
+            print "Transfer finished"
+        mainloop.quit()
+
+    @dbus.service.method("org.openobex.Agent",
+                    in_signature="os", out_signature="")
+    def Error(self, path, error):
+        print "Transfer finished with an error: %s" % (error)
+        mainloop.quit()
+
+    @dbus.service.method("org.openobex.Agent",
+                    in_signature="", out_signature="")
+    def Release(self):
+        mainloop.quit()
+
+tasks = []
+
+def get_image_callback(option, opt, value, parser):
+        parser.values.get = True
+        parser.values.get_settings = value.split(',')
+        print parser.values.get_settings
+
+def get_monitoring_image_callback(option, opt, value, parser):
+        parser.values.get = True
+        parser.values.get_settings = value.split(',')
+        print parser.values.get_settings
+
+def get_image_properties_callback(option, opt, value, parser):
+        parser.values.get_properties = True
+        parser.values.get_settings = value.split(',')
+        print parser.values.get_settings
+
+def get_image_thumbnail_callback(option, opt, value, parser):
+        parser.values.get_thumbnail = True
+        parser.values.get_settings = value.split(',')
+        print parser.values.get_settings
+
+def parse_options():
+    parser.add_option("-d", "--device", dest="device",
+                      help="Device to connect", metavar="DEVICE")
+    parser.add_option("-g", "--getimage", type="string", action="callback",
+                      callback=get_image_callback,
+                      help="Get image\nExample: -g [where to put the image],[handle],[encoding],[acceptable width*height],[maxsize],[transform]")
+    parser.add_option("-m", "--getmonitoringimage", type="string", action="callback",
+                      callback=get_monitoring_image_callback,
+                      help="Get image\nExample: -g [where to put the image],[handle],[encoding],[acceptable width*height],[maxsize],[transform]")
+    parser.add_option("-t", "--getimagethumbnail", type="string", action="callback",
+                      callback=get_image_thumbnail_callback,
+                      help="Get image thumbnail\nExample: -t [where to put the image],[handle]")
+    parser.add_option("-p", "--getimageproperties", type="string", action="callback",
+                      callback=get_image_properties_callback,
+                      help="Get image properties\nExample: -p [handle]")
+    parser.add_option("-v", "--verbose", action="store_true", dest="verbose")
+
+    return parser.parse_args()
+
+cur = 0
+bip = None
+
+def get_image_properties(session, handle):
+    print "GetProperties"
+    resp = session.GetImageProperties(handle)
+    for o in resp:
+            if 'type' in o:
+                    print
+                    print o['type']
+                    print o
+            else:
+                    print o
+    print "get image properties"
+    print resp
+    execute()
+
+def get_image(session, path, handle, encoding, pixel, maxsize, transform):
+    D = {}
+    if encoding != "":
+        D["encoding"] = encoding
+    if pixel != "":
+        D["pixel"] = pixel
+    if maxsize != "":
+        D["maxsize"] = maxsize
+    if transform != "":
+        print transform
+        D["transformation"] = transform
+    session.GetImage(path, handle, D)
+    print "GetImage returned"
+    execute()
+
+def get_monitoring_image(session, path, store):
+    session.GetMonitoringImage(path, store=="1")
+    print "GetMonitoringImage returned"
+
+def get_image_thumbnail(session, path, handle):
+    session.GetImageThumbnail(path, handle)
+    print "GetImageThumbnail returned"
+
+def execute():
+    print "execute"
+    global tasks
+    if len(tasks) == 0:
+        return
+    entry = tasks[0]
+    tasks.pop(0)
+    if entry[0] == "getimage":
+        get_image(bip, entry[1][0])
+    elif entry[0] == "getproperties":
+        get_properties(bip, entry[1][0])
+    elif entry[0] == "getthumbnail":
+        get_image_thumbnail(bip, entry[1][0])
+    elif entry[0] == "getmonitoring":
+        get_monitoring_image(bip, entry[1][0])
+
+def image_push_completed(handle):
+    print "Image pushed, received handle: "+handle
+    execute()
+
+def image_push_failed(reason):
+    print "Image push failed, reason: "+reason
+    execute()
+
+def attachment_push_completed():
+    print "Attachment push completed"
+    execute()
+
+def attachment_push_failed(reason):
+    print "Attachment push failed, reason: "+reason
+    execute()
+
+if  __name__ == '__main__':
+
+    dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+
+    parser = OptionParser()
+
+    (options, args) = parse_options()
+
+    if not options.device:
+        parser.print_help()
+        sys.exit(0)
+
+    bus = dbus.SessionBus()
+    mainloop = gobject.MainLoop()
+
+    path = "/test/agent"
+    agent = Agent(bus, path, options.verbose)
+	
+    bus.add_signal_receiver(image_push_completed,
+	dbus_interface="org.openobex.ImagePush",
+	signal_name="PutImageCompleted")
+    
+    bus.add_signal_receiver(image_push_failed,
+	dbus_interface="org.openobex.ImagePush",
+	signal_name="PutImageFailed")
+    
+    client = dbus.Interface(bus.get_object("org.openobex.client", "/"),
+                            "org.openobex.Client")
+
+    session_path = client.CreateSession({ "Destination": options.device,
+        "Target": "BIP:RD"})
+
+    session = dbus.Interface(bus.get_object("org.openobex.client", session_path),
+                 "org.openobex.Session")
+
+    session.AssignAgent(path)
+
+    bip = dbus.Interface(bus.get_object("org.openobex.client", session_path),
+                 "org.openobex.RemoteDisplay")
+    
+    execute()
+
+    mainloop.run()
