@@ -133,3 +133,31 @@ GDBusSignalTable remote_camera_signals[] = {
 	{ "GetImageThumbnailFailed", "s" },
 	{ }
 };
+
+gboolean bip_rc_register_interface(DBusConnection *connection,
+						const char *path,
+						void *user_data,
+						GDBusDestroyFunction destroy)
+{
+	if (!g_dbus_register_interface(connection, path,
+							REMOTE_CAMERA_INTERFACE,
+							remote_camera_methods,
+							NULL,
+							NULL, user_data,
+							destroy))
+		return FALSE;
+
+	return g_dbus_register_interface(connection, path,
+							BIP_SIGNAL_INTERFACE,
+							NULL,
+							remote_camera_signals,
+							NULL, user_data,
+							destroy);
+}
+
+void bip_rc_unregister_interface(DBusConnection *connection,
+					const char *path, void *user_data)
+{
+	g_dbus_unregister_interface(connection, path, REMOTE_CAMERA_INTERFACE);
+	g_dbus_unregister_interface(connection, path, BIP_SIGNAL_INTERFACE);
+}
