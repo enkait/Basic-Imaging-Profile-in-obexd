@@ -85,6 +85,11 @@ static DBusMessage *failed(DBusMessage *message)
 	return g_dbus_create_error(message, ERROR_INTERFACE, "Failed");
 }
 
+static DBusMessage *report_error(DBusMessage *message, char *err)
+{
+	return g_dbus_create_error(message, ERROR_INTERFACE, "%s", err);
+}
+
 static DBusMessage *invalid_argument(DBusMessage *message)
 {
 	return g_dbus_create_error(message, ERROR_INTERFACE,
