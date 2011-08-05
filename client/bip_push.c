@@ -21,6 +21,7 @@
 #include "bip_push.h"
 #include "bip_pull.h"
 #include "bip_rd.h"
+#include "bip_rc.h"
 #include "bip_arch.h"
 
 #define EOL_CHARS "\n"
@@ -490,97 +491,85 @@ static GDBusSignalTable image_push_signals[] = {
 	{ }
 };
 
+gboolean bip_push_register_interface(DBusConnection *connection,
+						const char *path,
+						void *user_data,
+						GDBusDestroyFunction destroy)
+{
+	if (!g_dbus_register_interface(connection, path,
+							IMAGE_PUSH_INTERFACE,
+							image_push_methods,
+							NULL,
+							NULL, user_data,
+							destroy))
+		return FALSE;
+
+	return g_dbus_register_interface(connection, path,
+							BIP_SIGNAL_INTERFACE,
+							NULL,
+							image_push_signals,
+							NULL, user_data,
+							destroy);
+}
+
+void bip_push_unregister_interface(DBusConnection *connection,
+					const char *path, void *user_data)
+{
+	g_dbus_unregister_interface(connection, path, IMAGE_PUSH_INTERFACE);
+	g_dbus_unregister_interface(connection, path, BIP_SIGNAL_INTERFACE);
+}
+
 gboolean bip_register_interface(DBusConnection *connection, const char *path,
 		void *user_data, GDBusDestroyFunction destroy)
 {
 	struct session_data * session = user_data;
-	printf("INTERFACE\n");
-	/** should be memcmp0 from obex.c */
-	if (memcmp(session->target, IMAGE_PUSH_UUID,
-				session->target_len) == 0) {
-		printf("PUSH_INTERFACE\n");
-		return g_dbus_register_interface(connection, path,
-							IMAGE_PUSH_INTERFACE,
-							image_push_methods,
-							image_push_signals,
-							NULL, user_data,
-							destroy);
-	}
+	if (memcmp(session->target, IMAGE_PUSH_UUID, session->target_len) == 0)
+		return bip_push_register_interface(connection, path, user_data,
+								destroy);
 	else if (memcmp(session->target, IMAGE_PULL_UUID,
-				session->target_len) == 0) {
-		printf("PULL_INTERFACE\n");
-		return g_dbus_register_interface(connection, path,
-							IMAGE_PULL_INTERFACE,
-							image_pull_methods,
-							image_pull_signals,
-							NULL, user_data,
-							destroy);
-	}
+				session->target_len) == 0)
+		return bip_pull_register_interface(connection, path, user_data,
+								destroy);
 	else if (memcmp(session->target, ARCHIVE_UUID,
-				session->target_len) == 0) {
-		printf("AUTOMATIC_ARCHIVE_INTERFACE\n");
-		return g_dbus_register_interface(connection, path,
-							ARCHIVE_INTERFACE,
-							archive_methods,
-							archive_signals,
-							NULL, user_data,
-							destroy);
-	}
+				session->target_len) == 0)
+		return bip_arch_register_interface(connection, path, user_data,
+								destroy);
 	else if (memcmp(session->target, REMOTE_DISPLAY_UUID,
-				session->target_len) == 0) {
-		printf("REMOTE_DISPLAY_INTERFACE\n");
-
-		if (!g_dbus_register_interface(connection, path,
-							REMOTE_DISPLAY_INTERFACE,
-							remote_display_methods,
-							NULL,
-							NULL, user_data,
-							destroy))
-			return FALSE;
-
-		return g_dbus_register_interface(connection, path,
-							IMAGE_PUSH_INTERFACE,
-							NULL,
-							remote_display_signals,
-							NULL, user_data,
-							destroy);
-	}
+				session->target_len) == 0)
+		return bip_rd_register_interface(connection, path, user_data,
+								destroy);
+	else if (memcmp(session->target, REMOTE_CAMERA_UUID,
+				session->target_len) == 0)
+		return bip_rc_register_interface(connection, path, user_data,
+								destroy);
 	else if (memcmp(session->target, ARCHIVED_OBJECTS_UUID,
-				session->target_len) == 0) {
-		return g_dbus_register_interface(connection, path,
-							IMAGE_PULL_INTERFACE,
-							image_pull_methods,
-							image_pull_signals,
-							NULL, user_data,
-							destroy);
-	}
-
+				session->target_len) == 0)
+		return aos_register_interface(connection, path, user_data,
+								destroy);
 	return FALSE;
 }
 
 void bip_unregister_interface(DBusConnection *connection, const char *path,
-								void *user_data)
+							void *user_data)
 {
 	struct session_data * session = user_data;
 	if (memcmp(session->target, IMAGE_PUSH_UUID, session->target_len) == 0)
-		g_dbus_unregister_interface(connection, path,
-							IMAGE_PUSH_INTERFACE);
+		bip_push_unregister_interface(connection, path, user_data);
 	else if (memcmp(session->target, IMAGE_PULL_UUID,
-						session->target_len) == 0)
-		g_dbus_unregister_interface(connection, path,
-							IMAGE_PULL_INTERFACE);
+				session->target_len) == 0)
+		bip_pull_unregister_interface(connection, path, user_data);
 	else if (memcmp(session->target, ARCHIVE_UUID,
-						session->target_len) == 0)
-		g_dbus_unregister_interface(connection, path,
-							ARCHIVE_INTERFACE);
+				session->target_len) == 0)
+		bip_arch_unregister_interface(connection, path, user_data);
 	else if (memcmp(session->target, REMOTE_DISPLAY_UUID,
-						session->target_len) == 0)
-		g_dbus_unregister_interface(connection, path,
-						REMOTE_DISPLAY_INTERFACE);
+				session->target_len) == 0)
+		bip_rd_unregister_interface(connection, path, user_data);
+	else if (memcmp(session->target, REMOTE_CAMERA_UUID,
+				session->target_len) == 0)
+		bip_rc_unregister_interface(connection, path, user_data);
 	else if (memcmp(session->target, ARCHIVED_OBJECTS_UUID,
-						session->target_len) == 0)
-		g_dbus_unregister_interface(connection, path,
-							IMAGE_PULL_INTERFACE);
+				session->target_len) == 0)
+		aos_unregister_interface(connection, path, user_data);
 }
 
 gboolean bip_sdp_filter(const void *user_data, const sdp_record_t *record)
