@@ -223,3 +223,32 @@ GDBusSignalTable remote_display_signals[] = {
 	{ "PutImageFailed",	"s" },
 	{ }
 };
+
+gboolean bip_rd_register_interface(DBusConnection *connection,
+						const char *path,
+						void *user_data,
+						GDBusDestroyFunction destroy)
+{
+	if (!g_dbus_register_interface(connection, path,
+							REMOTE_DISPLAY_INTERFACE,
+							remote_display_methods,
+							NULL,
+							NULL, user_data,
+							destroy))
+		return FALSE;
+
+	return g_dbus_register_interface(connection, path,
+							BIP_SIGNAL_INTERFACE,
+							NULL,
+							remote_display_signals,
+							NULL, user_data,
+							destroy);
+}
+
+void bip_rd_unregister_interface(DBusConnection *connection,
+					const char *path, void *user_data)
+{
+	g_dbus_unregister_interface(connection, path,
+						REMOTE_DISPLAY_INTERFACE);
+	g_dbus_unregister_interface(connection, path, BIP_SIGNAL_INTERFACE);
+}
