@@ -95,6 +95,21 @@ GDBusMethodTable archive_methods[] = {
 	{ }
 };
 
-GDBusSignalTable archive_signals[] = {
-	{ }
-};
+gboolean bip_arch_register_interface(DBusConnection *connection,
+						const char *path,
+						void *user_data,
+						GDBusDestroyFunction destroy)
+{
+	return g_dbus_register_interface(connection, path,
+							ARCHIVE_INTERFACE,
+							archive_methods,
+							NULL,
+							NULL, user_data,
+							destroy);
+}
+
+void bip_arch_unregister_interface(DBusConnection *connection, const char *path,
+							void *user_data)
+{
+	g_dbus_unregister_interface(connection, path, ARCHIVE_INTERFACE);
+}
