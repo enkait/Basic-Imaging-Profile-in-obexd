@@ -82,8 +82,7 @@ static gboolean put_attachment_failed(struct session_data *session, char *err)
 
 static DBusMessage *failed(DBusMessage *message)
 {
-	return g_dbus_create_error(message, ERROR_INTERFACE,
-				"Failed");
+	return g_dbus_create_error(message, ERROR_INTERFACE, "Failed");
 }
 
 static DBusMessage *invalid_argument(DBusMessage *message)
