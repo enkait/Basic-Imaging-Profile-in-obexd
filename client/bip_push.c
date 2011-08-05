@@ -88,7 +88,7 @@ static DBusMessage *failed(DBusMessage *message)
 static DBusMessage *invalid_argument(DBusMessage *message)
 {
 	return g_dbus_create_error(message, ERROR_INTERFACE,
-				"InvalidArgument");
+							"InvalidArgument");
 }
 
 static void put_thumbnail_callback(struct session_data *session, GError *err,
