@@ -40,6 +40,14 @@
 
 #define BIP_TEMP_FOLDER /tmp/bip/
 
+#define NBRETURNEDHANDLES_TAG 0x01
+#define NBRETURNEDHANDLES_LEN 0x02
+#define LISTSTARTOFFSET_TAG 0x02
+#define LISTSTARTOFFSET_LEN 0x02
+#define LATESTCAPTUREDIMAGES_TAG 0x03
+#define LATESTCAPTUREDIMAGES_LEN 0x01
+#define GETALLIMAGES 65535
+
 struct listing_object {
 	char *handle, *ctime, *mtime;
 };
@@ -1421,3 +1429,46 @@ GDBusSignalTable image_pull_signals[] = {
 	{ "GetImageAttachmentFailed", "s" },
 	{ }
 };
+
+gboolean bip_pull_register_interface(DBusConnection *connection,
+						const char *path,
+						void *user_data,
+						GDBusDestroyFunction destroy)
+{
+	if (!g_dbus_register_interface(connection, path,
+							IMAGE_PULL_INTERFACE,
+							image_pull_methods,
+							NULL,
+							NULL, user_data,
+							destroy))
+		return FALSE;
+
+	return g_dbus_register_interface(connection, path,
+							BIP_SIGNAL_INTERFACE,
+							NULL,
+							image_pull_signals,
+							NULL, user_data,
+							destroy);
+}
+
+gboolean aos_register_interface(DBusConnection *connection,
+						const char *path,
+						void *user_data,
+						GDBusDestroyFunction destroy)
+{
+	return bip_pull_register_interface(connection, path, user_data,
+								destroy);
+}
+
+void bip_pull_unregister_interface(DBusConnection *connection, const char *path,
+							void *user_data)
+{
+	g_dbus_unregister_interface(connection, path, IMAGE_PULL_INTERFACE);
+	g_dbus_unregister_interface(connection, path, BIP_SIGNAL_INTERFACE);
+}
+
+void aos_unregister_interface(DBusConnection *connection, const char *path,
+							void *user_data)
+{
+	bip_pull_unregister_interface(connection, path, user_data);
+}
