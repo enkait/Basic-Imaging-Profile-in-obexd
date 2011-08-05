@@ -49,6 +49,9 @@
 #include "btio.h"
 #include "bip_push.h"
 #include "bip_pull.h"
+#include "bip_arch.h"
+#include "bip_rd.h"
+#include "bip_rc.h"
 
 #define AGENT_INTERFACE  "org.openobex.Agent"
 
