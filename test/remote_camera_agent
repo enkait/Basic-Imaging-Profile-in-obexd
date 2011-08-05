@@ -1,0 +1,48 @@
+#!/usr/bin/python
+
+import gobject
+
+import sys
+import dbus
+import dbus.service
+import dbus.mainloop.glib
+import os.path
+from optparse import OptionParser
+
+class Agent(dbus.service.Object):
+    def __init__(self, conn=None, obj_path=None, verbose=False):
+        dbus.service.Object.__init__(self, conn, obj_path)
+        self.verbose = verbose
+
+    @dbus.service.method("org.openobex.GetMonitoringImage",
+                    in_signature="b", out_signature="ss")
+    def GetMonitoringImage(self, store):
+        print "Get Monitoring Image: store = " + str(store)
+        print "Insert monitoring image path"
+        monit_path = sys.stdin.readline()
+        path = ""
+        if store:
+            print "Insert monitoring image path"
+            path = sys.stdin.readline()
+        return (monit_path, path)
+
+tasks = []
+
+if  __name__ == '__main__':
+
+    dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
+
+    bus = dbus.SessionBus()
+    mainloop = gobject.MainLoop()
+
+    path = "/test/rcagent"
+    agent = Agent(bus, path, True)
+	
+    client = dbus.Interface(bus.get_object("org.openobex.RCManager",
+                            "/rcmanager"), "org.openobex.RCManager.RCManager")
+
+    print client
+
+    session_path = client.RegisterAgent(path)
+
+    mainloop.run()
