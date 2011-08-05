@@ -119,7 +119,7 @@ cleanup:
 GDBusMethodTable remote_camera_methods[] = {
 	{ "GetImage",	"ssa{ss}", "", get_image },
 	{ "GetImageThumbnail",	"ss", "", get_image_thumbnail },
-	{ "GetMonitoringImage",	"s", "", get_monit_image },
+	{ "GetMonitoringImage",	"b", "", get_monit_image },
 	{ "GetImageProperties",	"s", "aa{ss}", get_image_properties },
 	{ }
 };
@@ -127,7 +127,7 @@ GDBusMethodTable remote_camera_methods[] = {
 GDBusSignalTable remote_camera_signals[] = {
 	{ "GetImageCompleted", "" },
 	{ "GetImageFailed", "s" },
-	{ "GetMonitImageCompleted", "s" },
+	{ "GetMonitImageCompleted", "ss" },
 	{ "GetMonitImageFailed", "s" },
 	{ "GetImageThumbnailCompleted", "" },
 	{ "GetImageThumbnailFailed", "s" },
