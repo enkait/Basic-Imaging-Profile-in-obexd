@@ -1214,6 +1214,17 @@ static void cmd_put(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 		OBEX_SuspendRequest(obex, obj);
 		os->obj = obj;
 		os->driver->set_io_watch(os->object, handle_async_io, os);
+		return;
+	}
+
+	/* Try to write to stream and suspend the stream immediately
+	 * if no data available to send. */
+	err = obex_write(os, obex, obj);
+	if (err == -EAGAIN) {
+		OBEX_SuspendRequest(obex, obj);
+		os->obj = obj;
+		os->driver->set_io_watch(os->object, handle_async_io, os);
+		return;
 	}
 }
 
