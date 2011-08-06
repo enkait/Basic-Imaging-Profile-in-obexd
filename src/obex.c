@@ -569,99 +569,6 @@ static gboolean chk_cid(obex_t *obex, obex_object_t *obj, uint32_t cid)
 	return ret;
 }
 
-static int obex_read_stream(struct obex_session *os, obex_t *obex,
-						obex_object_t *obj)
-{
-	int size = 0;
-	ssize_t len = 0;
-	const uint8_t *buffer;
-
-	DBG("name=%s type=%s rx_mtu=%d file=%p",
-		os->name ? os->name : "", os->type ? os->type : "",
-		os->rx_mtu, os->object);
-
-	if (os->aborted)
-		return -EPERM;
-
-	/* workaround: client didn't send the object lenght */
-	if (os->size == OBJECT_SIZE_DELETE)
-		os->size = OBJECT_SIZE_UNKNOWN;
-
-	/* If there's something to write and we are able to write it */
-	if (os->pending > 0 && os->driver)
-		goto write;
-
-	size = OBEX_ObjectReadStream(obex, obj, &buffer);
-
-	if (size == 0) {
-		// streaming completed
-		os->body_streamed = TRUE;
-	}
-
-	if (size < 0) {
-		error("Error on OBEX stream");
-		return -EIO;
-	}
-
-	if (size > os->rx_mtu) {
-		error("Received more data than RX_MAX");
-		return -EIO;
-	}
-
-	os->buf = g_realloc(os->buf, os->pending + size);
-	memcpy(os->buf + os->pending, buffer, size);
-	os->pending += size;
-
-	/* only write if both object and driver are valid */
-	if (os->object == NULL || os->driver == NULL) {
-		DBG("Stored %" PRIu64 " bytes into temporary buffer",
-								os->pending);
-		return 0;
-	}
-
-write:
-	while (os->pending > 0) {
-		ssize_t w;
-
-		w = os->driver->write(os->object, os->buf + len,
-					os->pending);
-		if (w < 0) {
-			if (w == -EINTR)
-				continue;
-			else {
-				memmove(os->buf, os->buf + len, os->pending);
-				return w;
-			}
-		}
-
-		len += w;
-		os->offset += w;
-		os->pending -= w;
-	}
-
-	/* Flush on EOS */
-	if (os->body_streamed && os->pending == 0) {
-		int ret = 0;
-		if (os->driver->flush != NULL)
-			ret = os->driver->flush(os->object) > 0 ? -EAGAIN : 0;
-
-		if (ret < 0)
-			return ret;
-
-		/* Try to write to stream and suspend the stream immediately
-		 * if no data available to send. */
-		ret = obex_write(os, obex, obj);
-		if (ret == -EAGAIN) {
-			OBEX_SuspendRequest(obex, obj);
-			os->obj = obj;
-			os->driver->set_io_watch(os->object, handle_async_io, os);
-			return 0;
-		}
-	}
-
-	return 0;
-}
-
 static int obex_write_stream(struct obex_session *os,
 			obex_t *obex, obex_object_t *obj)
 {
@@ -740,10 +647,8 @@ static int obex_write(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 	if (os->buf == NULL)
 		os->buf = g_malloc0(os->tx_mtu);
 
-	while (TRUE) {
-		len = os->driver->get_next_header(os->object, os->buf,
-					os->tx_mtu, &hi);
-
+	while ((len = os->driver->get_next_header(os->object, os->buf,
+					os->tx_mtu, &hi)) != 0) {
 		if (len < 0) {
 			error("get_next_header(): %s (%zd)", strerror(-len),
 								-len);
@@ -769,6 +674,89 @@ skip:
 
 	if (os->cmd == OBEX_CMD_GET)
 		return obex_write_stream(os, obex, obj);
+	return 0;
+}
+
+static int obex_read_stream(struct obex_session *os, obex_t *obex,
+						obex_object_t *obj)
+{
+	int size;
+	ssize_t len = 0;
+	const uint8_t *buffer;
+
+	DBG("name=%s type=%s rx_mtu=%d file=%p",
+		os->name ? os->name : "", os->type ? os->type : "",
+		os->rx_mtu, os->object);
+
+	if (os->aborted)
+		return -EPERM;
+
+	/* workaround: client didn't send the object lenght */
+	if (os->size == OBJECT_SIZE_DELETE)
+		os->size = OBJECT_SIZE_UNKNOWN;
+
+	/* If there's something to write and we are able to write it */
+	if (os->pending > 0 && os->driver)
+		goto write;
+
+	size = OBEX_ObjectReadStream(obex, obj, &buffer);
+
+	if (size == 0)
+		os->body_streamed = TRUE;
+
+	if (size < 0) {
+		error("Error on OBEX stream");
+		return -EIO;
+	}
+
+	if (size > os->rx_mtu) {
+		error("Received more data than RX_MAX");
+		return -EIO;
+	}
+
+	os->buf = g_realloc(os->buf, os->pending + size);
+	memcpy(os->buf + os->pending, buffer, size);
+	os->pending += size;
+
+	/* only write if both object and driver are valid */
+	if (os->object == NULL || os->driver == NULL) {
+		DBG("Stored %" PRIu64 " bytes into temporary buffer",
+								os->pending);
+		return 0;
+	}
+
+write:
+	while (os->pending > 0) {
+		ssize_t w;
+
+		w = os->driver->write(os->object, os->buf + len,
+					os->pending);
+		if (w < 0) {
+			if (w == -EINTR)
+				continue;
+			else {
+				memmove(os->buf, os->buf + len, os->pending);
+				return w;
+			}
+		}
+
+		len += w;
+		os->offset += w;
+		os->pending -= w;
+	}
+
+	/* Flush on EOS and start  */
+	if (os->body_streamed && os->pending == 0) {
+		int ret = 0;
+		if (os->driver->flush != NULL)
+			ret = os->driver->flush(os->object) > 0 ? -EAGAIN : 0;
+
+		if (ret < 0)
+			return ret;
+
+		return obex_write(os, obex, obj);
+	}
+
 	return 0;
 }
 
@@ -1242,8 +1230,7 @@ static void cmd_put(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 		return;
 	}
 
-	/* Try to write to stream and suspend the stream immediately
-	 * if no data available to send. */
+	/* Get response headers if flush doesn't suspend */
 	err = obex_write(os, obex, obj);
 	if (err == -EAGAIN) {
 		OBEX_SuspendRequest(obex, obj);
