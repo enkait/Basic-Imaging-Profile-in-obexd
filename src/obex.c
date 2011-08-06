@@ -187,6 +187,11 @@ static struct {
 	{ 0xFF,					NULL			},
 };
 
+static int obex_write(struct obex_session *os, obex_t *obex, obex_object_t *obj);
+
+static gboolean handle_async_io(void *object, int flags, int err,
+						void *user_data);
+
 static void print_event(int evt, int cmd, int rsp)
 {
 	const char *evtstr = NULL, *cmdstr = NULL, *rspstr = NULL;
