@@ -1138,7 +1138,7 @@ static void cmd_put(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 	/* Check if there is a body and it is not empty (size > 0), otherwise
 	   openobex won't notify us with OBEX_EV_STREAMAVAIL and it gonna reply
 	   right away */
-	if (os->size != 0)
+	if (os->size > 0 || os->size == OBJECT_SIZE_UNKNOWN)
 		return;
 
 	/* Flush immediatly since there is nothing to write so the driver
