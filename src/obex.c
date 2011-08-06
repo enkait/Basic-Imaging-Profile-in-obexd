@@ -939,6 +939,32 @@ static void obex_reset_object(struct obex_session *os, obex_object_t *obj)
 	g_assert(OBEX_ObjectReParseHeaders(os->obex, obj));
 }
 
+int obex_feed_headers(struct obex_session *os)
+{
+	uint32_t hlen;
+	uint8_t hi;
+	obex_headerdata_t hd;
+	int err = 0;
+	g_assert(os->object != NULL);
+	g_assert(os->obj != NULL);
+
+	if (os->driver->feed_next_header == NULL)
+		return 0;
+	obex_reset_object(os, os->obj);
+	while (OBEX_ObjectGetNextHeader(os->obex, os->obj, &hi, &hd, &hlen)) {
+		err = os->driver->feed_next_header(os->object, hi, hd, hlen);
+
+		if (err < 0)
+			return err;
+	}
+	hd.bs = NULL;
+	err = os->driver->feed_next_header(os->object, OBEX_HDR_EMPTY, hd, 0);
+
+	if (err < 0)
+		return err;
+	return 0;
+}
+
 int obex_get_stream_start(struct obex_session *os, const char *filename)
 {
 	int err;
