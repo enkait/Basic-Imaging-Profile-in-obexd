@@ -833,6 +833,12 @@ struct session_data *session_create(const char *source,
 		session->target_len = REMOTE_DISPLAY_UUID_LEN;
 		session->sdp_filter = bip_sdp_filter;
 		session->sdp_filter_data = &remote_display_supp_feat;
+	} else if (!g_ascii_strncasecmp(service, "BIP:RC", 6)) {
+		sdp_uuid16_create(&session->uuid, IMAGING_RESPONDER_SVCLASS_ID);
+		session->target = REMOTE_CAMERA_UUID;
+		session->target_len = REMOTE_CAMERA_UUID_LEN;
+		session->sdp_filter = bip_sdp_filter;
+		session->sdp_filter_data = &remote_camera_supp_feat;
 	} else if (!g_ascii_strncasecmp(service, "BIP:AOS", 7)) {
 		sdp_uuid16_create(&session->uuid, IMAGING_ARCHIVE_SVCLASS_ID);
 		session->target = ARCHIVED_OBJECTS_UUID;
