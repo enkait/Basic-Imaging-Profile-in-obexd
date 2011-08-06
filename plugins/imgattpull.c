@@ -148,8 +148,7 @@ static void *imgattpull_open(const char *name, int oflag, mode_t mode,
 	return GINT_TO_POINTER(fd);
 }
 
-static ssize_t imgattpull_read(void *object, void *buf, size_t count,
-		uint8_t *hi)
+static ssize_t imgattpull_read(void *object, void *buf, size_t count)
 {
 	ssize_t ret;
 	
@@ -159,8 +158,6 @@ static ssize_t imgattpull_read(void *object, void *buf, size_t count,
 	printf("read %u\n", ret);
 	if (ret < 0)
 		return -errno;
-
-	*hi = OBEX_HDR_BODY;
 
 	return ret;
 }

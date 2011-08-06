@@ -167,7 +167,8 @@ failed:
 }
 
 int image_arch_get(struct obex_session *os, obex_object_t *obj,
-		gboolean *stream, void *user_data) {
+							void *user_data)
+{
 	struct archive_session *session = user_data;
 	int ret = -EBADR;
 

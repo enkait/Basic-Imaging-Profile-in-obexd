@@ -282,7 +282,7 @@ void *image_pull_connect(struct obex_session *os, int *err)
 }
 
 int image_pull_get(struct obex_session *os, obex_object_t *obj,
-					gboolean *stream, void *user_data)
+							void *user_data)
 {
 	struct image_pull_session *session = user_data;
 	const uint8_t *buffer;

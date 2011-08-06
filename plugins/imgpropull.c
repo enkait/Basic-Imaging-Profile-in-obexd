@@ -158,10 +158,8 @@ static void *imgpropull_open(const char *name, int oflag, mode_t mode,
 	return object;
 }
 
-static ssize_t imgpropull_read(void *object, void *buf, size_t count,
-								uint8_t *hi)
+static ssize_t imgpropull_read(void *object, void *buf, size_t count)
 {
-	*hi = OBEX_HDR_BODY;
 	printf("imgpropull_read\n");
 	return string_read(object, buf, count);
 }
