@@ -35,6 +35,7 @@
 #define OBEX_BIP_PULL	(1 << 10)
 #define OBEX_BIP_ARCH	(1 << 11)
 #define OBEX_BIP_AOS	(1 << 12)
+#define OBEX_BIP_RD	(1 << 13)
 #define OBEX_BIP	(OBEX_BIP_PUSH | OBEX_BIP_PULL | OBEX_BIP_ARCH | OBEX_BIP_AOS)
 #define OBEX_PBAP	(1 << 4)
 #define OBEX_IRMC	(1 << 5)
