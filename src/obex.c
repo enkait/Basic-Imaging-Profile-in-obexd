@@ -712,7 +712,7 @@ static int obex_write(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 		return -EIO;
 
 	if (os->headers_sent)
-		return obex_write_stream(os, obex, obj);
+		goto skip;
 
 	if (!os->driver->get_next_header)
 		goto skip;
