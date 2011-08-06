@@ -154,6 +154,13 @@ static void get_monitoring_image_cb(void *user_data, char *monit_image,
 		return;
 	}
 
+	data->transfering = TRUE;
+
+	if (!data->storeflag) {
+		obex_object_set_io_flags(user_data, G_IO_IN, 0);
+		return;
+	}
+
 	data->handle = get_new_handle_rc(data->context);
 
 	if (data->handle < 0) {
