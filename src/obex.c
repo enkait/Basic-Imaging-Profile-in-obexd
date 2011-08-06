@@ -739,7 +739,9 @@ static int obex_write(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 skip:
 	os->headers_sent = TRUE;
 
-	return obex_write_stream(os, obex, obj);
+	if (os->cmd == OBEX_CMD_GET)
+		return obex_write_stream(os, obex, obj);
+	return 0;
 }
 
 static gboolean handle_async_io(void *object, int flags, int err,
