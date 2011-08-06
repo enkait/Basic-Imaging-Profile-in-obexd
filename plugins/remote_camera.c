@@ -315,7 +315,6 @@ cleanup:
 int get_monitoring_image(gboolean store, monit_image_cb cb, void *user_data)
 {
 	DBusMessage *msg = NULL;
-	DBusMessageIter iter;
 	DBusPendingCall *call = NULL;
 	struct monit_image_data *data = NULL;
 
@@ -331,13 +330,11 @@ int get_monitoring_image(gboolean store, monit_image_cb cb, void *user_data)
 	if (msg == NULL)
 		return -ENOMEM;
 
-	dbus_message_append_args(msg, DBUS_TYPE_BOOLEAN, &store,
-                                        DBUS_TYPE_INVALID);
-
-	dbus_message_iter_init_append(msg, &iter);
-
-	if (!dbus_message_iter_append_basic(&iter, DBUS_TYPE_BOOLEAN, &store))
-		return FALSE;
+	if (!dbus_message_append_args(msg, DBUS_TYPE_BOOLEAN, &store,
+                                        DBUS_TYPE_INVALID)) {
+		dbus_message_unref(msg);
+		return -ENOMEM;
+	}
 
 	if (!dbus_connection_send_with_reply(connection, msg, &call, -1)) {
 		dbus_message_unref(msg);
