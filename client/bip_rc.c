@@ -99,11 +99,13 @@ static DBusMessage *get_monit_image(DBusConnection *connection,
 	struct session_data *session = user_data;
 	DBusMessage *reply = NULL;
 	struct monit_image_aparam *aparam = NULL;
+	char *image_path = NULL;
 	gboolean sf;
 
 	printf("requested get monitoring image\n");
 
 	if (dbus_message_get_args(message, NULL,
+				DBUS_TYPE_STRING, &image_path,
 				DBUS_TYPE_BOOLEAN, &sf,
 				DBUS_TYPE_INVALID) == FALSE) {
 		reply = invalid_argument(message);
@@ -119,7 +121,7 @@ static DBusMessage *get_monit_image(DBusConnection *connection,
 	}
 
 	if (session_get_with_aheaders(session, "x-bt/img-monitoring", NULL,
-					NULL, (const guint8 *) aparam,
+					image_path, (const guint8 *) aparam,
 					sizeof(struct monit_image_aparam),
 					NULL, get_monit_image_callback,
 								NULL) < 0) {
