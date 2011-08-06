@@ -325,6 +325,7 @@ static void os_reset_session(struct obex_session *os)
 	os->size = OBJECT_SIZE_DELETE;
 	os->headers_sent = FALSE;
 	os->streaming = FALSE;
+	os->body_streamed = FALSE;
 }
 
 static void obex_session_free(struct obex_session *os)
@@ -566,7 +567,7 @@ static gboolean chk_cid(obex_t *obex, obex_object_t *obj, uint32_t cid)
 static int obex_read_stream(struct obex_session *os, obex_t *obex,
 						obex_object_t *obj)
 {
-	int size;
+	int size = 0;
 	ssize_t len = 0;
 	const uint8_t *buffer;
 
@@ -586,6 +587,12 @@ static int obex_read_stream(struct obex_session *os, obex_t *obex,
 		goto write;
 
 	size = OBEX_ObjectReadStream(obex, obj, &buffer);
+
+	if (size == 0) {
+		// streaming completed
+		os->body_streamed = TRUE;
+	}
+
 	if (size < 0) {
 		error("Error on OBEX stream");
 		return -EIO;
