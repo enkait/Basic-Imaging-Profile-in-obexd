@@ -530,7 +530,7 @@ struct img_listing *get_img_listing(const char *path, int handle, int *err) {
 
 	if (lstat(path, &file_stat) < 0) {
 		if (err != NULL)
-			*err = -EBADR;
+			*err = -errno;
 		return NULL;
 	}
 	if (!(file_stat.st_mode & S_IFREG)) {
