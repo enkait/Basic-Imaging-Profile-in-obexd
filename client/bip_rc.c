@@ -25,6 +25,34 @@ struct monit_image_aparam {
     uint8_t sf;
 } __attribute__ ((packed));
 
+static gboolean get_monit_image_completed(struct session_data *session, char *handle)
+{
+	return g_dbus_emit_signal(session->conn, session->path,
+			BIP_SIGNAL_INTERFACE, "GetMonitImageCompleted",
+			DBUS_TYPE_STRING, &handle,
+			DBUS_TYPE_INVALID);
+}
+
+static gboolean get_monit_image_failed(struct session_data *session, char *err)
+{
+	return g_dbus_emit_signal(session->conn, session->path,
+				BIP_SIGNAL_INTERFACE, "GetMonitImageFailed",
+				DBUS_TYPE_STRING, &err,
+				DBUS_TYPE_INVALID);
+}
+
+static DBusMessage *invalid_argument(DBusMessage *message)
+{
+	return g_dbus_create_error(message, ERROR_INTERFACE,
+							"InvalidArgument");
+}
+
+static DBusMessage *failed(DBusMessage *message)
+{
+	return g_dbus_create_error(message, ERROR_INTERFACE,
+							"Failed");
+}
+
 static struct monit_image_aparam *new_monit_image_aparam(gboolean sf)
 {
 	struct monit_image_aparam *aparam =
@@ -47,27 +75,19 @@ static void get_monit_image_callback(struct session_data *session, GError *err,
 	printf("get_monit_image_callback\n");
 
 	if (err != NULL) {
-		g_dbus_emit_signal(session->conn, session->path,
-				IMAGE_PULL_INTERFACE, "GetMonitImageFailed",
-				DBUS_TYPE_STRING, &err->message,
-				DBUS_TYPE_INVALID);
+		get_monit_image_failed(session, err->message);
 		goto cleanup;
 	}
 
 	parse_client_user_headers(transfer->xfer, NULL, NULL, &handle,
 								&length);
+
 	if (handle == NULL || parse_handle(handle, length) < 0) {
-		g_dbus_emit_signal(session->conn, session->path,
-				IMAGE_PULL_INTERFACE, "GetMonitImageFailed",
-				DBUS_TYPE_STRING, "ImproperHandle",
-				DBUS_TYPE_INVALID);
-		return;
+		get_monit_image_completed(session, "");
+		goto cleanup;
 	}
 
-	g_dbus_emit_signal(session->conn, session->path,
-			IMAGE_PULL_INTERFACE, "GetMonitImageCompleted",
-			DBUS_TYPE_STRING, &handle,
-			DBUS_TYPE_INVALID);
+	get_monit_image_completed(session, handle);
 cleanup:
 	transfer_unregister(transfer);
 	g_free(handle);
@@ -86,8 +106,7 @@ static DBusMessage *get_monit_image(DBusConnection *connection,
 	if (dbus_message_get_args(message, NULL,
 				DBUS_TYPE_BOOLEAN, &sf,
 				DBUS_TYPE_INVALID) == FALSE) {
-		reply = g_dbus_create_error(message,
-				"org.openobex.Error", "InvalidArguments");
+		reply = invalid_argument(message);
 		goto cleanup;
 	}
 
@@ -95,8 +114,7 @@ static DBusMessage *get_monit_image(DBusConnection *connection,
 
 	session->msg = dbus_message_ref(message);
 	if (aparam == NULL) {
-		reply = g_dbus_create_error(message,
-				"org.openobex.Error", "Out of memory");
+		reply = failed(message);
 		goto cleanup;
 	}
 
@@ -105,8 +123,7 @@ static DBusMessage *get_monit_image(DBusConnection *connection,
 					sizeof(struct monit_image_aparam),
 					NULL, get_monit_image_callback,
 								NULL) < 0) {
-		reply = g_dbus_create_error(message, "org.openobex.Error",
-								"Failed");
+		reply = failed(message);
 		goto cleanup;
 	}
 
