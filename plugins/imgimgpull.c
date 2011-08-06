@@ -440,7 +440,7 @@ static struct obex_mime_type_driver imgimgpull = {
 };
 
 static struct obex_mime_type_driver imgimgpull_rc = {
-	.target = IMAGE_PULL_TARGET,
+	.target = REMOTE_CAMERA_TARGET,
 	.target_size = TARGET_SIZE,
 	.mimetype = "x-bt/img-img",
 	.open = remote_camera_open,

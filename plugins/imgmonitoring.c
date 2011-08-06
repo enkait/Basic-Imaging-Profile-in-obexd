@@ -220,7 +220,7 @@ static int imgmonitoring_close(void *object)
 }
 
 static struct obex_mime_type_driver imgmonitoring = {
-	.target = IMAGE_PULL_TARGET,
+	.target = REMOTE_CAMERA_TARGET,
 	.target_size = TARGET_SIZE,
 	.mimetype = "x-bt/img-monitoring",
 	.open = imgmonitoring_open,
