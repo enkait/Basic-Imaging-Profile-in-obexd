@@ -930,6 +930,15 @@ static void cmd_setpath(struct obex_session *os,
 	os_set_response(obj, err);
 }
 
+static void obex_reset_object(struct obex_session *os, obex_object_t *obj)
+{
+	uint32_t hlen;
+	uint8_t hi;
+	obex_headerdata_t hd;
+	while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen));
+	g_assert(OBEX_ObjectReParseHeaders(os->obex, obj));
+}
+
 int obex_get_stream_start(struct obex_session *os, const char *filename)
 {
 	int err;
