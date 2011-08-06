@@ -44,6 +44,7 @@ struct obex_session {
 	void *service_data;
 	struct obex_server *server;
 	gboolean checked;
+	gboolean body_streamed;
 	obex_t *obex;
 	obex_object_t *obj;
 	struct obex_mime_type_driver *driver;
