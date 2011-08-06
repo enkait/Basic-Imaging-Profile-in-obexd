@@ -635,9 +635,14 @@ write:
 	}
 
 	/* Flush on EOS */
-	if (os->size != OBJECT_SIZE_UNKNOWN && os->size == os->offset &&
-							os->driver->flush)
-		return os->driver->flush(os->object) > 0 ? -EAGAIN : 0;
+	if (os->body_streamed && os->pending == 0) {
+		int ret = 0;
+		if (os->driver->flush != NULL)
+			ret = os->driver->flush(os->object) > 0 ? -EAGAIN : 0;
+
+		if (ret < 0)
+			return ret;
+	}
 
 	return 0;
 }
