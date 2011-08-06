@@ -642,6 +642,16 @@ write:
 
 		if (ret < 0)
 			return ret;
+
+		/* Try to write to stream and suspend the stream immediately
+		 * if no data available to send. */
+		ret = obex_write(os, obex, obj);
+		if (ret == -EAGAIN) {
+			OBEX_SuspendRequest(obex, obj);
+			os->obj = obj;
+			os->driver->set_io_watch(os->object, handle_async_io, os);
+			return 0;
+		}
 	}
 
 	return 0;
