@@ -425,6 +425,22 @@ failed:
 	return FALSE;
 }
 
+gboolean parse_bip_header(char **header, unsigned int *hdr_len,
+				uint8_t hi, const uint8_t *data, unsigned int hlen) {
+	g_assert (header != NULL && hdr_len != NULL);
+	switch (hi) {
+	case IMG_DESC_HDR:
+		*header = decode_img_descriptor(data, hlen, hdr_len);
+		break;
+	case IMG_HANDLE_HDR:
+		*header = decode_img_handle(data, hlen, hdr_len);
+		break;
+	}
+	if (*header == NULL)
+		return FALSE;
+	return TRUE;
+}
+
 void parse_bip_user_headers(const struct obex_session *os,
 		obex_object_t *obj, char **desc_hdr, unsigned int *desc_hdr_len,
 		char **handle_hdr, unsigned int *handle_hdr_len)

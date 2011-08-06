@@ -98,7 +98,7 @@ static const uint8_t IMAGE_PUSH_TARGET[TARGET_SIZE] = {
 
 #define HANDLE_LIMIT 10000000
 
-//static const char * bip_root="/tmp/bip/";
+static const char * bip_root="/tmp/bip/";
 
 void free_image_push_session(struct image_push_session *session) {
 	g_free(session);
@@ -125,6 +125,7 @@ static void *image_push_connect(struct obex_session *os, int *err)
 
 	ips = g_new0(struct image_push_session, 1);
 	ips->os = os;
+	ips->bip_root = bip_root;
 
 	if (err)
 		*err = 0;

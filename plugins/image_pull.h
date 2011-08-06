@@ -29,14 +29,6 @@ static const uint8_t IMAGE_AOS_TARGET[TARGET_SIZE] = {
 			0x8E, 0x61, 0xF9, 0x5E, 0x1A, 0x79, 0x11, 0xD4,
 			0x8E, 0xA4, 0x00, 0x80, 0x5F, 0x9B, 0x98, 0x34 };
 
-struct img_listing {
-	int handle;
-	char *image;
-	time_t ctime;
-	time_t mtime;
-	struct image_attributes *attr;
-};
-
 struct image_pull_session {
     struct obex_session *os;
     uint8_t *aparam_data;
@@ -55,7 +47,4 @@ int image_pull_get(struct obex_session *os, obex_object_t *obj,
 int image_pull_chkput(struct obex_session *os, void *user_data);
 int image_pull_put(struct obex_session *os, obex_object_t *obj, void *user_data);
 void image_pull_disconnect(struct obex_session *os, void *user_data);
-
 struct image_handles_desc *new_hdesc();
-void img_listing_free(struct img_listing *listing);
-struct img_listing *get_listing(struct image_pull_session *session, int handle, int *err);
