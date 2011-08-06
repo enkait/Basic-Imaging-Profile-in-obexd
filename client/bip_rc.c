@@ -129,6 +129,8 @@ static DBusMessage *get_monit_image(DBusConnection *connection,
 		goto cleanup;
 	}
 
+	reply = dbus_message_new_method_return(message);
+
 cleanup:
 	g_free(aparam);
 
