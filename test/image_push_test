@@ -97,9 +97,8 @@ def execute():
     if entry[0] == "capabilities":
         imaging_capabilities(bip)
 
-def image_push_completed(handle, thumbnail):
+def image_push_completed(handle):
     print "Image pushed, received handle: "+handle
-    print "Is thumbnail requested? "+str(thumbnail)
     execute()
 
 def image_push_failed(reason):

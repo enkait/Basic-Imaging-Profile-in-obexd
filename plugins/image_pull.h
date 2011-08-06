@@ -46,6 +46,7 @@ struct image_pull_session {
     char *desc_hdr;
     unsigned int desc_hdr_len;
     GSList *image_list;
+    int status;
 };
 
 void *image_pull_connect(struct obex_session *os, int *err);

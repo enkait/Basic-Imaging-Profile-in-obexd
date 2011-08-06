@@ -584,7 +584,8 @@ gboolean gw_obex_set_error(GwObex *ctx) {
     else
         ctx->error = (gint)ctx->obex_rsp;
 
-    if (ctx->error == OBEX_RSP_SUCCESS)
+    if (ctx->error == OBEX_RSP_SUCCESS ||
+		    ctx->error == OBEX_RSP_PARTIAL_CONTENT)
         return FALSE;
 
     return TRUE;
