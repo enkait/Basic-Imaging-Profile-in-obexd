@@ -647,8 +647,10 @@ static int obex_write(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 	if (os->buf == NULL)
 		os->buf = g_malloc0(os->tx_mtu);
 
-	while ((len = os->driver->get_next_header(os->object, os->buf,
-					os->tx_mtu, &hi)) != 0) {
+	while (TRUE) {
+		len = os->driver->get_next_header(os->object, os->buf,
+					os->tx_mtu, &hi);
+
 		if (len < 0) {
 			error("get_next_header(): %s (%zd)", strerror(-len),
 								-len);
