@@ -19,11 +19,12 @@ class Agent(dbus.service.Object):
     def GetMonitoringImage(self, store):
         print "Get Monitoring Image: store = " + str(store)
         print "Insert monitoring image path"
-        monit_path = sys.stdin.readline()
+        monit_path = sys.stdin.readline().rstrip()
         path = ""
         if store:
-            print "Insert monitoring image path"
-            path = sys.stdin.readline()
+            print "Insert stored image path"
+            path = sys.stdin.readline().rstrip()
+        print "Responding with " + str((monit_path, path))
         return (monit_path, path)
 
 tasks = []
