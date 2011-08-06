@@ -98,12 +98,6 @@
   </attribute>								\
 </record>"
 
-#define CLIENT_ADDRESS "org.openobex.client"
-#define CLIENT_PATH "/"
-#define CLIENT_INTERFACE "org.openobex.Client"
-const char *dest_entry = "Destination";
-const char *channel_entry = "Channel";
-
 static const uint8_t IMAGE_ARCH_TARGET[TARGET_SIZE] = {
 			0x94, 0x01, 0x26, 0xC0, 0x46, 0x08, 0x11, 0xD5,
 			0x84, 0x1A, 0x00, 0x02, 0xA5, 0x32, 0x5B, 0x4E };
@@ -181,16 +175,6 @@ int image_arch_get(struct obex_session *os, obex_object_t *obj,
 	return 0;
 }
 
-int image_arch_chkput(struct obex_session *os, void *user_data) {
-	printf("IMAGE PULL CHKPUT\n");
-	if (obex_get_size(os) == OBJECT_SIZE_DELETE) {
-		//return obex_put_stream_start(os, NULL);
-		return 0;
-	}
-
-	return -EBADR;
-}
-
 static gboolean get_ret_address(struct obex_session *os, char *address) {
 	GError *err = NULL;
 	bt_io_get(os->io, BT_IO_RFCOMM, &err, BT_IO_OPT_DEST, address,
@@ -202,64 +186,24 @@ static gboolean get_ret_address(struct obex_session *os, char *address) {
 	return TRUE;
 }
 
-static DBusConnection *connect_to_client(void) {
-	return obex_dbus_get_connection();
-}
+int image_arch_chkput(struct obex_session *os, void *user_data) {
+	struct archive_session *session = user_data;
+	printf("IMAGE PULL CHKPUT\n");
+	if (obex_get_size(os) == OBJECT_SIZE_DELETE) {
+		session->address = g_malloc0(18);
 
-static void get_aos_interface_callback(DBusPendingCall *call, void *user_data) {
-	//struct archive_session *session = user_data;
-	//DBusMessage *msg;
-	//dbus_pending_call_steal_reply(call);
-	printf("callback\n");
-}
+		if (!get_ret_address(os, session->address))
+			return -EBADR;
 
-
-static DBusConnection *get_aos_interface(struct archive_session *session,
-							DBusConnection *conn)
-{
-	DBusMessage *msg;
-	DBusMessageIter args, dict, entry, value;
-	DBusError err;
-	DBusPendingCall *result;
-	msg = dbus_message_new_method_call(CLIENT_ADDRESS, CLIENT_PATH,
-							CLIENT_INTERFACE,
-							"CreateSession");
-
-	dbus_message_iter_init_append(msg, &args);
-	dbus_message_iter_open_container(&args, DBUS_TYPE_ARRAY, "{sv}", &dict);
-	dbus_message_iter_open_container(&dict, DBUS_TYPE_DICT_ENTRY, NULL,
-								&entry);
-	dbus_message_iter_append_basic(&entry, DBUS_TYPE_STRING,
-								&dest_entry);
-	dbus_message_iter_open_container(&entry, DBUS_TYPE_VARIANT, "s",
-							&value);
-	dbus_message_iter_append_basic(&value, DBUS_TYPE_STRING,
-							&session->address);
-	dbus_message_iter_close_container(&dict, &entry);
-	dbus_message_iter_close_container(&args, &dict);
-	
-	dbus_error_init(&err);
-	if (!dbus_connection_send_with_reply(conn, msg, &result, -1)) {
-		fprintf(stderr, "Conn error: (%s)\n", err.message);
-		return NULL;
+		return obex_put_stream_start(os, NULL);
 	}
 
-	dbus_pending_call_set_notify(result, get_aos_interface_callback,
-								session, NULL);
-
-	printf("lawl %p\n", &get_aos_interface_callback);
-
-	dbus_message_unref(msg);
-	dbus_pending_call_unref(result);
-
-	printf("omg?\n");
-
-	return NULL;
+	return -EBADR;
 }
 
 int image_arch_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 {
-	struct archive_session *session = user_data;
+	//struct archive_session *session = user_data;
 	static struct aa_aparam *aparam;
 	const uint8_t *buffer;
 	ssize_t rsize;
@@ -270,18 +214,13 @@ int image_arch_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 	
 	rsize = obex_aparam_read(os, obj, &buffer);
 	aparam = parse_aparam(buffer, rsize);
-	
+	/*
 	if (g_strcmp0(os->type, "x-bt/img-archive") == 0) {
 		int i;
 		DBusConnection *conn;
 		for(i=0;i<16;i++) {
 			printf("%x\n", (char) aparam->serviceid[i]);
 		}
-
-		session->address = g_malloc0(18);
-
-		if (!get_ret_address(os, session->address))
-			return -EBADR;
 
 		for(i=0;i<18;i++) {
 			printf("lol:%x\n", session->address[i]);
@@ -295,6 +234,7 @@ int image_arch_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 		printf("start archive\n");
 
 	}
+	*/
 	return 0;
 }
 
@@ -329,45 +269,5 @@ static void image_arch_exit(void)
 {
 	obex_service_driver_unregister(&image_arch);
 }
-
-static void *imgarch_open(const char *name, int oflag, mode_t mode,
-		void *context, size_t *size, int *err)
-{
-	printf("imgarch open\n");
-	return 0;
-}
-
-static int imgarch_close(void *object)
-{
-	printf("imgarch close\n");
-	return 0;
-}
-
-static ssize_t imgarch_write(void *object, const void *buf, size_t count)
-{
-	printf("imgarch write\n");
-	return 0;
-}
-
-static struct obex_mime_type_driver imgarch = {
-	.target = IMAGE_ARCH_TARGET,
-	.target_size = TARGET_SIZE,
-	.mimetype = "x-bt/img-archive",
-	.open = imgarch_open,
-	.close = imgarch_close,
-	.write = imgarch_write,
-};
-
-static int imgarch_init(void)
-{
-	return obex_mime_type_driver_register(&imgarch);
-}
-
-static void imgarch_exit(void)
-{
-	obex_mime_type_driver_unregister(&imgarch);
-}
-
-OBEX_PLUGIN_DEFINE(imgarch, imgarch_init, imgarch_exit)
 
 OBEX_PLUGIN_DEFINE(image_arch, image_arch_init, image_arch_exit)
