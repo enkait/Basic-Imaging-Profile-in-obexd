@@ -254,7 +254,6 @@ static void get_images_listing_callback(
 cleanup:
 	g_dbus_send_message(session->conn, reply);
 	dbus_message_unref(session->msg);
-	dbus_message_unref(reply);
 	
 	while (listing != NULL) {
 		struct listing_object *obj = listing->data;
@@ -751,7 +750,7 @@ static DBusMessage *get_image_properties(DBusConnection *connection,
 		DBusMessage *message, void *user_data)
 {
 	struct session_data *session = user_data;
-	DBusMessage *reply;
+	DBusMessage *reply = NULL;
 	DBusMessageIter iter;
 	char *handle = NULL, *buffer = NULL;
 	struct a_header *hdesc = NULL;
@@ -816,7 +815,8 @@ static DBusMessage *get_image_properties(DBusConnection *connection,
 
 cleanup:
 	g_free(buffer);
-	dbus_message_unref(message);
+	//dbus_message_unref(message);
+	printf("reply: %p\n", reply);
 	a_header_free(hdesc);
 	g_slist_free(aheaders);
 	return reply;
