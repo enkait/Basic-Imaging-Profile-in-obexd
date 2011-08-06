@@ -43,6 +43,8 @@ struct obex_mime_type_driver {
 	int (*remove) (const char *name);
 	int (*set_io_watch) (void *object, obex_object_io_func func,
 				void *user_data);
+	int (*feed_next_header) (void *object, uint8_t hi, obex_headerdata_t hv,
+				uint32_t hv_size);
 };
 
 int obex_mime_type_driver_register(struct obex_mime_type_driver *driver);
