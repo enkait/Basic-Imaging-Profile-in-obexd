@@ -343,6 +343,17 @@ static void obex_session_free(struct obex_session *os)
 	g_free(os);
 }
 
+static void obex_reset_object(obex_t *obex, obex_object_t *obj)
+{
+	uint32_t hlen;
+	uint8_t hi;
+	obex_headerdata_t hd;
+	gboolean res;
+	while (OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen));
+	res = OBEX_ObjectReParseHeaders(obex, obj);
+	g_assert(res);
+}
+
 /* From Imendio's GnomeVFS OBEX module (om-utils.c) */
 static time_t parse_iso8610(const char *val, int size)
 {
@@ -553,14 +564,14 @@ static gboolean chk_cid(obex_t *obex, obex_object_t *obj, uint32_t cid)
 	if (os->service->service == OBEX_OPP)
 		return TRUE;
 
+	obex_reset_object(obex, obj);
+
 	while (OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen)) {
 		if (hi == OBEX_HDR_CONNECTION && hlen == 4) {
 			ret = (hd.bq4 == cid ? TRUE : FALSE);
 			break;
 		}
 	}
-
-	OBEX_ObjectReParseHeaders(obex, obj);
 
 	if (ret == FALSE)
 		OBEX_ObjectSetRsp(obj, OBEX_RSP_SERVICE_UNAVAILABLE,
@@ -1093,6 +1104,8 @@ static gboolean check_put(obex_t *obex, obex_object_t *obj)
 		os->name = NULL;
 	}
 
+	obex_reset_object(obex, obj);
+
 	while (OBEX_ObjectGetNextHeader(obex, obj, &hi, &hd, &hlen)) {
 		switch (hi) {
 		case OBEX_HDR_NAME:
@@ -1151,8 +1164,6 @@ static gboolean check_put(obex_t *obex, obex_object_t *obj)
 			break;
 		}
 	}
-
-	OBEX_ObjectReParseHeaders(obex, obj);
 
 	if (os->type == NULL)
 		os->driver = obex_mime_type_driver_find(os->service->target,
@@ -1682,7 +1693,7 @@ ssize_t obex_aparam_read(struct obex_session *os,
 	uint8_t hi;
 	uint32_t hlen;
 
-	OBEX_ObjectReParseHeaders(os->obex, obj);
+	obex_reset_object(os->obex, obj);
 
 	while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen)) {
 		if (hi == OBEX_HDR_APPARAM) {
