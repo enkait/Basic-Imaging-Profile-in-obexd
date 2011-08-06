@@ -130,29 +130,6 @@ static int feed_next_header(void *object, uint8_t hi, obex_headerdata_t hv,
 	return 0;
 }
 
-static ssize_t imgmonitoring_get_next_header(void *object, void *buf, size_t mtu,
-								uint8_t *hi)
-{
-	struct imgmonitoring_data *data = object;
-	printf("imgimg_get_next_header\n");
-
-	if (data == NULL) {
-		return -EBADR;
-	}
-
-	if (!data->handle_sent) {
-		ssize_t len = 0;
-		if ((len = add_reply_handle(buf, mtu, hi, data->handle)) < 0) {
-			printf("LEN = %d\n", len);
-			return len;
-		}
-		data->handle_sent = TRUE;
-		return len;
-	}
-	*hi = OBEX_HDR_EMPTY;
-	return 0;
-}
-
 static void get_monitoring_image_cb(void *user_data, char *monit_image,
 							char *image, int err)
 {
@@ -196,6 +173,38 @@ static void get_monitoring_image_cb(void *user_data, char *monit_image,
 	obex_object_set_io_flags(user_data, G_IO_IN, 0);
 }
 
+static ssize_t imgmonitoring_get_next_header(void *object, void *buf, size_t mtu,
+								uint8_t *hi)
+{
+	struct imgmonitoring_data *data = object;
+	int ret = 0;
+	printf("imgimg_get_next_header\n");
+
+	if (data == NULL) {
+		return -EBADR;
+	}
+
+	if (!data->transfering) {
+		if ((ret = get_monitoring_image(data->storeflag,
+					get_monitoring_image_cb, data)) < 0)
+			return ret;
+		printf("EAGAIN\n");
+		return -EAGAIN;
+	}
+
+	if (!data->handle_sent) {
+		ssize_t len = 0;
+		if ((len = add_reply_handle(buf, mtu, hi, data->handle)) < 0) {
+			printf("LEN = %d\n", len);
+			return len;
+		}
+		data->handle_sent = TRUE;
+		return len;
+	}
+	*hi = OBEX_HDR_EMPTY;
+	return 0;
+}
+
 static ssize_t imgmonitoring_read(void *object, void *buf, size_t count)
 {
 	struct imgmonitoring_data *data = object;
@@ -204,15 +213,10 @@ static ssize_t imgmonitoring_read(void *object, void *buf, size_t count)
 	if (data == NULL)
 		return -EBADR;
 
-	if (data->transfering) {
-		ret = read(data->fd, buf, count);
-		if (ret < 0)
-			return -errno;
-		return ret;
-	}
-	get_monitoring_image(data->storeflag, get_monitoring_image_cb, data);
-	printf("imgmonitoring_read\n");
-	return -EAGAIN;
+	ret = read(data->fd, buf, count);
+	if (ret < 0)
+		return -errno;
+	return ret;
 }
 
 static int imgmonitoring_close(void *object)
