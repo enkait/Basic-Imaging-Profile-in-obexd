@@ -58,3 +58,5 @@ char *parse_unsignednumber(const char *size);
 char *get_att_dir(const char *image_path);
 char *safe_rename(const char *name, const char *folder,
 							const char *orig_path);
+struct a_header *create_handle(const char *handle);
+char *get_null_terminated(char *buffer, int len);

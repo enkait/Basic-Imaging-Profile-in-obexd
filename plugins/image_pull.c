@@ -184,7 +184,6 @@ GSList *get_image_list(const char *dir, int *err) {
 	struct dirent *file;
 	GSList *images = NULL;
 	struct img_listing *il = NULL;
-	struct stat file_stat;
 	int handle = 0;
 	DIR *img_dir = opendir(dir);
 
@@ -197,33 +196,12 @@ GSList *get_image_list(const char *dir, int *err) {
 
 	while ((file = readdir(img_dir)) != NULL) {
 		char *path = g_build_filename(bip_dir, file->d_name, NULL);
-		struct image_attributes *attr;
-		
-		if (lstat(path, &file_stat) < 0) {
-			g_free(path);
+		int tmperr;
+		il = get_img_listing(path, handle++, &tmperr);
+
+		if (il == NULL)
 			continue;
-		}
-
-		if (!(file_stat.st_mode & S_IFREG)) {
-			g_free(path);
-			continue;
-		}
-
-		if ((attr = get_image_attributes(path, err)) == NULL) {
-			g_free(path);
-			continue;
-		}
-
-		printf("passed verification: %s\n", path);
-
-		il = g_new0(struct img_listing, 1);
-		il->image = path;
-		il->mtime = file_stat.st_mtime;
-		il->ctime = file_stat.st_ctime;
-		il->handle = handle++;
-		il->attr = attr;
 		images = g_slist_append(images, il);
-
 		printf("image added: %s\n", il->image);
 	}
 

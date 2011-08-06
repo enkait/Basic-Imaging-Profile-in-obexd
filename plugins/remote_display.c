@@ -44,6 +44,7 @@
 #include <openobex/obex.h>
 #include <openobex/obex_const.h>
 
+#include "gdbus.h"
 #include "plugin.h"
 #include "log.h"
 #include "obex.h"
@@ -54,7 +55,7 @@
 #include "remote_display.h"
 #include "bip_util.h"
 
-#define REMOTE_DISPLAY_CHANNEL 20
+#define REMOTE_DISPLAY_CHANNEL 26
 #define REMOTE_DISPLAY_RECORD "<?xml version=\"1.0\" encoding=\"UTF-8\" ?> \
 <record>								\
   <attribute id=\"0x0001\">						\
@@ -95,9 +96,31 @@
 #define HANDLE_LIMIT 10000000
 
 //static const char * bip_root="/tmp/bip/";
+#define RD_MANAGER_SERVICE "org.openobex.RDManager"
+#define RD_MANAGER_PATH "/rdmanager"
+#define RD_MANAGER_INTERFACE RD_MANAGER_SERVICE ".RDManager"
+#define RD_MANAGER_ERROR_INTERFACE RD_MANAGER_SERVICE ".RDManagerError"
+
+struct rd_agent {
+	char *bus_name;
+	char *path;
+	unsigned int watch_id;
+	int (*cb) ();
+};
+
+static DBusConnection *connection = NULL;
+static struct rd_agent *agent = NULL;
+
 
 static void free_remote_display_session(struct remote_display_session *session) {
 	g_free(session);
+}
+
+int get_new_handle_rd(struct remote_display_session *session) {
+	if (session->next_handle >= HANDLE_LIMIT) {
+		return -1;
+	}
+	return session->next_handle++;
 }
 
 static void *remote_display_connect(struct obex_session *os, int *err)
@@ -109,8 +132,9 @@ static void *remote_display_connect(struct obex_session *os, int *err)
 	session = g_new0(struct remote_display_session, 1);
 	session->os = os;
 	session->dir = "/tmp/display/1/";
+	session->displayed_handle = -1;
 
-	if (err == NULL)
+	if (err != NULL)
 		*err = 0;
 
 	return session;
@@ -119,8 +143,9 @@ static void *remote_display_connect(struct obex_session *os, int *err)
 static int remote_display_get(struct obex_session *os, obex_object_t *obj,
 							void *user_data)
 {
-	int ret = obex_get_stream_start(os, "");
+	int ret;
 	printf("REMOTE_DISPLAY_GET\n");
+	ret = obex_get_stream_start(os, "");
 	if (ret < 0)
 		return ret;
 	return 0;
@@ -134,27 +159,7 @@ static int remote_display_chkput(struct obex_session *os, void *user_data)
 
 	ret = obex_put_stream_start(os, "");
 	return ret;
-	//return 0;
 }
-
-/*
-static gboolean add_reply_handle(struct obex_session *os, obex_object_t *obj, int handle) {
-	GString *handle_str = g_string_new("");
-	obex_headerdata_t handle_hdr;
-	unsigned int handle_hdr_len;
-	if (handle < 0 || handle >= HANDLE_LIMIT) {
-		g_string_free(handle_str, TRUE);
-		return FALSE;
-	}
-	g_string_append_printf(handle_str, "%07d", handle);
-	handle_hdr.bs = encode_img_handle(handle_str->str, handle_str->len, &handle_hdr_len);
-	g_string_free(handle_str, TRUE);
-	if (handle_hdr.bs == NULL)
-		return FALSE;
-	OBEX_ObjectAddHeader(os->obex, obj, IMG_HANDLE_HDR, handle_hdr, handle_hdr_len, OBEX_FL_FIT_ONE_PACKET);
-	return TRUE;
-}
-*/
 
 static int remote_display_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 {
@@ -186,8 +191,166 @@ static struct obex_service_driver remote_display = {
 	.disconnect = remote_display_disconnect
 };
 
+static void rd_agent_free(struct rd_agent* agent) {
+	g_free(agent->bus_name);
+	g_free(agent->path);
+	g_dbus_remove_watch(connection, agent->watch_id);
+	g_free(agent);
+}
+
+static void agent_disconnected(DBusConnection *conn, void *user_data)
+{
+	DBG("Agent exited");
+	rd_agent_free(agent);
+	agent = NULL;
+}
+
+static inline DBusMessage *invalid_args(DBusMessage *msg)
+{
+	return g_dbus_create_error(msg,
+			RD_MANAGER_ERROR_INTERFACE ".InvalidArguments",
+			"Invalid arguments in method call");
+}
+
+static inline DBusMessage *agent_already_exists(DBusMessage *msg)
+{
+	return g_dbus_create_error(msg,
+			RD_MANAGER_ERROR_INTERFACE ".AlreadyExists",
+			"Agent already exists");
+}
+
+static inline DBusMessage *agent_does_not_exist(DBusMessage *msg)
+{
+	return g_dbus_create_error(msg,
+			RD_MANAGER_ERROR_INTERFACE ".DoesNotExist",
+			"Agent does not exist");
+}
+
+static inline DBusMessage *not_authorized(DBusMessage *msg)
+{
+	return g_dbus_create_error(msg,
+			RD_MANAGER_ERROR_INTERFACE ".NotAuthorized",
+			"Not authorized");
+}
+
+static DBusMessage *rd_register_agent(DBusConnection *conn,
+					DBusMessage *msg, void *data)
+{
+	const char *path, *sender;
+
+	if (agent)
+		return agent_already_exists(msg);
+
+	if (!dbus_message_get_args(msg, NULL,
+				DBUS_TYPE_OBJECT_PATH, &path,
+				DBUS_TYPE_INVALID))
+		return invalid_args(msg);
+
+	sender = dbus_message_get_sender(msg);
+	agent = g_new0(struct rd_agent, 1);
+	agent->bus_name = g_strdup(sender);
+	agent->path = g_strdup(path);
+
+	agent->watch_id = g_dbus_add_disconnect_watch(conn, sender,
+					agent_disconnected, NULL, NULL);
+
+	DBG("Agent registered");
+
+	return dbus_message_new_method_return(msg);
+}
+
+static DBusMessage *rd_unregister_agent(DBusConnection *conn,
+					DBusMessage *msg, void *data)
+{
+	const char *path, *sender;
+
+	if (!agent)
+		return agent_does_not_exist(msg);
+
+	if (!dbus_message_get_args(msg, NULL,
+				DBUS_TYPE_OBJECT_PATH, &path,
+				DBUS_TYPE_INVALID))
+		return invalid_args(msg);
+
+	if (strcmp(agent->path, path) != 0)
+		return agent_does_not_exist(msg);
+
+	sender = dbus_message_get_sender(msg);
+	if (strcmp(agent->bus_name, sender) != 0)
+		return not_authorized(msg);
+
+	rd_agent_free(agent);
+	agent = NULL;
+
+	DBG("Agent unregistered");
+
+	return dbus_message_new_method_return(msg);
+}
+
+int display_image(unsigned int id, char *image_path) {
+	DBusMessage *msg = NULL;
+	if (strlen(image_path) == 0)
+		return -EINVAL;
+
+	if (agent == NULL) {
+		printf("Display IMage Failed\n");
+		return -EBADR;
+	}
+
+	msg = dbus_message_new_method_call(agent->bus_name, agent->path,
+					"org.openobex.DisplayImage",
+					"DisplayImage");
+
+	dbus_message_append_args(msg, DBUS_TYPE_STRING, &image_path,
+					DBUS_TYPE_UINT32, &id,
+						DBUS_TYPE_INVALID);
+
+	if (msg == NULL)
+		return -ENOMEM;
+
+	g_dbus_send_message(connection, msg);
+	return 0;
+}
+
+static GDBusMethodTable rd_manager_methods[] = {
+	{ "RegisterAgent",	"o",	"",	rd_register_agent	},
+	{ "UnregisterAgent",	"o",	"",	rd_unregister_agent	},
+	{ }
+};
+
+static gboolean rd_manager_init(void)
+{
+	DBusError err;
+
+	DBG("");
+
+	dbus_error_init(&err);
+
+	connection = g_dbus_setup_bus(DBUS_BUS_SESSION, RD_MANAGER_SERVICE,
+									&err);
+	if (connection == NULL) {
+		if (dbus_error_is_set(&err) == TRUE) {
+			fprintf(stderr, "%s\n", err.message);
+			dbus_error_free(&err);
+		} else
+			fprintf(stderr, "Can't register with session bus\n");
+		return FALSE;
+	}
+
+	printf("Service: %s\n", RD_MANAGER_SERVICE);
+	printf("Interface: %s\n", RD_MANAGER_INTERFACE);
+	printf("Path: %s\n", RD_MANAGER_PATH);
+
+	return g_dbus_register_interface(connection, RD_MANAGER_PATH,
+					RD_MANAGER_INTERFACE,
+					rd_manager_methods, NULL, NULL,
+					NULL, NULL);
+}
+
 static int remote_display_init(void)
 {
+	if (!rd_manager_init())
+		return -EPERM;
 	return obex_service_driver_register(&remote_display);
 }
 

@@ -29,5 +29,8 @@ struct remote_display_session {
     struct obex_session *os;
     GSList *image_list;
     char *dir;
-    int status;
+    int status, next_handle, displayed_handle;
 };
+
+int get_new_handle_rd(struct remote_display_session *session);
+int display_image(unsigned int id, char *image_path);

@@ -63,6 +63,9 @@ builtin_sources += plugins/imgimgpull.c plugins/imgimgpull.h
 builtin_modules += imgthmpull
 builtin_sources += plugins/imgthmpull.c plugins/imgthmpull.h
 
+builtin_modules += imgdisplay
+builtin_sources += plugins/imgdisplay.c
+
 builtin_modules += imgattpull
 builtin_sources += plugins/imgattpull.c plugins/imgattpull.h
 
