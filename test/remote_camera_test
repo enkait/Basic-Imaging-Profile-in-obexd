@@ -47,24 +47,16 @@ class Agent(dbus.service.Object):
 tasks = []
 
 def get_image_callback(option, opt, value, parser):
-        parser.values.get = True
-        parser.values.get_settings = value.split(',')
-        print parser.values.get_settings
+        tasks.append(("getimage", value.split(',')))
 
 def get_monitoring_image_callback(option, opt, value, parser):
-        parser.values.get = True
-        parser.values.get_settings = value.split(',')
-        print parser.values.get_settings
+        tasks.append(("getmonitoring", value.split(',')))
 
 def get_image_properties_callback(option, opt, value, parser):
-        parser.values.get_properties = True
-        parser.values.get_settings = value.split(',')
-        print parser.values.get_settings
+        tasks.append(("getproperties", value.split(',')))
 
 def get_image_thumbnail_callback(option, opt, value, parser):
-        parser.values.get_thumbnail = True
-        parser.values.get_settings = value.split(',')
-        print parser.values.get_settings
+        tasks.append(("getthumbnail", value.split(',')))
 
 def parse_options():
     parser.add_option("-d", "--device", dest="device",
@@ -133,28 +125,36 @@ def execute():
     entry = tasks[0]
     tasks.pop(0)
     if entry[0] == "getimage":
-        get_image(bip, entry[1][0])
+        get_image(bip, entry[1][0], entry[1][1], entry[1][2], entry[1][3], entry[1][4], entry[1][5])
     elif entry[0] == "getproperties":
         get_properties(bip, entry[1][0])
     elif entry[0] == "getthumbnail":
-        get_image_thumbnail(bip, entry[1][0])
+        get_image_thumbnail(bip, entry[1][0], entry[1][1])
     elif entry[0] == "getmonitoring":
-        get_monitoring_image(bip, entry[1][0])
+        get_monitoring_image(bip, entry[1][0], entry[1][1])
 
-def image_push_completed(handle):
-    print "Image pushed, received handle: "+handle
+def get_image_completed():
+    print "got image"
     execute()
 
-def image_push_failed(reason):
-    print "Image push failed, reason: "+reason
+def get_image_failed(reason):
+    print "get image failed: " + reason
     execute()
 
-def attachment_push_completed():
-    print "Attachment push completed"
+def get_monit_image_completed(handle):
+    print "got monitoring image, handle: " + handle
     execute()
 
-def attachment_push_failed(reason):
-    print "Attachment push failed, reason: "+reason
+def get_monit_image_failed(reason):
+    print "get monitoring image failed: " + reason
+    execute()
+
+def get_thumbnail_completed():
+    print "got monitoring image"
+    execute()
+
+def get_thumbnail_failed(reason):
+    print "get monitoring image failed: " + reason
     execute()
 
 if  __name__ == '__main__':
@@ -174,20 +174,36 @@ if  __name__ == '__main__':
 
     path = "/test/agent"
     agent = Agent(bus, path, options.verbose)
-	
-    bus.add_signal_receiver(image_push_completed,
-	dbus_interface="org.openobex.ImagePush",
-	signal_name="PutImageCompleted")
-    
-    bus.add_signal_receiver(image_push_failed,
-	dbus_interface="org.openobex.ImagePush",
-	signal_name="PutImageFailed")
-    
+
+    bus.add_signal_receiver(get_monit_image_completed,
+	dbus_interface="org.openobex.BipSignal",
+	signal_name="GetMonitImageCompleted")
+
+    bus.add_signal_receiver(get_monit_image_failed,
+	dbus_interface="org.openobex.BipSignal",
+	signal_name="GetMonitImageFailed")
+
+    bus.add_signal_receiver(get_thumbnail_completed,
+	dbus_interface="org.openobex.BipSignal",
+	signal_name="GetThumbnailCompleted")
+
+    bus.add_signal_receiver(get_thumbnail_failed,
+	dbus_interface="org.openobex.BipSignal",
+	signal_name="GetThumbnailFailed")
+
+    bus.add_signal_receiver(get_image_completed,
+	dbus_interface="org.openobex.BipSignal",
+	signal_name="GetImageCompleted")
+
+    bus.add_signal_receiver(get_image_failed,
+	dbus_interface="org.openobex.BipSignal",
+	signal_name="GetImageFailed")
+
     client = dbus.Interface(bus.get_object("org.openobex.client", "/"),
                             "org.openobex.Client")
 
     session_path = client.CreateSession({ "Destination": options.device,
-        "Target": "BIP:RD"})
+        "Target": "BIP:RC"})
 
     session = dbus.Interface(bus.get_object("org.openobex.client", session_path),
                  "org.openobex.Session")
@@ -195,7 +211,7 @@ if  __name__ == '__main__':
     session.AssignAgent(path)
 
     bip = dbus.Interface(bus.get_object("org.openobex.client", session_path),
-                 "org.openobex.RemoteDisplay")
+                 "org.openobex.RemoteCamera")
     
     execute()
 
