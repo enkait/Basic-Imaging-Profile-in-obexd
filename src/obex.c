@@ -1263,6 +1263,7 @@ static void obex_event_cb(obex_t *obex, obex_object_t *obj, int mode,
 	print_event(evt, cmd, rsp);
 
 	os = OBEX_GetUserData(obex);
+	os->obj = obj;
 
 	switch (evt) {
 	case OBEX_EV_PROGRESS:
