@@ -253,7 +253,7 @@ int image_push_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 		char *new_path;
 		printf("wtf\n");
 		if ((new_path = safe_rename(os->name, bip_root, ips->file_path))
-				== NULL) {
+								== NULL) {
 			return -errno;
 		}
 		printf("newpath: %s\n", new_path);
@@ -268,6 +268,35 @@ int image_push_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 		img->image = new_path;
 		ips->pushed_images = g_slist_append(ips->pushed_images, img);
 		add_reply_handle(os, obj, img->handle);
+		OBEX_ObjectSetRsp(obj, OBEX_RSP_PARTIAL_CONTENT,
+						OBEX_RSP_PARTIAL_CONTENT);
+	}
+	else if (g_strcmp0(os->type, "x-bt/img-img") == 0) {
+		int handle = parse_handle(ips->handle_hdr, ips->handle_hdr_len);
+		char *new_path, *name;
+		GString *thmname = NULL;
+
+		if (handle < 0)
+			return -EBADR;
+
+		img = get_pushed_image(ips, handle);
+
+		if (img == NULL)
+			return -EEXIST;
+
+		printf("wtf\n");
+		name = g_path_get_basename(ips->file_path);
+		thmname = g_string_new(name);
+		thmname = g_string_append(thmname, "_thm");
+		g_free(name);
+
+		if ((new_path = safe_rename(thmname->str, bip_root, ips->file_path))
+									== NULL) {
+			g_string_free(thmname, TRUE);
+			return -errno;
+		}
+		g_string_free(thmname, TRUE);
+		printf("newpath: %s\n", new_path);
 	}
 	else if(g_strcmp0(os->type, "x-bt/img-attachment") == 0) {
 		int handle = parse_handle(ips->handle_hdr, ips->handle_hdr_len);

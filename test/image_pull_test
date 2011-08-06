@@ -138,6 +138,7 @@ def get_image_properties(session, handle):
     print resp
 
 def delete_image(session, handle):
+        print "deleting"
         print session.DeleteImage(handle)
 
 def get_image(session, path, handle, encoding, pixel, maxsize, transform):

@@ -852,7 +852,7 @@ static DBusMessage *delete_image(DBusConnection *connection,
 	
 	if (hdesc == NULL) {
 		reply = g_dbus_create_error(message,
-			"org.openobex.Error.InvalidArguments", NULL);
+			"org.openobex.Error.Failed", "Out Of Memory");
 		goto cleanup;
 	}
 	
@@ -1037,8 +1037,8 @@ static DBusMessage *get_images_listing(DBusConnection *connection,
 	if ((err=session_get_with_aheaders(session, "x-bt/img-listing", NULL,
 					NULL, (const guint8 *)aparam,
 					sizeof(struct images_listing_aparam),
-					aheaders, get_images_listing_callback))
-									< 0) {
+					aheaders, get_images_listing_callback,
+								NULL)) < 0) {
 		reply = g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
 				"Failed");
@@ -1183,8 +1183,8 @@ static DBusMessage *get_image_thumbnail(DBusConnection *connection,
 
 	if ((err=session_get_with_aheaders(session, "x-bt/img-thm", NULL,
 						image_path, NULL, 0, aheaders,
-						get_image_thumbnail_callback))
-									< 0) {
+						get_image_thumbnail_callback,
+								NULL)) < 0) {
 		reply = g_dbus_create_error(message,
 					"org.openobex.Error.Failed", "Failed");
 		goto cleanup;
@@ -1236,9 +1236,11 @@ static DBusMessage *get_image_attachment(DBusConnection *connection,
 	
 	aheaders = g_slist_append(NULL, hdesc);
 
-	if ((err=session_get_with_aheaders(session, "x-bt/img-attachment", att_name, file_path,
+	if ((err=session_get_with_aheaders(session, "x-bt/img-attachment",
+						att_name, file_path,
 						NULL, 0, aheaders,
-						get_image_attachment_callback)) < 0) {
+						get_image_attachment_callback,
+						NULL)) < 0) {
 		reply = g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
 				"Failed");
@@ -1377,9 +1379,9 @@ static DBusMessage *get_image(DBusConnection *connection,
 
 	printf("rozmiar aparam: %u\n", sizeof(struct images_listing_aparam));
 
-	if ((err=session_get_with_aheaders(session, "x-bt/img-img", NULL, image_path,
-						NULL, 0, aheaders,
-						get_image_callback)) < 0) {
+	if ((err=session_get_with_aheaders(session, "x-bt/img-img", NULL,
+					image_path, NULL, 0, aheaders,
+					get_image_callback, NULL)) < 0) {
 		return g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
 				"Failed");
