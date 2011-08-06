@@ -1794,7 +1794,6 @@ int session_register(struct session_data *session)
 					NULL, NULL, session, NULL) == FALSE)
 		return -EIO;
 
-        printf("here\n");
 	switch (session->uuid.value.uuid16) {
 	case OBEX_FILETRANS_SVCLASS_ID:
 		result = g_dbus_register_interface(session->conn,
