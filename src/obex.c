@@ -985,6 +985,13 @@ int obex_get_stream_start(struct obex_session *os, const char *filename)
 	if (size > 0)
 		os->buf = g_malloc0(os->tx_mtu);
 
+	os->body_streamed = FALSE;
+
+	if ((err = obex_feed_headers(os)) < 0) {
+		error("obex_feed_headers(%p): %s (%d)", os, strerror(-err), -err);
+		return err;
+	}
+
 	return 0;
 }
 
@@ -1003,6 +1010,11 @@ int obex_put_stream_start(struct obex_session *os, const char *filename)
 
 	os->path = g_strdup(filename);
 
+	if ((err = obex_feed_headers(os)) < 0) {
+		error("obex_feed_headers(%p): %s (%d)", os, strerror(-err), -err);
+		return err;
+	}
+
 	if (!os->buf) {
 		DBG("PUT request checked, no buffered data");
 		return 0;
@@ -1010,6 +1022,8 @@ int obex_put_stream_start(struct obex_session *os, const char *filename)
 
 	if (os->pending == 0)
 		return 0;
+
+	os->body_streamed = FALSE;
 
 	return obex_read_stream(os, os->obex, NULL);
 }
