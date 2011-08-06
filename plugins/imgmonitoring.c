@@ -106,6 +106,7 @@ static void *imgmonitoring_open(const char *name, int oflag,
 	struct imgmonitoring_data *data = g_new0(struct imgmonitoring_data, 1);
 	printf("imgmonitoring_open\n");
 	data->context = context;
+	data->handle = -1;
 	return data;
 }
 
