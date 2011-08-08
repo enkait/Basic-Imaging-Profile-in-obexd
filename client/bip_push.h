@@ -39,4 +39,5 @@ gboolean bip_register_interface(DBusConnection *connection, const char *path,
 void bip_unregister_interface(DBusConnection *connection, const char *path,
 				void *user_data);
 
-gboolean bip_sdp_filter(const void *user_data, const sdp_record_t *record);
+gboolean bip_sdp_filter(const void *user_data, const sdp_record_t *record,
+						const char *params);

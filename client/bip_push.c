@@ -572,7 +572,8 @@ void bip_unregister_interface(DBusConnection *connection, const char *path,
 		aos_unregister_interface(connection, path, user_data);
 }
 
-gboolean bip_sdp_filter(const void *user_data, const sdp_record_t *record)
+gboolean bip_sdp_filter(const void *user_data, const sdp_record_t *record,
+							const char *params)
 {
 	const uint32_t *expected_feat = user_data;
 	uint32_t supp_feat;
