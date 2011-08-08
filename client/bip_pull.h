@@ -40,3 +40,5 @@ void bip_pull_unregister_interface(DBusConnection *connection,
 					const char *path, void *user_data);
 void aos_unregister_interface(DBusConnection *connection, const char *path,
 							void *user_data);
+gboolean aos_sdp_filter(const void *user_data, const sdp_record_t *record,
+							const char *params);

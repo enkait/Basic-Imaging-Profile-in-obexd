@@ -7,6 +7,9 @@
 #include <gdbus.h>
 #include <unistd.h>
 
+#include <bluetooth/sdp.h>
+#include <bluetooth/sdp_lib.h>
+
 #include "log.h"
 #include "transfer.h"
 #include "session.h"
@@ -1471,4 +1474,32 @@ void aos_unregister_interface(DBusConnection *connection, const char *path,
 							void *user_data)
 {
 	bip_pull_unregister_interface(connection, path, user_data);
+}
+
+gboolean aos_sdp_filter(const void *user_data, const sdp_record_t *record,
+							const char *params)
+{
+	uuid_t uuid;
+	char temp[MAX_LEN_UUID_STR];
+	DBG("");
+
+	if (strlen(params) != MAX_LEN_UUID_STR-1)
+		return FALSE;
+
+	if (sdp_get_service_id(record, &uuid) < 0)
+		return FALSE;
+
+	if (uuid.type != SDP_UUID128)
+		return FALSE;
+
+	if (sdp_uuid2strn(&uuid, temp, MAX_LEN_UUID_STR) < 0)
+		return FALSE;
+
+	printf("remote: %s\n", temp);
+	printf("params: %s\n", params);
+
+	if (!g_strcmp0(temp, params))
+		return FALSE;
+
+	return TRUE;
 }
