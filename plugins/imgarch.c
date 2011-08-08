@@ -48,6 +48,8 @@
 
 #include <openobex/obex.h>
 #include <openobex/obex_const.h>
+#include <bluetooth/sdp.h>
+#include <bluetooth/sdp_lib.h>
 
 #include "gdbus.h"
 #include "plugin.h"
@@ -70,6 +72,7 @@ struct sarchive_data {
 	struct archive_session *session;
 	DBusConnection *conn;
 	char *aos_path;
+	char *service_id;
 	GSList *image_list;
 	unsigned int completed_watch, failed_watch;
 	gboolean reg_watches;
@@ -744,6 +747,11 @@ static gboolean get_aos_interface(struct sarchive_data *data)
 					DBUS_TYPE_STRING_AS_STRING, &bip_aos))
 		goto failed;
 
+	if (!append_sv_dict_entry(&dict, "Parameters", DBUS_TYPE_STRING,
+					DBUS_TYPE_STRING_AS_STRING,
+					&data->service_id))
+		goto failed;
+
 	if (!dbus_message_iter_close_container(&args, &dict))
 		goto failed;
 	
@@ -763,6 +771,90 @@ failed:
 	return FALSE;
 }
 
+struct sa_aparam_header {
+	uint8_t tag;
+	uint8_t len;
+	uint8_t val[0];
+} __attribute__ ((packed));
+
+static char *parse_aparam(const uint8_t *buffer, int32_t hlen)
+{
+	struct sa_aparam_header *hdr;
+	int32_t len = 0;
+	char *service_id = NULL;
+	uint128_t beval;
+	uuid_t uuid;
+	char temp[MAX_LEN_UUID_STR];
+
+	while (len < hlen) {
+		printf("got %u %u %u of data\n", len, hlen, sizeof(struct sa_aparam_header));
+		hdr = (void *) buffer + len;
+		if (hlen - len < (int32_t) sizeof(struct sa_aparam_header))
+			goto failed;
+
+		switch (hdr->tag) {
+		case SID_TAG:
+			if (hdr->len != SID_LEN)
+				goto failed;
+			if (service_id != NULL)
+				goto failed;
+
+			memcpy(&beval, hdr->val, SID_LEN);
+			sdp_uuid128_create(&uuid, &beval);
+			sdp_uuid2strn(&uuid, temp, MAX_LEN_UUID_STR);
+
+			service_id = g_strdup(temp);
+			printf("service_id = %s\n", service_id);
+			break;
+
+		default:
+			goto failed;
+		}
+
+		len += hdr->len + sizeof(struct sa_aparam_header);
+	}
+
+	return service_id;
+
+failed:
+	g_free(service_id);
+
+	return NULL;
+}
+
+static int feed_next_header (void *object, uint8_t hi, obex_headerdata_t hv,
+							uint32_t hv_size)
+{
+	struct sarchive_data *data = object;
+	printf("feed_next_header\n");
+
+	if (hi == OBEX_HDR_APPARAM) {
+		char *service_id = NULL;
+		service_id = parse_aparam(hv.bs, hv_size);
+
+		if (service_id == NULL)
+			return -EBADR;
+
+		data->service_id = service_id;
+	}
+	return 0;
+}
+
+static ssize_t get_next_header(void *object, void *buf, size_t mtu,
+								uint8_t *hi) {
+	struct sarchive_data *data = object;
+
+	*hi = OBEX_HDR_EMPTY;
+
+	if ((data->conn = connect_to_client()) == NULL)
+		return -EBADR;
+
+	if (!get_aos_interface(data))
+		return -EBADR;
+
+	return 0;
+}
+
 static void *imgarch_open(const char *name, int oflag, mode_t mode,
 		void *context, size_t *size, int *err)
 {
@@ -770,18 +862,8 @@ static void *imgarch_open(const char *name, int oflag, mode_t mode,
 	struct sarchive_data *data = g_new0(struct sarchive_data, 1);
 	data->session = session;
 
-	if ((object->conn = connect_to_client()) == NULL)
-		goto failed;
-
-	if (!get_aos_interface(object))
-		goto failed;
 	printf("imgarch open\n");
 	return data;
-failed:
-	free_archive_context(object);
-	if (err != NULL)
-		*err = -EBADR;
-	return NULL;
 }
 
 static int imgarch_close(void *object)
@@ -812,6 +894,8 @@ static struct obex_mime_type_driver imgarch = {
 	.close = imgarch_close,
 	.write = imgarch_write,
 	.flush = imgarch_flush,
+	.feed_next_header = feed_next_header,
+	.get_next_header = get_next_header,
 };
 
 static void *imgstatus_open(const char *name, int oflag, mode_t mode,
