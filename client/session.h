@@ -32,7 +32,8 @@ struct agent_data;
 struct session_callback;
 
 typedef gboolean (*sdp_filter_func) (const void *user_data,
-					const sdp_record_t *record);
+					const sdp_record_t *record,
+					const char *params);
 
 struct session_data {
 	gint refcount;
@@ -59,6 +60,7 @@ struct session_data {
 	char *adapter;
 	sdp_filter_func sdp_filter;
 	const void *sdp_filter_data;
+	char *params;
 };
 
 typedef void (*session_callback_t) (struct session_data *session,
@@ -67,6 +69,7 @@ typedef void (*session_callback_t) (struct session_data *session,
 struct session_data *session_create(const char *source,
 						const char *destination,
 						const char *service,
+						const char *params,
 						uint8_t channel,
 						const char *owner,
 						session_callback_t function,

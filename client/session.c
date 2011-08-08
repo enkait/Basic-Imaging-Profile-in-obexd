@@ -265,6 +265,7 @@ static void session_free(struct session_data *session)
 	g_free(session->path);
 	g_free(session->service);
 	g_free(session->owner);
+	g_free(session->params);
 	g_free(session);
 }
 
@@ -431,7 +432,7 @@ static void search_callback(uint8_t type, uint16_t status,
 
 		if (session->sdp_filter)
 			if (!session->sdp_filter(session->sdp_filter_data,
-									rec))
+								rec, session->params))
 				goto pass;
 
 		if (!sdp_get_access_protos(rec, &protos)) {
@@ -762,6 +763,7 @@ proceed:
 struct session_data *session_create(const char *source,
 						const char *destination,
 						const char *service,
+						const char *params,
 						uint8_t channel,
 						const char *owner,
 						session_callback_t function,
@@ -806,6 +808,7 @@ struct session_data *session_create(const char *source,
 
 	str2ba(destination, &session->dst);
 	session->service = g_strdup(service);
+	session->params = g_strdup(params);
 
 	if (!g_ascii_strncasecmp(service, "OPP", 3)) {
 		sdp_uuid16_create(&session->uuid, OBEX_OBJPUSH_SVCLASS_ID);
