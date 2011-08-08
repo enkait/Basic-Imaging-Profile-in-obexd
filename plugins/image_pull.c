@@ -140,7 +140,7 @@
   </attribute>								\
 									\
   <attribute id=\"0x0003\">						\
-    <uuid value=\"" AOS_SID "\"/>					\
+    <uuid value=\"01234567-89ab-cdef-0123-456789abcdef\"/>		\
   </attribute>								\
 									\
   <attribute id=\"0x0009\">						\
