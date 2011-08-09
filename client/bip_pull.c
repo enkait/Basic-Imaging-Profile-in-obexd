@@ -1498,7 +1498,7 @@ gboolean aos_sdp_filter(const void *user_data, const sdp_record_t *record,
 	printf("remote: %s\n", temp);
 	printf("params: %s\n", params);
 
-	if (!g_strcmp0(temp, params))
+	if (g_strcmp0(temp, params) != 0)
 		return FALSE;
 
 	return TRUE;
