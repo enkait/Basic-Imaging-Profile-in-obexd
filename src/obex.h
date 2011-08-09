@@ -79,5 +79,8 @@ int obex_aparam_write(struct obex_session *os, obex_object_t *obj,
 const char *obex_option_root_folder(void);
 gboolean obex_option_symlinks(void);
 
+inline gboolean put_hdr_u8(void *buf, size_t mtu, guint8 u8);
+inline gboolean put_hdr_u32(void *buf, size_t mtu, guint32 u32);
+
 /* Just a thin wrapper around memcmp to deal with NULL values */
 int memncmp0(const void *a, size_t na, const void *b, size_t nb);
