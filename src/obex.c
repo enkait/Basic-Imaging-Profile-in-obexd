@@ -612,6 +612,24 @@ static int obex_write_stream(struct obex_session *os,
 	return 0;
 }
 
+static void fill_headerdata(obex_headerdata_t *hd, uint8_t hi, void *buf)
+{
+	guint8 *val8 = buf;
+	guint32 *val32 = buf;
+	switch (hi & OBEX_HDR_TYPE_MASK) {
+	case OBEX_HDR_TYPE_BYTES:
+	case OBEX_HDR_TYPE_UNICODE:
+		hd->bs = buf;
+		break;
+	case OBEX_HDR_TYPE_UINT8:
+		hd->bq1 = *val8;
+		break;
+	case OBEX_HDR_TYPE_UINT32:
+		hd->bq4 = *val32;
+		break;
+	}
+}
+
 static int obex_write(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 {
 	obex_headerdata_t hd;
@@ -657,7 +675,7 @@ static int obex_write(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 		if (hi == OBEX_HDR_EMPTY)
 			break;
 
-		hd.bs = os->buf;
+		fill_headerdata(&hd, hi, os->buf);
 		OBEX_ObjectAddHeader(obex, obj, hi, hd, len, 0);
 	}
 
@@ -1625,6 +1643,26 @@ int obex_aparam_write(struct obex_session *os,
 
 	return OBEX_ObjectAddHeader(os->obex, obj,
 			OBEX_HDR_APPARAM, hd, size, 0);
+}
+
+inline ssize_t put_hdr_u8(void *buf, size_t mtu, guint8 u8) {
+	guint8 *tmp = buf;
+	if (tmp == NULL)
+		return -1;
+	if (mtu < sizeof(guint8))
+		return -1;
+	*tmp = u8;
+	return sizeof(guint8);
+}
+
+inline ssize_t put_hdr_u32(void *buf, size_t mtu, guint32 u32) {
+	guint32 *tmp = buf;
+	if (tmp == NULL)
+		return -1;
+	if (mtu < sizeof(guint32))
+		return -1;
+	*tmp = u32;
+	return sizeof(guint32);
 }
 
 int memncmp0(const void *a, size_t na, const void *b, size_t nb)
