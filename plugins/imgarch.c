@@ -617,6 +617,7 @@ static void rename_image(struct sarchive_data *data, int err) {
 		//critical error - abort
 		data->session->status = -EBADR;
 		end_aos_session(data);
+		free_sarchive_data(data);
 		return;
 	}
 	else if (err == -EINVAL) {
@@ -644,6 +645,7 @@ static void save_image_to_temp(struct sarchive_data *data, int err) {
 		//critical error - abort
 		data->session->status = -EBADR;
 		end_aos_session(data);
+		free_sarchive_data(data);
 		return;
 	}
 	// finished obtaining properties
@@ -668,6 +670,7 @@ static void get_next_image(struct sarchive_data *data, int err) {
 	if (data->image_list == NULL) {
 		data->session->status = 0;
 		end_aos_session(data);
+		free_sarchive_data(data);
 		return;
 	}
 	data->cur_image = data->image_list->data;
@@ -683,6 +686,7 @@ static void get_listing_finished(struct sarchive_data *data, int err)
 	if (err < 0) {
 		data->session->status = err;
 		end_aos_session(data);
+		free_sarchive_data(data);
 		return;
 	}
 	get_next_image(data, 0);
@@ -719,6 +723,7 @@ static void get_aos_interface_callback(DBusPendingCall *call, void *user_data)
 	if (!get_listing(data, get_listing_finished)) {
 		end_aos_session(data);
 		data->session->status = -EBADR;
+		free_sarchive_data(data);
 		return;
 	}
 }
@@ -785,7 +790,6 @@ static char *parse_aparam(const uint8_t *buffer, int32_t hlen)
 	uint128_t beval;
 	uuid_t uuid;
 	char temp[MAX_LEN_UUID_STR];
-
 	while (len < hlen) {
 		printf("got %u %u %u of data\n", len, hlen, sizeof(struct sa_aparam_header));
 		hdr = (void *) buffer + len;
@@ -813,7 +817,6 @@ static char *parse_aparam(const uint8_t *buffer, int32_t hlen)
 
 		len += hdr->len + sizeof(struct sa_aparam_header);
 	}
-
 	return service_id;
 
 failed:
@@ -845,13 +848,15 @@ static ssize_t get_next_header(void *object, void *buf, size_t mtu,
 	struct sarchive_data *data = object;
 
 	*hi = OBEX_HDR_EMPTY;
-
-	if ((data->conn = connect_to_client()) == NULL)
+	if ((data->conn = connect_to_client()) == NULL) {
+		free_sarchive_data(data);
 		return -EBADR;
+	}
 
-	if (!get_aos_interface(data))
+	if (!get_aos_interface(data)) {
+		free_sarchive_data(data);
 		return -EBADR;
-
+	}
 	return 0;
 }
 
@@ -868,8 +873,6 @@ static void *imgarch_open(const char *name, int oflag, mode_t mode,
 
 static int imgarch_close(void *object)
 {
-	struct sarchive_data *data = object;
-	free_sarchive_data(data);
 	printf("imgarch close\n");
 	return 0;
 }
