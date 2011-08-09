@@ -975,6 +975,7 @@ static ssize_t vobject_pull_get_next_header(void *object, void *buf, size_t mtu,
 		return array_read(obj->aparams, buf, mtu);
 	}
 
+	*hi = OBEX_HDR_EMPTY;
 	return 0;
 }
 
@@ -1024,6 +1025,7 @@ static ssize_t vobject_list_get_next_header(void *object, void *buf, size_t mtu,
 	if (pbap->params->maxlistcount == 0)
 		return array_read(obj->aparams, buf, mtu);
 
+	*hi = OBEX_HDR_EMPTY;
 	return 0;
 }
 
