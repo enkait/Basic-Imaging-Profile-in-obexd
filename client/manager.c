@@ -131,7 +131,7 @@ done:
 
 static int parse_device_dict(DBusMessageIter *iter,
 		const char **source, const char **dest, const char **target,
-		uint8_t *channel)
+		const char **params, uint8_t *channel)
 {
 	while (dbus_message_iter_get_arg_type(iter) == DBUS_TYPE_DICT_ENTRY) {
 		DBusMessageIter entry, value;
@@ -151,6 +151,8 @@ static int parse_device_dict(DBusMessageIter *iter,
 				dbus_message_iter_get_basic(&value, dest);
 			else if (g_str_equal(key, "Target") == TRUE)
 				dbus_message_iter_get_basic(&value, target);
+			else if (g_str_equal(key, "Parameters") == TRUE)
+				dbus_message_iter_get_basic(&value, params);
 			break;
 		case DBUS_TYPE_BYTE:
 			if (g_str_equal(key, "Channel") == TRUE)
@@ -172,13 +174,13 @@ static DBusMessage *send_files(DBusConnection *connection,
 	GPtrArray *files;
 	struct send_data *data;
 	const char *agent, *source = NULL, *dest = NULL, *target = NULL;
-	const char *sender;
+	const char *sender, *params = NULL;
 	uint8_t channel = 0;
 
 	dbus_message_iter_init(message, &iter);
 	dbus_message_iter_recurse(&iter, &array);
 
-	parse_device_dict(&array, &source, &dest, &target, &channel);
+	parse_device_dict(&array, &source, &dest, &target, &params, &channel);
 	if (dest == NULL)
 		return g_dbus_create_error(message,
 				"org.openobex.Error.InvalidArguments", NULL);
@@ -224,7 +226,7 @@ static DBusMessage *send_files(DBusConnection *connection,
 	data->agent = g_strdup(agent);
 	data->files = files;
 
-	session = session_create(source, dest, "OPP", channel, sender,
+	session = session_create(source, dest, "OPP", params, channel, sender,
 							create_callback, data);
 	if (session != NULL) {
 		sessions = g_slist_append(sessions, session);
@@ -299,13 +301,13 @@ static DBusMessage *pull_business_card(DBusConnection *connection,
 	struct session_data *session;
 	struct send_data *data;
 	const char *source = NULL, *dest = NULL, *target = NULL;
-	const char *name = NULL;
+	const char *name = NULL, *params = NULL;
 	uint8_t channel = 0;
 
 	dbus_message_iter_init(message, &iter);
 	dbus_message_iter_recurse(&iter, &dict);
 
-	parse_device_dict(&dict, &source, &dest, &target, &channel);
+	parse_device_dict(&dict, &source, &dest, &target, &params, &channel);
 	if (dest == NULL)
 		return g_dbus_create_error(message,
 				"org.openobex.Error.InvalidArguments", NULL);
@@ -328,7 +330,7 @@ static DBusMessage *pull_business_card(DBusConnection *connection,
 	data->sender = g_strdup(dbus_message_get_sender(message));
 	data->filename = g_strdup(name);
 
-	session = session_create(source, dest, "OPP", channel, data->sender,
+	session = session_create(source, dest, "OPP", params, channel, data->sender,
 					pull_session_callback, data);
 	if (session != NULL) {
 		sessions = g_slist_append(sessions, session);
@@ -371,12 +373,13 @@ static DBusMessage *create_session(DBusConnection *connection,
 	struct session_data *session;
 	struct send_data *data;
 	const char *source = NULL, *dest = NULL, *target = NULL;
+	const char *params = NULL;
 	uint8_t channel = 0;
 
 	dbus_message_iter_init(message, &iter);
 	dbus_message_iter_recurse(&iter, &dict);
 
-	parse_device_dict(&dict, &source, &dest, &target, &channel);
+	parse_device_dict(&dict, &source, &dest, &target, &params, &channel);
 	if (dest == NULL || target == NULL)
 		return g_dbus_create_error(message,
 				"org.openobex.Error.InvalidArguments", NULL);
@@ -390,8 +393,8 @@ static DBusMessage *create_session(DBusConnection *connection,
 	data->message = dbus_message_ref(message);
 	data->sender = g_strdup(dbus_message_get_sender(message));
 
-	session = session_create(source, dest, target, channel, data->sender,
-							create_callback, data);
+	session = session_create(source, dest, target, params, channel,
+					data->sender, create_callback, data);
 	if (session != NULL) {
 		sessions = g_slist_append(sessions, session);
 		return NULL;
@@ -499,12 +502,13 @@ static DBusMessage *get_capabilities(DBusConnection *connection,
 	struct session_data *session;
 	struct send_data *data;
 	const char *source = NULL, *dest = NULL, *target = NULL;
+	const char *params = NULL;
 	uint8_t channel = 0;
 
 	dbus_message_iter_init(message, &iter);
 	dbus_message_iter_recurse(&iter, &dict);
 
-	parse_device_dict(&dict, &source, &dest, &target, &channel);
+	parse_device_dict(&dict, &source, &dest, &target, &params, &channel);
 	if (dest == NULL)
 		return g_dbus_create_error(message,
 				"org.openobex.Error.InvalidArguments", NULL);
@@ -521,8 +525,10 @@ static DBusMessage *get_capabilities(DBusConnection *connection,
 	if (!target)
 		target = "OPP";
 
-	session = session_create(source, dest, target, channel, data->sender,
-					capability_session_callback, data);
+	session = session_create(source, dest, target, params,
+					channel, data->sender,
+					capability_session_callback,
+					data);
 	if (session != NULL) {
 		sessions = g_slist_append(sessions, session);
 		return NULL;

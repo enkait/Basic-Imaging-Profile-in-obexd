@@ -88,6 +88,10 @@ struct pending_req {
 	void *user_data;
 };
 
+typedef gboolean (*sdp_filter_func) (const void *user_data,
+						const sdp_record_t *record,
+						const char *params);
+
 struct session_data {
 	gint refcount;
 	bdaddr_t src;
@@ -111,6 +115,9 @@ struct session_data {
 	GSList *pending_calls;
 	void *priv;
 	char *adapter;
+	sdp_filter_func sdp_filter;
+	const void *sdp_filter_data;
+	char *params;
 };
 
 static GSList *sessions = NULL;
@@ -231,6 +238,7 @@ static void session_free(struct session_data *session)
 	g_free(session->path);
 	g_free(session->service);
 	g_free(session->owner);
+	g_free(session->params);
 	g_free(session);
 }
 
@@ -395,6 +403,11 @@ static void search_callback(uint8_t type, uint16_t status,
 			break;
 		}
 
+		if (session->sdp_filter)
+			if (!session->sdp_filter(session->sdp_filter_data,
+							rec, session->params))
+				goto pass;
+
 		if (!sdp_get_access_protos(rec, &protos)) {
 			ch = sdp_get_proto_port(protos, RFCOMM_UUID);
 			sdp_list_foreach(protos,
@@ -403,6 +416,7 @@ static void search_callback(uint8_t type, uint16_t status,
 			protos = NULL;
 		}
 
+pass:
 		sdp_record_free(rec);
 
 		if (ch > 0) {
@@ -722,6 +736,7 @@ proceed:
 struct session_data *session_create(const char *source,
 						const char *destination,
 						const char *service,
+						const char *params,
 						uint8_t channel,
 						const char *owner,
 						session_callback_t function,
@@ -766,6 +781,7 @@ struct session_data *session_create(const char *source,
 
 	str2ba(destination, &session->dst);
 	session->service = g_strdup(service);
+	session->params = g_strdup(params);
 
 	if (!g_ascii_strncasecmp(service, "OPP", 3)) {
 		sdp_uuid16_create(&session->uuid, OBEX_OBJPUSH_SVCLASS_ID);
