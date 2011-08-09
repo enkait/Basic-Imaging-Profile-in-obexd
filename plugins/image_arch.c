@@ -132,52 +132,6 @@ void *image_arch_connect(struct obex_session *os, int *err) {
 	return as;
 }
 
-struct sa_aparam_header {
-	uint8_t tag;
-	uint8_t len;
-	uint8_t val[0];
-} __attribute__ ((packed));
-
-static struct aa_aparam *parse_aparam(const uint8_t *buffer, int32_t hlen)
-{
-	struct aa_aparam *param = g_new0(struct aa_aparam, 1);
-	struct sa_aparam_header *hdr;
-	int32_t len = 0;
-	int i;
-
-
-	while (len < hlen) {
-		printf("got %u %u %u of data\n", len, hlen, sizeof(struct sa_aparam_header));
-		hdr = (void *) buffer + len;
-		if (hlen - len < (int32_t) sizeof(struct sa_aparam_header))
-			goto failed;
-
-		switch (hdr->tag) {
-		case SID_TAG:
-			if (hdr->len != SID_LEN)
-				goto failed;
-			memcpy(param->serviceid, hdr->val,
-					SID_LEN);
-			break;
-
-		default:
-			goto failed;
-		}
-
-		len += hdr->len + sizeof(struct sa_aparam_header);
-	}
-	for(i=0;i<16;i++) {
-		printf("%x\n", (char) param->serviceid[i]);
-	}
-
-	return param;
-
-failed:
-	g_free(param);
-
-	return NULL;
-}
-
 int image_arch_get(struct obex_session *os, obex_object_t *obj,
 							void *user_data)
 {
@@ -240,16 +194,10 @@ int image_arch_chkput(struct obex_session *os, void *user_data) {
 int image_arch_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 {
 	//struct archive_session *session = user_data;
-	static struct aa_aparam *aparam;
-	const uint8_t *buffer;
-	ssize_t rsize;
 	printf("IMAGE ARCH PUT\n");
 
 	if (obex_get_size(os) != OBJECT_SIZE_DELETE)
 		return -EBADR;
-	
-	rsize = obex_aparam_read(os, obj, &buffer);
-	aparam = parse_aparam(buffer, rsize);
 	return 0;
 }
 
