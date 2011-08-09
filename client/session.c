@@ -846,6 +846,7 @@ struct session_data *session_create(const char *source,
 		sdp_uuid16_create(&session->uuid, IMAGING_ARCHIVE_SVCLASS_ID);
 		session->target = ARCHIVED_OBJECTS_UUID;
 		session->target_len = ARCHIVED_OBJECTS_UUID_LEN;
+		session->sdp_filter = aos_sdp_filter;
 	} else if (!g_ascii_strncasecmp(service, "FTP", 3)) {
 		sdp_uuid16_create(&session->uuid, OBEX_FILETRANS_SVCLASS_ID);
 		session->target = OBEX_FTP_UUID;
