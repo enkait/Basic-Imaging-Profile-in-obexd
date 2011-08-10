@@ -187,7 +187,7 @@ struct transfer_data *transfer_register(struct session_data *session,
 						const char *filename,
 						const char *name,
 						const char *type,
-	                    struct transfer_params *params,
+						struct transfer_params *params,
 						GSList *aheaders)
 {
 	struct transfer_data *transfer;
@@ -199,6 +199,7 @@ struct transfer_data *transfer_register(struct session_data *session,
 	transfer->type = g_strdup(type);
 	transfer->params = params;
 	transfer->aheaders = aheaders;
+	transfer->send_size = TRUE;
 
 	/* for OBEX specific mime types we don't need to register a transfer */
 	if (type != NULL &&
@@ -516,7 +517,10 @@ done:
 		apparam_size = transfer->params->size;
 	}
 
-	size = transfer->size < UINT32_MAX ? transfer->size : 0;
+	if (transfer->send_size)
+		size = transfer->size < UINT32_MAX ? transfer->size : 0;
+	else
+		size = -1;
 	transfer->xfer = gw_obex_put_async_with_aheaders(session->obex,
 					transfer->name, transfer->type,
 					apparam, apparam_size,

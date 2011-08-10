@@ -46,6 +46,7 @@ struct transfer_data {
 	int filled;
 	gint64 size;
 	gint64 transferred;
+	gboolean send_size;
 	int err;
 };
 
@@ -58,7 +59,7 @@ struct transfer_data *transfer_register(struct session_data *session,
 						const char *name,
 						const char *type,
 						struct transfer_params *params,
-                        GSList *aheaders);
+						GSList *aheaders);
 
 void transfer_unregister(struct transfer_data *transfer);
 

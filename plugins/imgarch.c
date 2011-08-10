@@ -699,6 +699,7 @@ static void get_aos_interface_callback(DBusPendingCall *call, void *user_data)
 	char *path;
 
 	printf("get_aos_interface_callback\n");
+	printf("session: %p\n", data->session);
 
 	if (msg == NULL) {
 		// assign int is atomic? - possible concurrency issue
@@ -720,6 +721,8 @@ static void get_aos_interface_callback(DBusPendingCall *call, void *user_data)
 
 	data->aos_path = g_strdup(path);
 
+	if (TRUE)
+		return;
 	if (!get_listing(data, get_listing_finished)) {
 		end_aos_session(data);
 		data->session->status = -EBADR;

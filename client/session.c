@@ -1888,17 +1888,15 @@ int session_put(struct session_data *session, char *buf, const char *targetname)
 }
 
 int session_put_with_aheaders(struct session_data *session, const char *type,
-		char *buf, const char *filename, const char *targetname,
+		const char *filename, const char *targetname,
 		const guint8 *apparam, gint apparam_size,
-		const GSList *aheaders,
+		const GSList *aheaders, 
 		session_callback_t func, void *user_data)
 {
 	struct transfer_data *transfer;
 	struct transfer_params *params = NULL;
 	GSList *aheaders_copy = NULL;
 	int err;
-
-	g_assert(buf == NULL || filename == NULL);
 
 	if (session->obex == NULL)
 		return -ENOTCONN;
@@ -1922,8 +1920,8 @@ int session_put_with_aheaders(struct session_data *session, const char *type,
 		}
 	}
 
-	transfer = transfer_register(session, filename, targetname, type, params,
-			aheaders_copy);
+	transfer = transfer_register(session, filename, targetname, type,
+						params, aheaders_copy);
 	if (transfer == NULL) {
 		if (aheaders_copy != NULL) {
 			while (aheaders_copy)
@@ -1937,17 +1935,14 @@ int session_put_with_aheaders(struct session_data *session, const char *type,
 		return -EIO;
 	}
 
+	transfer->send_size = FALSE;
+
 	if (func != NULL) {
 		struct session_callback *callback;
 		callback = g_new0(struct session_callback, 1);
 		callback->func = func;
 		callback->data = user_data;
 		session->callback = callback;
-	}
-
-	if (buf != NULL) {
-		transfer->size = strlen(buf);
-		transfer->buffer = buf;
 	}
 
 	err = session_request(session, session_prepare_put, transfer);

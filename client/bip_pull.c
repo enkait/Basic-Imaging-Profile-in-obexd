@@ -1501,5 +1501,7 @@ gboolean aos_sdp_filter(const void *user_data, const sdp_record_t *record,
 	if (g_strcmp0(temp, params) != 0)
 		return FALSE;
 
+	printf("jest ok\n");
+
 	return TRUE;
 }
