@@ -163,6 +163,7 @@ struct image_attributes *get_image_attributes(const char *image_file, int *err)
 	attr->height = MagickGetImageHeight(wand);
 	MagickGetImageLength(wand, &size);
 	attr->length = (unsigned long) size;
+	wand=DestroyMagickWand(wand);
 	MagickWandTerminus();
 
 	if (err)
