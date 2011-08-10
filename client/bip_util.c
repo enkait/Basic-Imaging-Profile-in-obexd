@@ -30,8 +30,8 @@
 #define HANDLE_LEN 7
 #define HANDLE_MAX 10000000
 
-const char *att_suf = "_att";
-const char *default_name = "image";
+static const char *att_suf = "_att";
+static const char *default_name = "image";
 static const gchar *valid_name_chars="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 static const gchar rep_char='_';
 
