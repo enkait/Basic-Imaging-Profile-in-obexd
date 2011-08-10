@@ -76,26 +76,35 @@ bip = None
 
 def image_push(session, filename):
     session.PutModifiedImage(os.path.abspath(filename),"BMP",1000,200,"fill")
+    return False
 
 def image_attachment_push(session, filename, handle):
     session.PutImageAttachment(os.path.abspath(filename),handle)
     print "Push Attachment finished"
+    return False
 
 def imaging_capabilities(session):
     print session.GetImagingCapabilities()
+    return True
 
 def execute():
     global tasks
-    if len(tasks) == 0:
-        return
-    entry = tasks[0]
-    tasks.pop(0)
-    if entry[0] == "image":
-        image_push(bip, entry[1][0])
-    if entry[0] == "attachment":
-        image_attachment_push(bip, entry[1][0], entry[1][1])
-    if entry[0] == "capabilities":
-        imaging_capabilities(bip)
+    while True:
+        if len(tasks) == 0:
+            return
+        entry = tasks[0]
+        tasks.pop(0)
+        ret = False
+        if entry[0] == "image":
+            ret = image_push(bip, entry[1][0])
+        if entry[0] == "attachment":
+            ret = image_attachment_push(bip, entry[1][0], entry[1][1])
+        if entry[0] == "capabilities":
+            ret = imaging_capabilities(bip)
+
+        if not ret:
+            break
+
 
 def image_push_completed(handle):
     print "Image pushed, received handle: "+handle
@@ -132,19 +141,19 @@ if  __name__ == '__main__':
     agent = Agent(bus, path, options.verbose)
 	
     bus.add_signal_receiver(image_push_completed,
-	dbus_interface="org.openobex.ImagePush",
+	dbus_interface="org.openobex.BipSignal",
 	signal_name="PutImageCompleted")
     
     bus.add_signal_receiver(image_push_failed,
-	dbus_interface="org.openobex.ImagePush",
+	dbus_interface="org.openobex.BipSignal",
 	signal_name="PutImageFailed")
     
     bus.add_signal_receiver(attachment_push_completed,
-	dbus_interface="org.openobex.ImagePush",
+	dbus_interface="org.openobex.BipSignal",
 	signal_name="PutAttachmentCompleted")
     
     bus.add_signal_receiver(attachment_push_failed,
-	dbus_interface="org.openobex.ImagePush",
+	dbus_interface="org.openobex.BipSignal",
 	signal_name="PutAttachmentFailed")
 
     client = dbus.Interface(bus.get_object("org.openobex.client", "/"),
