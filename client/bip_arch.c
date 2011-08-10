@@ -54,8 +54,8 @@ cleanup:
 	return reply;
 }
 
-static DBusMessage *get_status(DBusConnection *connection,
-		DBusMessage *message, void *user_data)
+DBusMessage *get_status(DBusConnection *connection,
+				DBusMessage *message, void *user_data)
 {
 	struct session_data *session = user_data;
 	DBusMessage *reply;

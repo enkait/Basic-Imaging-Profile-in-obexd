@@ -25,3 +25,6 @@ gboolean bip_arch_register_interface(DBusConnection *connection,
 						GDBusDestroyFunction destroy);
 void bip_arch_unregister_interface(DBusConnection *connection, const char *path,
 							void *user_data);
+
+DBusMessage *get_status(DBusConnection *connection,
+				DBusMessage *message, void *user_data);

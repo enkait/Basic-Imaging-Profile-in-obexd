@@ -181,7 +181,8 @@ client_obex_client_SOURCES = $(gdbus_sources) $(gobex_sources) \
 				client/bip_util.h client/bip_util.c \
 				client/bip_arch.h client/bip_arch.c \
 				client/bip_rd.h client/bip_rd.c \
-				client/bip_rc.h client/bip_rc.c
+				client/bip_rc.h client/bip_rc.c \
+				client/bip_bp.h client/bip_bp.c
 
 client_obex_client_LDADD = @GLIB_LIBS@ @DBUS_LIBS@ @OPENOBEX_LIBS@ @BLUEZ_LIBS@ @MAGICKWAND_LIBS@
 endif
