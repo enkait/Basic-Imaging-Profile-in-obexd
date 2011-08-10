@@ -144,7 +144,7 @@ static DBusMessage *put_thumbnail(struct session_data *session,
 		goto cleanup;
 	}
 
-	if ((err=session_put_with_aheaders(session, "x-bt/img-thm", NULL,
+	if ((err=session_put_with_aheaders(session, "x-bt/img-thm",
 						thm_path, NULL, NULL, 0,
 						aheaders,
 						put_thumbnail_callback,
@@ -275,7 +275,7 @@ static DBusMessage *put_transformed_image(DBusMessage *message, struct session_d
 	descriptor = create_image_descriptor(attr, transform);
 	aheaders = g_slist_append(NULL, descriptor);
 
-	if ((err=session_put_with_aheaders(session, "x-bt/img-img", NULL,
+	if ((err=session_put_with_aheaders(session, "x-bt/img-img",
 						local_image, remote_image,
 						NULL, 0, aheaders,
 						put_image_callback,
@@ -456,7 +456,7 @@ static DBusMessage *put_image_attachment(DBusConnection *connection,
 	aheaders = g_slist_append(aheaders, ah);
 
 	if ((err=session_put_with_aheaders(session, "x-bt/img-attachment",
-					NULL, att_path, NULL, NULL, 0,
+					att_path, NULL, NULL, 0,
 					aheaders, put_attachment_callback,
 							NULL)) < 0) {
 		reply = failed(message);
