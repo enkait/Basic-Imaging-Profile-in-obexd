@@ -185,24 +185,7 @@ int get_new_handle(struct image_push_session *session) {
 	}
 	return session->next_handle++;
 }
-/*
-static gboolean add_reply_handle(struct obex_session *os, obex_object_t *obj, int handle) {
-	GString *handle_str = g_string_new("");
-	obex_headerdata_t handle_hdr;
-	unsigned int handle_hdr_len;
-	if (handle < 0 || handle >= HANDLE_LIMIT) {
-		g_string_free(handle_str, TRUE);
-		return FALSE;
-	}
-	g_string_append_printf(handle_str, "%07d", handle);
-	handle_hdr.bs = encode_img_handle(handle_str->str, handle_str->len, &handle_hdr_len);
-	g_string_free(handle_str, TRUE);
-	if (handle_hdr.bs == NULL)
-		return FALSE;
-	OBEX_ObjectAddHeader(os->obex, obj, IMG_HANDLE_HDR, handle_hdr, handle_hdr_len, OBEX_FL_FIT_ONE_PACKET);
-	return TRUE;
-}
-*/
+
 struct att_desc {
 	char *name;
 };
