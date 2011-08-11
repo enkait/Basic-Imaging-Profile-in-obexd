@@ -166,9 +166,6 @@ static void free_image_pull_session(struct image_pull_session *session)
 		image_list = g_slist_next(image_list);
 	}
 	g_slist_free(session->image_list);
-	g_free(session->aparam_data);
-	g_free(session->handle_hdr);
-	g_free(session->desc_hdr);
 	g_free(session);
 }
 
@@ -249,30 +246,9 @@ void *image_pull_connect(struct obex_session *os, int *err)
 int image_pull_get(struct obex_session *os, obex_object_t *obj,
 							void *user_data)
 {
-	struct image_pull_session *session = user_data;
-	const uint8_t *buffer;
 	int ret;
-	ssize_t rsize;
-
-	rsize = obex_aparam_read(os, obj, &buffer);
 
 	printf("IMAGE PULL GET\n");
-
-	printf("%p %p\n", &session->desc_hdr, session->desc_hdr);
-	printf("%p: session->aparam_data", session->aparam_data);
-	g_free(session->aparam_data);
-	session->aparam_data = NULL;
-	session->aparam_data_len = 0;
-
-	if (rsize >= 0) {
-		session->aparam_data = g_memdup(buffer, rsize);
-		session->aparam_data_len = rsize;
-	}
-
-	parse_bip_user_headers(os, obj,	&session->desc_hdr,
-					&session->desc_hdr_len,
-					&session->handle_hdr,
-					&session->handle_hdr_len);
 
 	ret = obex_get_stream_start(os, os->name);
 
@@ -297,20 +273,18 @@ int image_pull_put(struct obex_session *os, obex_object_t *obj,
 	struct image_pull_session *session = user_data;
 	struct img_listing *il;
 	int handle, err;
+	char *handle_hdr;
+	unsigned int handle_hdr_len;
 	printf("IMAGE PULL PUT\n");
 
 	if (obex_get_size(os) != OBJECT_SIZE_DELETE ||
 					!g_str_equal(os->type, "x-bt/img-img"))
 		return -EBADR;
 
-	printf("%p %p\n", &session->desc_hdr, session->desc_hdr);
-
-	parse_bip_user_headers(os, obj, &session->desc_hdr,
-					&session->desc_hdr_len,
-					&session->handle_hdr,
-					&session->handle_hdr_len);
+	parse_bip_user_headers(os, obj, NULL, NULL, &handle_hdr,
+							&handle_hdr_len);
 	
-	handle = parse_handle(session->handle_hdr, session->handle_hdr_len);
+	handle = parse_handle(handle_hdr, handle_hdr_len);
 
 	if (handle < 0)
 		return -EBADR;

@@ -31,12 +31,6 @@ static const uint8_t IMAGE_AOS_TARGET[TARGET_SIZE] = {
 
 struct image_pull_session {
     struct obex_session *os;
-    uint8_t *aparam_data;
-    unsigned int aparam_data_len;
-    char *handle_hdr;
-    unsigned int handle_hdr_len;
-    char *desc_hdr;
-    unsigned int desc_hdr_len;
     GSList *image_list;
     int status;
 };

@@ -56,6 +56,12 @@
 #include "filesystem.h"
 #include "bip_util.h"
 
+struct imgattpull_data {
+	struct image_pull_session *context;
+	int handle, fd;
+	const char *name;
+};
+
 static char *get_att_path(const char *image_path, const char *name, int *err) {
 	struct dirent *file;
 	struct stat file_stat;
@@ -105,47 +111,66 @@ done:
 static void *imgattpull_open(const char *name, int oflag, mode_t mode,
 		void *context, size_t *size, int *err)
 {
-	struct image_pull_session *session = context;
-	char *att_path;
-	int handle;
-	struct img_listing *il;
-	int fd = -1;
+	struct imgattpull_data *data = g_new0(struct imgattpull_data, 1);
+
+	data->handle = -1;
+	data->fd = -1;
+	data->context = context;
+	data->name = name;
 
 	if (err)
 		*err = 0;
-	
-	printf("imgattpull_open\n");
-	printf("name: %s\n", name);
 
-	handle = parse_handle(session->handle_hdr, session->handle_hdr_len);
+	return data;
+}
 
-	if (handle == -1) {
-		if (err)
-			*err = -ENOENT;
-		return NULL;
+static int feed_next_header(void *object, uint8_t hi, obex_headerdata_t hv,
+							uint32_t hv_size)
+{
+	struct imgattpull_data *data = object;
+	struct image_pull_session *session = data->context;
+	struct img_listing *il;
+	int err, handle;
+
+	if (data == NULL)
+		return -EBADR;
+	printf("feed_next_header\n");
+
+	if (hi == IMG_HANDLE_HDR) {
+		unsigned int hdr_len;
+		char *header;
+
+		if (!parse_bip_header(&header, &hdr_len, hi, hv.bs, hv_size))
+			return -EBADR;
+		handle = parse_handle(header, hdr_len);
+
+		if (handle < 0)
+			return -EBADR;
+
+		data->handle = handle;
 	}
+	else if (hi == OBEX_HDR_EMPTY) {
+		char *att_path = NULL;
+		const char *name = data->name;
+		handle = data->handle;
 
-	printf("handle = %d\n", handle);
+		if (handle == -1)
+			return -ENOENT;
 
-	if ((il = get_listing(session->image_list, handle, err)) == NULL)
-		return NULL;
+		if ((il = get_listing(session->image_list, handle, &err))
+								== NULL)
+			return err;
 
-	if ((att_path = get_att_path(il->image, name, err)) == NULL)
-		return NULL;
+		if ((att_path = get_att_path(il->image, name, &err)) == NULL)
+			return err;
 
-	printf("path: %s\n", att_path);
+		data->fd = open(att_path, O_RDONLY, 0);
+		g_free(att_path);
 
-	fd = open(att_path, oflag, mode);
-	g_free(att_path);
-
-	if (fd < 0) {
-		if (err != NULL)
-			*err = -errno;
-		return NULL;
+		if (data->fd < 0)
+			return -errno;
 	}
-	printf("fd = %d\n", fd);
-
-	return GINT_TO_POINTER(fd);
+	return 0;
 }
 
 static ssize_t imgattpull_read(void *object, void *buf, size_t count)
@@ -177,6 +202,7 @@ static struct obex_mime_type_driver imgattpull = {
 	.open = imgattpull_open,
 	.close = imgattpull_close,
 	.read = imgattpull_read,
+	.feed_next_header = feed_next_header,
 };
 
 static struct obex_mime_type_driver imgattpull_aos = {
@@ -186,6 +212,7 @@ static struct obex_mime_type_driver imgattpull_aos = {
 	.open = imgattpull_open,
 	.close = imgattpull_close,
 	.read = imgattpull_read,
+	.feed_next_header = feed_next_header,
 };
 
 static int imgattpull_init(void)
