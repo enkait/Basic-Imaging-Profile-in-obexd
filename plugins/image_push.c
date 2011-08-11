@@ -236,13 +236,9 @@ static struct att_desc *parse_att_desc(char *data, unsigned int length)
 
 static int image_push_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 {
-	struct image_push_session *ips = user_data;
 	//struct pushed_image *img;
 	//printf("IMAGE PUSH PUT %s\n", os->name);
 	printf("%p\n", parse_att_desc);
-
-	parse_bip_user_headers(os, obj, &ips->desc_hdr, &ips->desc_hdr_len,
-				&ips->handle_hdr, &ips->handle_hdr_len);
 
 	printf("os->type = %s\n", os->type);
 	if (g_strcmp0(os->type, "x-bt/img-img") == 0) {

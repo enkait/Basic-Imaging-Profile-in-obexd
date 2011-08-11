@@ -35,10 +35,6 @@ struct pushed_image {
 
 struct image_push_session {
     struct obex_session *os;
-    char *handle_hdr;
-    unsigned int handle_hdr_len;
-    char *desc_hdr;
-    unsigned int desc_hdr_len;
     const char *bip_root;
     int next_handle;
     GSList *pushed_images;
