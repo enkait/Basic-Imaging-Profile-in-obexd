@@ -238,13 +238,13 @@ gboolean parse_pixel_range(const gchar *dim, unsigned int *lower_ret,
 	unsigned int lower[2], upper[2];
 	gboolean fixed_ratio = FALSE;
 	if (!regex_initialized) {
-		regcomp(&no_range, "^([[:digit:]]+)\\*([[:digit:]]+)$",
+		regcomp(&no_range, "^([[:digit:]]{1,5})\\*([[:digit:]]{1,5})$",
 							REG_EXTENDED);
-		regcomp(&range, "^([[:digit:]]+)\\*([[:digit:]]+)"
-				"-([[:digit:]]+)\\*([[:digit:]]+)$",
+		regcomp(&range, "^([[:digit:]]{1,5})\\*([[:digit:]]{1,5})"
+				"-([[:digit:]]{1,5})\\*([[:digit:]]{1,5})$",
 							REG_EXTENDED);
-		regcomp(&range_fixed, "^([[:digit:]]+)\\*\\*"
-				"-([[:digit:]]+)\\*([[:digit:]]+)$",
+		regcomp(&range_fixed, "^([[:digit:]]{1,5})\\*\\*"
+				"-([[:digit:]]{1,5})\\*([[:digit:]]{1,5})$",
 							REG_EXTENDED);
 		regex_initialized = 1;
 	}
