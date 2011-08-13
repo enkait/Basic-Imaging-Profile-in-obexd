@@ -124,20 +124,23 @@ static int feed_next_header(void *object, uint8_t hi, obex_headerdata_t hv,
 							uint32_t hv_size)
 {
 	struct imgdisplay_data *data = object;
-	char *handle_hdr;
-	unsigned int handle_hdr_len;
+	char *header;
+	unsigned int hdr_len;
 	int err = 0;
 	printf("feed_next_header %x\n", hi);
 
 	if (hi == IMG_HANDLE_HDR) {
-		printf("handle header\n");
 		if (data->handle != -1)
 			return -EBADR;
-		if (!parse_bip_header(&handle_hdr, &handle_hdr_len, hi, hv.bs,
-								hv_size))
+
+		header = decode_img_handle(hv.bs, hv_size, &hdr_len);
+
+		// czy to tu ma byc
+		if (header == NULL)
 			return -EBADR;
-		data->handle = parse_handle(handle_hdr, handle_hdr_len);
-		g_free(handle_hdr);
+
+		data->handle = parse_handle(header);
+		g_free(header);
 	}
 	else if (hi == OBEX_HDR_APPARAM) {
 		int rd = parse_aparam(hv.bs, hv_size);

@@ -354,7 +354,8 @@ static int feed_next_header(void *object, uint8_t hi, obex_headerdata_t hv,
 	if (hi == IMG_HANDLE_HDR) {
 		if (!parse_bip_header(&header, &hdr_len, hi, hv.bs, hv_size))
 			return -EBADR;
-		handle = parse_handle(header, hdr_len);
+
+		handle = parse_handle(header);
 
 		if (handle < 0)
 			return -EBADR;

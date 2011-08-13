@@ -82,7 +82,7 @@ static void get_monit_image_callback(struct session_data *session, GError *err,
 	parse_client_user_headers(transfer->xfer, NULL, NULL, &handle,
 								&length);
 
-	if (handle == NULL || parse_handle(handle, length) < 0) {
+	if (handle == NULL || parse_handle(handle) < 0) {
 		get_monit_image_completed(session, "");
 		goto cleanup;
 	}

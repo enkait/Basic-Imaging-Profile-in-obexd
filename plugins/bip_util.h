@@ -44,7 +44,7 @@ int make_modified_image(const char *image_path, const char *modified_path,
 			int *err);
 gboolean make_thumbnail(const char *image_path, const char *modified_path,
 								int *err);
-int parse_handle(const char *data, unsigned int length);
+int parse_handle(const char *data);
 gboolean parse_bip_header(char **header, unsigned int *hdr_len,
 			uint8_t hi, const uint8_t *data, unsigned int hlen);
 void parse_bip_user_headers(const struct obex_session *os, obex_object_t *obj,

@@ -284,7 +284,7 @@ int image_pull_put(struct obex_session *os, obex_object_t *obj,
 	parse_bip_user_headers(os, obj, NULL, NULL, &handle_hdr,
 							&handle_hdr_len);
 	
-	handle = parse_handle(handle_hdr, handle_hdr_len);
+	handle = parse_handle(handle_hdr);
 
 	if (handle < 0)
 		return -EBADR;

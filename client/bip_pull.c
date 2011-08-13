@@ -83,7 +83,7 @@ static gboolean listing_parse_attr(struct listing_object *object, const gchar *k
 	if (g_str_equal(key, "handle")) {
 		if (value == NULL)
 			goto invalid;
-		if (parse_handle(value, strlen(value)) < 0)
+		if (parse_handle(value) < 0)
 			goto invalid;
 		object->handle = g_strdup(value);
 		printf("handle: %s\n", object->handle);
@@ -524,7 +524,7 @@ static gboolean parse_attrib_prop(struct prop_object *prop, const gchar *key,
 {
 	printf("key: %s\n", key);
 	if (g_str_equal(key, "handle")) {
-		if (parse_handle(value, strlen(value)) < 0)
+		if (parse_handle(value) < 0)
 			goto invalid;
 		prop->handle = g_strdup(value);
 	}
@@ -781,7 +781,7 @@ DBusMessage *get_image_properties(DBusConnection *connection,
 		goto cleanup;
 	}
 
-	if (parse_handle(handle, strlen(handle)) < 0) {
+	if (parse_handle(handle) < 0) {
 		reply = g_dbus_create_error(message,
 				"org.openobex.Error.InvalidArguments", NULL);
 		goto cleanup;
@@ -855,7 +855,7 @@ DBusMessage *delete_image(DBusConnection *connection,
 		goto cleanup;
 	}
 
-	if (parse_handle(handle, strlen(handle)) < 0) {
+	if (parse_handle(handle) < 0) {
 		reply = g_dbus_create_error(message,
 				"org.openobex.Error.InvalidArguments", NULL);
 		goto cleanup;
@@ -1177,7 +1177,7 @@ DBusMessage *get_image_thumbnail(DBusConnection *connection,
 		goto cleanup;
 	}
 	
-	if (parse_handle(handle, strlen(handle)) < 0) {
+	if (parse_handle(handle) < 0) {
 		reply = g_dbus_create_error(message,
 				"org.openobex.Error.InvalidArguments", NULL);
 		goto cleanup;
@@ -1233,7 +1233,7 @@ DBusMessage *get_image_attachment(DBusConnection *connection,
 	}
 
 	printf("requested get image attachment %s %s %s\n", file_path, handle, att_name);
-	if (parse_handle(handle, strlen(handle)) < 0) {
+	if (parse_handle(handle) < 0) {
 		reply = g_dbus_create_error(message,
 				"org.openobex.Error.InvalidArguments", NULL);
 		goto cleanup;

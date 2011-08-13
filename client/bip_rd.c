@@ -55,7 +55,7 @@ static char *remote_display(DBusConnection *conn, struct session_data *session,
 	if (handle_len == 0) {
 		ret = g_strdup("");
 	}
-	else if (parse_handle(handle, handle_len) < 0) {
+	else if (parse_handle(handle) < 0) {
 		if (err != NULL)
 			*err = -EINVAL;
 		goto cleanup;

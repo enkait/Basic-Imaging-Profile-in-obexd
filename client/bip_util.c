@@ -289,18 +289,18 @@ gboolean parse_pixel_range(const gchar *dim, unsigned int *lower_ret,
 	return TRUE;
 }
 
-int parse_handle(const char *data, unsigned int length)
+int parse_handle(const char *data)
 {
 	int handle;
 	char *ptr;
 	if (data == NULL)
 		return -1;
-	if (length != HANDLE_LEN)
+	if (strlen(data) != HANDLE_LEN)
 		return -1;
 	handle = strtol(data, &ptr, 10);
-	if (ptr != data + 7)
+	if (ptr != data + HANDLE_LEN)
 		return -1;
-	if (handle < 0 || handle >= HANDLE_MAX)
+	if (handle < 0 || handle >= HANDLE_LIMIT)
 		return -1;
 	return handle;
 }
