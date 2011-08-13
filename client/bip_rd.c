@@ -46,7 +46,7 @@ static char *remote_display(DBusConnection *conn, struct session_data *session,
 
 	g_assert(session->obex->xfer != NULL);
 
-	parse_client_user_headers(session->obex->xfer, NULL, NULL,
+	parse_client_user_headers(session->obex->xfer->aheaders, NULL, NULL,
 					&handle, &handle_len);
 
 	printf("parse_client_user_headers\n");

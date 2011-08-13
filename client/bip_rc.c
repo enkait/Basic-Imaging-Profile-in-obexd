@@ -79,7 +79,9 @@ static void get_monit_image_callback(struct session_data *session, GError *err,
 		goto cleanup;
 	}
 
-	parse_client_user_headers(transfer->xfer, NULL, NULL, &handle,
+	g_assert(transfer->xfer != NULL);
+
+	parse_client_user_headers(transfer->xfer->aheaders, NULL, NULL, &handle,
 								&length);
 
 	if (handle == NULL || parse_handle(handle) < 0) {

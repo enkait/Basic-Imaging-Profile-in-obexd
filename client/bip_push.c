@@ -177,7 +177,12 @@ static void put_image_callback(struct session_data *session, GError *err,
 	if (session->obex->obex_rsp)
 		required = TRUE;
 
-	parse_client_user_headers(transfer->xfer, NULL, NULL, &handle,
+	if (transfer->xfer == NULL) {
+		put_image_failed(session, "Failed");
+		return;
+	}
+
+	parse_client_user_headers(transfer->xfer->aheaders, NULL, NULL, &handle,
 								&length);
 	transfer_unregister(transfer);
 
