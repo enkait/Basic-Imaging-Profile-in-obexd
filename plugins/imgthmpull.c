@@ -158,7 +158,9 @@ static int feed_next_header(void *object, uint8_t hi, obex_headerdata_t hv,
 	printf("feed_next_header\n");
 
 	if (hi == IMG_HANDLE_HDR) {
-		if (!parse_bip_header(&header, &hdr_len, hi, hv.bs, hv_size))
+		header = decode_img_handle(hv.bs, hv_size, &hdr_len);
+
+		if (header == NULL)
 			return -EBADR;
 
 		handle = parse_handle(header);

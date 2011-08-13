@@ -461,7 +461,7 @@ failed:
 	return FALSE;
 }
 
-gboolean parse_bip_header(char **header, unsigned int *hdr_len,
+/*gboolean parse_bip_header(char **header, unsigned int *hdr_len,
 				uint8_t hi, const uint8_t *data, unsigned int hlen) {
 	g_assert (header != NULL && hdr_len != NULL);
 	switch (hi) {
@@ -475,7 +475,7 @@ gboolean parse_bip_header(char **header, unsigned int *hdr_len,
 	if (*header == NULL)
 		return FALSE;
 	return TRUE;
-}
+}*/
 
 void parse_bip_user_headers(const struct obex_session *os,
 		obex_object_t *obj, char **desc_hdr, unsigned int *desc_hdr_len,

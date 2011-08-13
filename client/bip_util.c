@@ -446,7 +446,7 @@ failed:
 		*err = -EBADR;
 	return FALSE;
 }
-
+/*
 gboolean parse_bip_header(char **header, unsigned int *hdr_len,
 				uint8_t hi, const uint8_t *data, unsigned int hlen) {
 	g_assert (header != NULL && hdr_len != NULL);
@@ -462,7 +462,7 @@ gboolean parse_bip_header(char **header, unsigned int *hdr_len,
 		return FALSE;
 	return TRUE;
 }
-
+*/
 void parse_client_user_headers(GwObexXfer *xfer,
 				char **desc_hdr,
 				unsigned int *desc_hdr_len,
