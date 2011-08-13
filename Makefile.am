@@ -223,10 +223,12 @@ plugins/messages.c: plugins/@MESSAGES_DRIVER@
 	$(AM_V_GEN)$(LN_S) @abs_top_srcdir@/$< $@
 
 TESTS = unit/test-gobex-header unit/test-gobex-packet unit/test-gobex \
-						unit/test-gobex-transfer
+		unit/test-gobex-transfer unit/test-gobex-transfer \
+		unit/test-bip
 
 noinst_PROGRAMS += unit/test-gobex-header unit/test-gobex-packet \
-				unit/test-gobex unit/test-gobex-transfer
+		unit/test-gobex unit/test-gobex-transfer \
+		unit/test-bip
 
 unit_test_gobex_SOURCES = $(gobex_sources) unit/test-gobex.c \
 							unit/util.c unit/util.h
@@ -243,6 +245,10 @@ unit_test_gobex_header_LDADD = @GLIB_LIBS@
 unit_test_gobex_transfer_SOURCES = $(gobex_sources) unit/util.c unit/util.h \
 						unit/test-gobex-transfer.c
 unit_test_gobex_transfer_LDADD = @GLIB_LIBS@
+
+unit_test_bip_SOURCES = client/bip_util.c $(gwobex_sources) $(gobex_sources) client/bip_util.h unit/util.c unit/util.h \
+						unit/test-bip.c
+unit_test_bip_LDADD = $(client_obex_client_LDADD)
 
 if READLINE
 noinst_PROGRAMS += tools/test-client
