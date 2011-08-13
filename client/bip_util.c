@@ -535,9 +535,7 @@ void parse_bip_user_headers(const struct obex_session *os,
 
 	while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen));
 	OBEX_ObjectReParseHeaders(os->obex, obj);
-	printf("header search: %d %d\n", IMG_DESC_HDR, IMG_HANDLE_HDR);
 	while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen)) {
-		printf("header: %d %d %d\n", hi, IMG_DESC_HDR, IMG_HANDLE_HDR);
 		switch (hi) {
 		case IMG_DESC_HDR:
 			if (desc_hdr == NULL || desc_hdr_len == NULL)
@@ -546,7 +544,6 @@ void parse_bip_user_headers(const struct obex_session *os,
 								desc_hdr_len);
 			break;
 		case IMG_HANDLE_HDR:
-			printf("handle header\n");
 			if (handle_hdr == NULL || handle_hdr_len == NULL)
 				continue;
 			*handle_hdr = decode_img_handle(hd.bs, hlen,
@@ -559,7 +556,6 @@ void parse_bip_user_headers(const struct obex_session *os,
 
 char *get_att_dir(const char *image_path) {
 	GString *att_path = g_string_new(image_path);
-	printf("img Path :%s\n", image_path);
 	att_path = g_string_append(att_path, att_suf);
 	return g_string_free(att_path, FALSE);
 }
@@ -648,11 +644,9 @@ char *get_null_terminated(char *buffer, int len) {
 		newbuffer = g_try_malloc(len + 1);
 		g_memmove(newbuffer, buffer, len);
 		newbuffer[len]='\0';
-		printf("null terminating\n");
 	}
 	else {
 		newbuffer = g_memdup(buffer, len);
 	}
 	return newbuffer;
 }
-
