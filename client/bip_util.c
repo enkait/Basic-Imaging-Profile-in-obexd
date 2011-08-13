@@ -36,24 +36,19 @@ static const gchar *valid_name_chars="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOP
 static const gchar rep_char='_';
 
 uint8_t *encode_img_handle(const char *data, unsigned int length, unsigned int *newsize) {
-	gsize newlen;
-	uint8_t *utf16buf = (uint8_t *) g_convert(data, length,
-					"UTF16BE", "UTF8", NULL, &newlen, NULL);
-	uint8_t *res;
-	newlen += 2;
+	uint8_t *utf16buf;
+	if (length == 0) {
+		*newsize = 0;
+		return NULL;
+	}
+	utf16buf = (uint8_t *) g_convert(data, length,
+					"UTF16BE", "UTF8", NULL, newsize, NULL);
 
 	if (utf16buf == NULL)
 		return NULL;
 
-	res = g_malloc(newlen);
-	g_memmove(res, utf16buf, newlen);
-	res[newlen-2] = '\0';
-	res[newlen-1] = '\0';
-	g_free(utf16buf);
-
-	printf("encode_img_handle newlen = %d\n", newlen);
-	*newsize = newlen;
-	return (uint8_t *) res;
+	*newsize += 2;
+	return utf16buf;
 }
 
 char *decode_img_handle(const uint8_t *data, unsigned int length, unsigned int *newsize) {
@@ -86,27 +81,23 @@ char *decode_img_handle(const uint8_t *data, unsigned int length, unsigned int *
 }
 
 uint8_t *encode_img_descriptor(const char *data, unsigned int length, unsigned int *newsize) {
-	uint16_t len = length;
-	uint8_t *buf = g_try_malloc(2+length);
-	len = GUINT16_TO_BE(len);
+	uint8_t *buf = g_try_malloc(length);
 	if(!buf)
 		return NULL;
-	g_memmove(buf, &len, 2);
-	g_memmove(buf+2, data, length);
-	*newsize = length+2;
+	g_memmove(buf, data, length);
+	*newsize = length;
 	return buf;
 }
 
 char *decode_img_descriptor(const uint8_t *data, unsigned int length, unsigned int *newsize) {
 	char *buf;
-	printf("%u\n", length);
-	buf = g_try_malloc(length-2);
+	buf = g_try_malloc(length);
 
 	if (buf == NULL)
 		return NULL;
 
-	g_memmove(buf, data+2, length-2);
-	*newsize = length-2;
+	g_memmove(buf, data, length);
+	*newsize = length;
 	return buf;
 }
 
