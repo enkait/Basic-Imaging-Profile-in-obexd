@@ -28,7 +28,7 @@
 #include "bip_util.h"
 
 #define HANDLE_LEN 7
-#define HANDLE_MAX 10000000
+#define HANDLE_LIMIT 10000000
 
 static const char *att_suf = "_att";
 static const char *default_name = "image";
