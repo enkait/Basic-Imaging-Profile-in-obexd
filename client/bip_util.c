@@ -325,20 +325,42 @@ char *parse_transform(const char *transform) {
 }
 
 char *parse_transform_list(const char *transform) {
-	char **args = NULL, *arg = NULL;
+	char **args = NULL, **arg = NULL;
+	gboolean used[3] = { FALSE, FALSE, FALSE };
 	if (transform == NULL)
 		return NULL;
 	if (strlen(transform) == 0)
 		return NULL;
 	args = g_strsplit(transform, " ", 0);
-	for (arg = *args; arg != NULL; arg++) {
-		if (!verify_transform(arg)) {
+	for (arg = args; *arg != NULL; arg++) {
+		char *t = *arg;
+		if (!verify_transform(t)) {
 			g_strfreev(args);
 			return NULL;
+		}
+		switch (t[0]) {
+		case 's':
+			if (used[0])
+				goto failure;
+			used[0] = TRUE;
+			break;
+		case 'c':
+			if (used[1])
+				goto failure;
+			used[1] = TRUE;
+			break;
+		case 'f':
+			if (used[2])
+				goto failure;
+			used[2] = TRUE;
+			break;
 		}
 	}
 	g_strfreev(args);
 	return g_strdup(transform);
+failure:
+	g_strfreev(args);
+	return NULL;
 }
 
 char *parse_unsignednumber(const char *size) {
