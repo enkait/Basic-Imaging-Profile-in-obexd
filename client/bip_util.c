@@ -267,10 +267,15 @@ gboolean parse_pixel_range(const gchar *dim, unsigned int *lower_ret,
 		lower[1] = 0;
 		fixed_ratio = TRUE;
 	}
+	else {
+		return FALSE;
+	}
 	if (lower[0] > 65535 || lower[1] > 65535 || upper[0] > 65535 || upper[1] > 65535)
 		return FALSE;
 	if (lower_ret == NULL || upper_ret == NULL || fixed_ratio_ret == NULL)
 		return TRUE;
+	if (upper[0] < lower[0] || upper[1] < lower[1])
+		return FALSE;
 	lower_ret[0] = lower[0];
 	lower_ret[1] = lower[1];
 	upper_ret[0] = upper[0];
