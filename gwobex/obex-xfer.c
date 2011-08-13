@@ -508,7 +508,7 @@ void a_header_free(struct a_header *ah) {
     g_free(ah);
 }
 
-struct a_header *a_header_find(GSList *aheaders, uint8_t hi) {
+struct a_header *a_header_find(const GSList *aheaders, uint8_t hi) {
     while (aheaders) {
         struct a_header *ah = aheaders->data;
         if (ah->hi == hi)

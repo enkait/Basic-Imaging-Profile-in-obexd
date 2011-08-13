@@ -98,7 +98,7 @@ struct a_header *make_a_header(uint8_t hi, obex_headerdata_t hv,
 
 struct a_header *a_header_copy(struct a_header *ah);
 
-struct a_header *a_header_find(GSList *aheaders, uint8_t hi);
+struct a_header *a_header_find(const GSList *aheaders, uint8_t hi);
 
 struct gw_obex_xfer *gw_obex_xfer_new(struct gw_obex *ctx, gboolean async, int stream_fd);
 
