@@ -27,6 +27,7 @@
 #include "util.h"
 
 static uint8_t hdr_connid[] = { G_OBEX_HDR_CONNECTION, 1, 2, 3, 4 };
+static uint8_t hdr_name_empty[] = { G_OBEX_HDR_NAME, 0x00, 0x03 };
 static uint8_t hdr_name_ascii[] = { G_OBEX_HDR_NAME, 0x00, 0x0b,
 				0x00, 'f', 0x00, 'o', 0x00, 'o',
 				0x00, 0x00 };
@@ -258,6 +259,21 @@ static void test_decode_header_name_ascii(void)
 	g_obex_header_free(header);
 }
 
+static void test_decode_header_name_empty(void)
+{
+	GObexHeader *header;
+	size_t parsed;
+	GError *err = NULL;
+
+	header = g_obex_header_decode(hdr_name_empty, sizeof(hdr_name_empty),
+					G_OBEX_DATA_REF, &parsed, &err);
+	g_assert_no_error(err);
+
+	g_assert_cmpuint(parsed, ==, sizeof(hdr_name_empty));
+
+	g_obex_header_free(header);
+}
+
 static void test_decode_header_name_umlaut(void)
 {
 	GObexHeader *header;
@@ -412,6 +428,8 @@ int main(int argc, char *argv[])
 
 	g_test_add_func("/gobex/test_decode_header_connid",
 						test_decode_header_connid);
+	g_test_add_func("/gobex/test_decode_header_name_empty",
+					test_decode_header_name_empty);
 	g_test_add_func("/gobex/test_decode_header_name_ascii",
 					test_decode_header_name_ascii);
 	g_test_add_func("/gobex/test_decode_header_name_umlaut",
