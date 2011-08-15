@@ -178,7 +178,6 @@ static int feed_next_header(void *object, uint8_t hi, obex_headerdata_t hv,
 			return -ENOENT;
 
 		data->att_path = get_att_dir(pi->image);
-		free_pushed_image(pi);
 
 		if (data->att_path == NULL)
 			return -ENOMEM;
