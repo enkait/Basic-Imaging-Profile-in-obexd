@@ -301,7 +301,8 @@ DBusMessage *put_modified_image(DBusConnection *connection,
 		DBusMessage *message, void *user_data)
 {
 	struct session_data *session = user_data;
-	char *image_path = NULL, *encoding = NULL, *transform = NULL;
+	char *image_path, *encoding, *transform;
+	char *remote_image;
 	int fd, err;
 	struct image_attributes *attr = g_new0(struct image_attributes, 1);
 	GString *new_image_path = NULL;
@@ -346,8 +347,10 @@ DBusMessage *put_modified_image(DBusConnection *connection,
 		goto cleanup;
 	}
 
+	remote_image = g_path_get_basename(image_path);
+
 	reply = put_transformed_image(message, session, new_image_path->str,
-							image_path, transform);
+							remote_image, transform);
 
 cleanup:
 	free_image_attributes(attr);
@@ -358,7 +361,7 @@ DBusMessage *put_image(DBusConnection *connection,
 					DBusMessage *message, void *user_data)
 {
 	struct session_data *session = user_data;
-	char *image_path = NULL;
+	char *image_path, *remote_image;
 	DBusMessage *reply;
 
 	if (dbus_message_get_args(message, NULL,
@@ -373,7 +376,9 @@ DBusMessage *put_image(DBusConnection *connection,
 		goto cleanup;
 	}
 
-	reply = put_transformed_image(message, session, image_path, image_path, NULL);
+	remote_image = g_path_get_basename(image_path);
+
+	reply = put_transformed_image(message, session, image_path, remote_image, NULL);
 cleanup:
 	return reply;
 }
