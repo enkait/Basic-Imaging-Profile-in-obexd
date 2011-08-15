@@ -30,51 +30,30 @@
 #define HANDLE_LEN 7
 #define HANDLE_LIMIT 10000000
 
-const char *att_suf = "_att";
-const char *default_name = "image";
-static const gchar *valid_name_chars="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+static const char *att_suf = "_att";
+static const char *default_name = "image";
 static const gchar rep_char='_';
 
 uint8_t *encode_img_handle(const char *data, unsigned int length, unsigned int *newsize) {
-	gsize newlen;
-	uint8_t *utf16buf = (uint8_t *) g_convert(data, length,
-					"UTF16BE", "UTF8", NULL, &newlen, NULL);
-	uint8_t *res;
-	newlen += 2;
+	uint8_t *utf16buf;
+	if (length == 0) {
+		*newsize = 0;
+		return NULL;
+	}
+	utf16buf = (uint8_t *) g_convert(data, length,
+					"UTF16BE", "UTF8", NULL, newsize, NULL);
 
 	if (utf16buf == NULL)
 		return NULL;
 
-	res = g_malloc(newlen);
-	g_memmove(res, utf16buf, newlen);
-	res[newlen-2] = '\0';
-	res[newlen-1] = '\0';
-	g_free(utf16buf);
-
-	printf("encode_img_handle newlen = %d\n", newlen);
-	*newsize = newlen;
-	return (uint8_t *) res;
+	*newsize += 2;
+	return utf16buf;
 }
 
 char *decode_img_handle(const uint8_t *data, unsigned int length, unsigned int *newsize) {
 	gsize size;
 	char *handle;
 	unsigned int i;
-	//for (j = 0; j <= length - 3; j++) {
-	//	for (i = 0; i < j; i++) {
-	//		printf("(data+2)[i] = (%c,%x)\n", (data+2)[i], (data+2)[i]);
-	//	}
-	//	handle = g_utf16_to_utf8((gunichar2 *) (data + 2), j, NULL, &size, NULL);
-		/*
-		printf("size of decoded image handle: %ld\n", size);
-		handle = g_convert((char *) data + 2, j,
-					"UTF8", "UTF16BE", NULL, NULL, NULL);
-		if (handle != NULL) {
-			printf("handle = %p\n", handle);
-			size = strlen(handle);
-			printf("size of decoded image handle: %ld\n", size);
-		}*/
-	//}
 
 	if (length == 0) {
 		*newsize = 0;
@@ -101,27 +80,23 @@ char *decode_img_handle(const uint8_t *data, unsigned int length, unsigned int *
 }
 
 uint8_t *encode_img_descriptor(const char *data, unsigned int length, unsigned int *newsize) {
-	uint16_t len = length;
-	uint8_t *buf = g_try_malloc(2+length);
-	len = GUINT16_TO_BE(len);
+	uint8_t *buf = g_try_malloc(length);
 	if(!buf)
 		return NULL;
-	g_memmove(buf, &len, 2);
-	g_memmove(buf+2, data, length);
-	*newsize = length+2;
+	g_memmove(buf, data, length);
+	*newsize = length;
 	return buf;
 }
 
 char *decode_img_descriptor(const uint8_t *data, unsigned int length, unsigned int *newsize) {
 	char *buf;
-	printf("%u\n", length);
-	buf = g_try_malloc(length-2);
+	buf = g_try_malloc(length);
 
 	if (buf == NULL)
 		return NULL;
 
-	g_memmove(buf, data+2, length-2);
-	*newsize = length-2;
+	g_memmove(buf, data, length);
+	*newsize = length;
 	return buf;
 }
 
@@ -178,6 +153,7 @@ struct image_attributes *get_image_attributes(const char *image_file, int *err)
 	attr->height = MagickGetImageHeight(wand);
 	MagickGetImageLength(wand, &size);
 	attr->length = (unsigned long) size;
+	wand = DestroyMagickWand(wand);
 	MagickWandTerminus();
 
 	if (err)
@@ -261,13 +237,13 @@ gboolean parse_pixel_range(const gchar *dim, unsigned int *lower_ret,
 	unsigned int lower[2], upper[2];
 	gboolean fixed_ratio = FALSE;
 	if (!regex_initialized) {
-		regcomp(&no_range, "^([[:digit:]]+)\\*([[:digit:]]+)$",
+		regcomp(&no_range, "^([[:digit:]]{1,5})\\*([[:digit:]]{1,5})$",
 							REG_EXTENDED);
-		regcomp(&range, "^([[:digit:]]+)\\*([[:digit:]]+)"
-				"-([[:digit:]]+)\\*([[:digit:]]+)$",
+		regcomp(&range, "^([[:digit:]]{1,5})\\*([[:digit:]]{1,5})"
+				"-([[:digit:]]{1,5})\\*([[:digit:]]{1,5})$",
 							REG_EXTENDED);
-		regcomp(&range_fixed, "^([[:digit:]]+)\\*\\*"
-				"-([[:digit:]]+)\\*([[:digit:]]+)$",
+		regcomp(&range_fixed, "^([[:digit:]]{1,5})\\*\\*"
+				"-([[:digit:]]{1,5})\\*([[:digit:]]{1,5})$",
 							REG_EXTENDED);
 		regex_initialized = 1;
 	}
@@ -290,10 +266,15 @@ gboolean parse_pixel_range(const gchar *dim, unsigned int *lower_ret,
 		lower[1] = 0;
 		fixed_ratio = TRUE;
 	}
+	else {
+		return FALSE;
+	}
 	if (lower[0] > 65535 || lower[1] > 65535 || upper[0] > 65535 || upper[1] > 65535)
 		return FALSE;
 	if (lower_ret == NULL || upper_ret == NULL || fixed_ratio_ret == NULL)
 		return TRUE;
+	if (upper[0] < lower[0] || upper[1] < lower[1])
+		return FALSE;
 	lower_ret[0] = lower[0];
 	lower_ret[1] = lower[1];
 	upper_ret[0] = upper[0];
@@ -343,20 +324,42 @@ char *parse_transform(const char *transform) {
 }
 
 char *parse_transform_list(const char *transform) {
-	char **args = NULL, *arg = NULL;
+	char **args = NULL, **arg = NULL;
+	gboolean used[3] = { FALSE, FALSE, FALSE };
 	if (transform == NULL)
 		return NULL;
 	if (strlen(transform) == 0)
 		return NULL;
 	args = g_strsplit(transform, " ", 0);
-	for (arg = *args; arg != NULL; arg++) {
-		if (!verify_transform(arg)) {
+	for (arg = args; *arg != NULL; arg++) {
+		char *t = *arg;
+		if (!verify_transform(t)) {
 			g_strfreev(args);
 			return NULL;
+		}
+		switch (t[0]) {
+		case 's':
+			if (used[0])
+				goto failure;
+			used[0] = TRUE;
+			break;
+		case 'c':
+			if (used[1])
+				goto failure;
+			used[1] = TRUE;
+			break;
+		case 'f':
+			if (used[2])
+				goto failure;
+			used[2] = TRUE;
+			break;
 		}
 	}
 	g_strfreev(args);
 	return g_strdup(transform);
+failure:
+	g_strfreev(args);
+	return NULL;
 }
 
 char *parse_unsignednumber(const char *size) {
@@ -461,22 +464,6 @@ failed:
 	return FALSE;
 }
 
-/*gboolean parse_bip_header(char **header, unsigned int *hdr_len,
-				uint8_t hi, const uint8_t *data, unsigned int hlen) {
-	g_assert (header != NULL && hdr_len != NULL);
-	switch (hi) {
-	case IMG_DESC_HDR:
-		*header = decode_img_descriptor(data, hlen, hdr_len);
-		break;
-	case IMG_HANDLE_HDR:
-		*header = decode_img_handle(data, hlen, hdr_len);
-		break;
-	}
-	if (*header == NULL)
-		return FALSE;
-	return TRUE;
-}*/
-
 void parse_bip_user_headers(const struct obex_session *os,
 		obex_object_t *obj, char **desc_hdr, unsigned int *desc_hdr_len,
 		char **handle_hdr, unsigned int *handle_hdr_len)
@@ -499,9 +486,7 @@ void parse_bip_user_headers(const struct obex_session *os,
 
 	while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen));
 	OBEX_ObjectReParseHeaders(os->obex, obj);
-	printf("header search: %d %d\n", IMG_DESC_HDR, IMG_HANDLE_HDR);
 	while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen)) {
-		printf("header: %d %d %d\n", hi, IMG_DESC_HDR, IMG_HANDLE_HDR);
 		switch (hi) {
 		case IMG_DESC_HDR:
 			if (desc_hdr == NULL || desc_hdr_len == NULL)
@@ -510,7 +495,6 @@ void parse_bip_user_headers(const struct obex_session *os,
 								desc_hdr_len);
 			break;
 		case IMG_HANDLE_HDR:
-			printf("handle header\n");
 			if (handle_hdr == NULL || handle_hdr_len == NULL)
 				continue;
 			*handle_hdr = decode_img_handle(hd.bs, hlen,
@@ -523,28 +507,8 @@ void parse_bip_user_headers(const struct obex_session *os,
 
 char *get_att_dir(const char *image_path) {
 	GString *att_path = g_string_new(image_path);
-	printf("img Path :%s\n", image_path);
 	att_path = g_string_append(att_path, att_suf);
 	return g_string_free(att_path, FALSE);
-}
-
-static char *filter_name(const char *name) {
-	char *new_name;
-	if (name == NULL)
-		new_name = g_strdup(default_name);
-	else
-		new_name = g_strdup(name);
-	printf("%p\n", new_name);
-	return g_strcanon(new_name, valid_name_chars, rep_char);
-}
-
-static char *append_number(const char *path, unsigned int number) {
-	GString *new_path;
-	if (number > 10000000)
-		return NULL;
-	new_path = g_string_new(path);
-	g_string_append_printf(new_path, "_%u", number);
-	return g_string_free(new_path, FALSE);
 }
 
 struct a_header *create_handle(const char *handle) {
@@ -554,29 +518,59 @@ struct a_header *create_handle(const char *handle) {
 	return ah;
 }
 
-char *safe_rename(const char *name, const char *folder,
-							const char *orig_path)
-{
-	char *new_name = filter_name(name);
-	char *new_path = g_build_filename(folder, new_name, NULL);
-	char *test_path = g_strdup(new_path);
-	int lock_fd = -1, number = 1;
-	
-	printf("test_path: %s %s %s %s\n", test_path, folder, new_name, name);
+char *insert_number(const char *path, unsigned int number) {
+	GString *new_path;
+	char *spl;
+	if (number > 10000000)
+		return NULL;
+	spl = g_utf8_strchr(path, -1, '.');
+	if (spl == NULL)
+		new_path = g_string_new(path);
+	else
+		new_path = g_string_new_len(path, spl-path);
+	g_string_append_printf(new_path, "_%u", number);
 
-	while((lock_fd = open(test_path, O_CREAT | O_EXCL, 0600)) < 0 &&
-			errno == EEXIST) {
+	if (spl != NULL)
+		new_path = g_string_append(new_path, spl);
+	return g_string_free(new_path, FALSE);
+}
+
+char *safe_rename(const char *name, const char *folder, const char *orig_path)
+{
+	char *new_name, *new_path, *test_path = NULL, *dest_folder;
+	int lock_fd = -1, number = 1;
+	gboolean root;
+
+	if (name == NULL || strlen(name) == 0)
+		new_name = g_strdup(default_name);
+	else
+		new_name = (char *) name;
+
+	new_path = g_build_filename(folder, name, NULL);
+
+	dest_folder = g_path_get_dirname(new_path);
+	root = g_strcmp0(folder, dest_folder);
+
+	if (!root)
+		goto cleanup;
+
+	test_path = g_strdup(new_path);
+
+	while ((lock_fd = open(test_path, O_CREAT | O_EXCL, 0600)) < 0 &&
+							errno == EEXIST) {
 		number++;
 		g_free(test_path);
-		test_path = append_number(new_path, number);
+		test_path = insert_number(new_path, number);
 		if (test_path == NULL)
 			goto cleanup;
 	}
+
 	if (lock_fd < 0) {
 		g_free(test_path);
 		test_path = NULL;
 		goto cleanup;
 	}
+
 	if (rename(orig_path, test_path) < 0) {
 		g_free(test_path);
 		test_path = NULL;
@@ -584,7 +578,8 @@ char *safe_rename(const char *name, const char *folder,
 	close(lock_fd);
 
 cleanup:
-	g_free(new_name);
+	if (name == NULL || strlen(name) == 0)
+		g_free(new_name);
 	g_free(new_path);
 	return test_path;
 }
@@ -598,7 +593,6 @@ char *get_null_terminated(char *buffer, int len) {
 		newbuffer = g_try_malloc(len + 1);
 		g_memmove(newbuffer, buffer, len);
 		newbuffer[len]='\0';
-		printf("null terminating\n");
 	}
 	else {
 		newbuffer = g_memdup(buffer, len);

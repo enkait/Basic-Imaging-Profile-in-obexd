@@ -463,23 +463,7 @@ failed:
 		*err = -EBADR;
 	return FALSE;
 }
-/*
-gboolean parse_bip_header(char **header, unsigned int *hdr_len,
-				uint8_t hi, const uint8_t *data, unsigned int hlen) {
-	g_assert (header != NULL && hdr_len != NULL);
-	switch (hi) {
-	case IMG_DESC_HDR:
-		*header = decode_img_descriptor(data, hlen, hdr_len);
-		break;
-	case IMG_HANDLE_HDR:
-		*header = decode_img_handle(data, hlen, hdr_len);
-		break;
-	}
-	if (*header == NULL)
-		return FALSE;
-	return TRUE;
-}
-*/
+
 void parse_client_user_headers(const GSList *aheaders,
 				char **desc_hdr,
 				unsigned int *desc_hdr_len,
@@ -578,15 +562,13 @@ char *insert_number(const char *path, unsigned int number) {
 	else
 		new_path = g_string_new_len(path, spl-path);
 	g_string_append_printf(new_path, "_%u", number);
-	printf("%p\n", new_path);
 
 	if (spl != NULL)
 		new_path = g_string_append(new_path, spl);
 	return g_string_free(new_path, FALSE);
 }
 
-char *safe_rename(const char *name, const char *folder,
-							const char *orig_path)
+char *safe_rename(const char *name, const char *folder, const char *orig_path)
 {
 	char *new_name, *new_path, *test_path = NULL, *dest_folder;
 	int lock_fd = -1, number = 1;
@@ -650,3 +632,36 @@ char *get_null_terminated(char *buffer, int len) {
 	}
 	return newbuffer;
 }
+
+ssize_t add_reply_handle(void *buf, size_t mtu, uint8_t *hi, int handle)
+{
+	GString *handle_str = g_string_new("");
+	uint8_t *handle_hdr;
+	unsigned int handle_hdr_len;
+
+	if (handle < -1 || handle >= HANDLE_LIMIT) {
+		g_string_free(handle_str, TRUE);
+		return -EBADR;
+	}
+	if (handle != -1) {
+		g_string_append_printf(handle_str, "%07d", handle);
+	}
+	handle_hdr = encode_img_handle(handle_str->str, handle_str->len,
+							&handle_hdr_len);
+	g_string_free(handle_str, TRUE);
+
+	if (handle_hdr == NULL)
+		return -ENOMEM;
+
+	*hi = IMG_HANDLE_HDR;
+
+	if (handle_hdr_len > mtu) {
+		g_free(handle_hdr);
+		return -ENOMEM;
+	}
+	printf("%p %p %d\n", buf, handle_hdr, handle_hdr_len);
+	g_memmove(buf, handle_hdr, handle_hdr_len);
+	g_free(handle_hdr);
+	return handle_hdr_len;
+}
+

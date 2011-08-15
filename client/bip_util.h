@@ -61,6 +61,7 @@ char *safe_rename(const char *name, const char *folder,
 struct a_header *create_handle(const char *handle);
 char *insert_number(const char *path, unsigned int number);
 char *get_null_terminated(char *buffer, int len);
+ssize_t add_reply_handle(void *buf, size_t mtu, uint8_t *hi, int handle);
 void parse_client_user_headers(const GSList *aheaders,
 				char **desc_hdr,
 				unsigned int *desc_hdr_len,
