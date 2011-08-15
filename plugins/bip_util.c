@@ -573,7 +573,7 @@ char *safe_rename(const char *name, const char *folder, const char *orig_path,
 		test_path = insert_number(new_path, number);
 		if (test_path == NULL) {
 			if (err != NULL)
-				*err = -errno;
+				*err = -EBADR;
 			goto cleanup;
 		}
 	}
@@ -582,7 +582,7 @@ char *safe_rename(const char *name, const char *folder, const char *orig_path,
 		g_free(test_path);
 		test_path = NULL;
 		if (err != NULL)
-			*err = -EBADR;
+			*err = -errno;
 		goto cleanup;
 	}
 
