@@ -779,8 +779,9 @@ write:
 	/* Flush on EOS and start  */
 	if (os->body_streamed && os->pending == 0) {
 		int ret = 0;
+
 		if (os->driver->flush != NULL)
-			ret = os->driver->flush(os->object) > 0 ? -EAGAIN : 0;
+			ret = os->driver->flush(os->object);
 
 		if (ret < 0)
 			return ret;
@@ -1243,12 +1244,18 @@ static void cmd_put(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 
 	/* Flush immediatly since there is nothing to write so the driver
 	   has a chance to do something before we reply */
-	if (os->object && os->driver && os->driver->flush &&
-					os->driver->flush(os->object) > 0) {
-		OBEX_SuspendRequest(obex, obj);
-		os->obj = obj;
-		os->driver->set_io_watch(os->object, handle_async_io, os);
-		return;
+	if (os->object && os->driver && os->driver->flush) {
+		int ret = os->driver->flush(os->object);
+		if (ret < 0 && ret != -EAGAIN) {
+			os_set_response(obj, ret);
+			return;
+		}
+		if (ret == -EAGAIN) {
+			OBEX_SuspendRequest(obex, obj);
+			os->obj = obj;
+			os->driver->set_io_watch(os->object, handle_async_io, os);
+			return;
+		}
 	}
 
 	/* Get response headers if flush doesn't suspend */
