@@ -196,16 +196,16 @@ static ssize_t imgimg_get_next_header(void *object, void *buf, size_t mtu,
 
 	DBG("");
 
+	if (data->handle_sent) {
+		*hi = OBEX_HDR_EMPTY;
+		return 0;
+	}
+
 	g_assert(data->finished_cb != NULL);
 
 	if ((err = data->finished_cb(data->context, data->path, &handle)) < 0)
 		return err;
 	data->handle = handle;
-
-	if (data->handle_sent) {
-		*hi = OBEX_HDR_EMPTY;
-		return 0;
-	}
 
 	if ((len = add_reply_handle(buf, mtu, hi, data->handle)) < 0) {
 		return len;
