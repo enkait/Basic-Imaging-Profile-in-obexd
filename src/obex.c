@@ -986,16 +986,7 @@ static void cmd_setpath(struct obex_session *os,
 	os_set_response(obj, err);
 }
 
-static void obex_reset_object(struct obex_session *os, obex_object_t *obj)
-{
-	uint32_t hlen;
-	uint8_t hi;
-	obex_headerdata_t hd;
-	while (OBEX_ObjectGetNextHeader(os->obex, obj, &hi, &hd, &hlen));
-	g_assert(OBEX_ObjectReParseHeaders(os->obex, obj));
-}
-
-int obex_feed_headers(struct obex_session *os)
+static int obex_feed_headers(struct obex_session *os)
 {
 	uint32_t hlen;
 	uint8_t hi;
@@ -1006,7 +997,7 @@ int obex_feed_headers(struct obex_session *os)
 
 	if (os->driver->feed_next_header == NULL)
 		return 0;
-	obex_reset_object(os, os->obj);
+	obex_reset_object(os->obex, os->obj);
 	while (OBEX_ObjectGetNextHeader(os->obex, os->obj, &hi, &hd, &hlen)) {
 		err = os->driver->feed_next_header(os->object, hi, hd, hlen);
 
@@ -1042,7 +1033,6 @@ int obex_get_stream_start(struct obex_session *os, const char *filename)
 		os->buf = g_malloc0(os->tx_mtu);
 
 	os->body_streamed = FALSE;
-
 	if ((err = obex_feed_headers(os)) < 0) {
 		error("obex_feed_headers(%p): %s (%d)", os, strerror(-err), -err);
 		return err;
