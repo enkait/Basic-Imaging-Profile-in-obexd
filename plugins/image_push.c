@@ -123,15 +123,13 @@ void free_image_push_session(struct image_push_session *session) {
 	g_free(session);
 }
 
-struct pushed_image *get_pushed_image(struct image_push_session *session,
-					int handle)
+struct pushed_image *get_pushed_image(GSList *image_list, int handle)
 {
-	GSList *images = session->pushed_images;
-	while (images != NULL) {
-		struct pushed_image *image = images->data;
+	while (image_list != NULL) {
+		struct pushed_image *image = image_list->data;
 		if (image->handle == handle)
 			return image;
-		images = g_slist_next(images);
+		image_list = g_slist_next(image_list);
 	}
 	return NULL;
 }

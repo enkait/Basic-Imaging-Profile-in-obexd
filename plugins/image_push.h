@@ -43,6 +43,6 @@ struct image_push_session {
 int get_new_handle(struct image_push_session *ips);
 void free_image_push_session(struct image_push_session *session);
 int obex_handle_write(struct obex_session *os, obex_object_t *obj, const char *data, unsigned int size);
-struct pushed_image *get_pushed_image(struct image_push_session *session,
+struct pushed_image *get_pushed_image(GSList *image_list,
 					int handle);
 void free_pushed_image(struct pushed_image *pi);
