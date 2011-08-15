@@ -112,6 +112,13 @@ static const uint8_t IMAGE_PUSH_TARGET[TARGET_SIZE] = {
 
 static const char * bip_root="/tmp/bip/";
 
+void free_pushed_image(struct pushed_image *pi) {
+	if (pi == NULL)
+		return;
+	g_free(pi->image);
+	g_free(pi);
+}
+
 void free_image_push_session(struct image_push_session *session) {
 	g_free(session);
 }
