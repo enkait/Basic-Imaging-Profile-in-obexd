@@ -170,6 +170,8 @@ static int feed_next_header(void *object, uint8_t hi, obex_headerdata_t hv,
 		struct pushed_image *pi;
 		if (data->handle < 0)
 			return -EBADR;
+		if (data->name == NULL)
+			return -EBADR;
 
 		if ((pi = get_pushed_image(session->pushed_images,
 						data->handle)) == NULL)
