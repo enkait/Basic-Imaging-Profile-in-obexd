@@ -1266,6 +1266,10 @@ static void cmd_put(struct obex_session *os, obex_t *obex, obex_object_t *obj)
 		os->driver->set_io_watch(os->object, handle_async_io, os);
 		return;
 	}
+	if (err < 0) {
+		os_set_response(obj, err);
+		return;
+	}
 }
 
 static void cmd_action(struct obex_session *os, obex_t *obex,
