@@ -185,7 +185,13 @@ static ssize_t imgimg_get_next_header(void *object, void *buf, size_t mtu,
 {
 	struct imgimg_data *data = object;
 	ssize_t len;
+	int err, handle;
 	printf("imgimg_get_next_header %d\n", data->handle);
+	g_assert(data->finished_cb != NULL);
+
+	if ((err = data->finished_cb(data->context, data->path, &handle)) < 0)
+		return err;
+	data->handle = handle;
 
 	if (data->handle_sent) {
 		*hi = OBEX_HDR_EMPTY;
@@ -198,22 +204,6 @@ static ssize_t imgimg_get_next_header(void *object, void *buf, size_t mtu,
 	}
 	data->handle_sent = TRUE;
 	return len;
-}
-
-static int imgimg_flush(void *object)
-{
-	struct imgimg_data *data = object;
-	int err, handle;
-	printf("imgimg_flush\n");
-	if (data->finished_cb != NULL)
-		if ((err = data->finished_cb(data->context, data->path,
-								&handle)) < 0) {
-			printf("err = %d\n", err);
-			return err;
-		}
-	printf("handle = %d\n", handle);
-	data->handle = handle;
-	return 0;
 }
 
 int imgimg_close(void *object)
@@ -244,7 +234,6 @@ static struct obex_mime_type_driver imgimg = {
 	.open = image_push_open,
 	.close = imgimg_close,
 	.write = imgimg_write,
-	.flush = imgimg_flush,
 	.get_next_header = imgimg_get_next_header,
 };
 
@@ -255,7 +244,6 @@ static struct obex_mime_type_driver imgimg_rd = {
 	.open = remote_display_open,
 	.close = imgimg_close,
 	.write = imgimg_write,
-	.flush = imgimg_flush,
 	.get_next_header = imgimg_get_next_header,
 };
 
