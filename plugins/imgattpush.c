@@ -120,6 +120,9 @@ static void *imgattpush_open(const char *name, int oflag, mode_t mode,
 {
 	struct imgattpush_data *data = NULL;
 	printf("imgattpush_open\n");
+
+	if (err != NULL)
+		*err = 0;
 	
 	data = g_new0(struct imgattpush_data, 1);
 	data->context = context;
