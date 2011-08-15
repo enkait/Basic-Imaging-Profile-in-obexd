@@ -415,9 +415,11 @@ gboolean make_modified_image(const char *image_path, const char *modified_path,
 	if (!MagickWriteImage(wand, modified_path))
 		goto failed;
 
+	wand = DestroyMagickWand(wand);
 	MagickWandTerminus();
 	return TRUE;
 failed:
+	wand = DestroyMagickWand(wand);
 	MagickWandTerminus();
 	if (err != NULL)
 		*err = -EBADR;
@@ -455,6 +457,7 @@ gboolean make_thumbnail(const char *image_path, const char *modified_path,
 	if (!MagickWriteImage(wand, modified_path))
 		goto failed;
 	
+	wand = DestroyMagickWand(wand);
 	MagickWandTerminus();
 	return TRUE;
 failed:
@@ -568,11 +571,15 @@ char *insert_number(const char *path, unsigned int number) {
 	return g_string_free(new_path, FALSE);
 }
 
-char *safe_rename(const char *name, const char *folder, const char *orig_path)
+char *safe_rename(const char *name, const char *folder, const char *orig_path,
+								int *err)
 {
 	char *new_name, *new_path, *test_path = NULL, *dest_folder;
 	int lock_fd = -1, number = 1;
 	gboolean root;
+
+	if (err != NULL)
+		*err = 0;
 
 	if (name == NULL || strlen(name) == 0)
 		new_name = g_strdup(default_name);
@@ -584,8 +591,11 @@ char *safe_rename(const char *name, const char *folder, const char *orig_path)
 	dest_folder = g_path_get_dirname(new_path);
 	root = g_strcmp0(folder, dest_folder);
 
-	if (!root)
+	if (!root) {
+		if (err != NULL)
+			*err = -EBADR;
 		goto cleanup;
+	}
 
 	test_path = g_strdup(new_path);
 
@@ -594,13 +604,18 @@ char *safe_rename(const char *name, const char *folder, const char *orig_path)
 		number++;
 		g_free(test_path);
 		test_path = insert_number(new_path, number);
-		if (test_path == NULL)
+		if (test_path == NULL) {
+			if (err != NULL)
+				*err = -errno;
 			goto cleanup;
+		}
 	}
 
 	if (lock_fd < 0) {
 		g_free(test_path);
 		test_path = NULL;
+		if (err != NULL)
+			*err = -EBADR;
 		goto cleanup;
 	}
 

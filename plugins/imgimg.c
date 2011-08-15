@@ -114,12 +114,13 @@ static int pushcb(void *context, char *path, int *handle_out) {
 	struct image_push_session *session = context;
 	struct pushed_image *img = NULL;
 	char *new_path = NULL;
+	int err;
 	printf("pushcb %p %s\n", context, path);
 	printf("%s %s\n", session->os->name, session->bip_root);
 
 	if ((new_path = safe_rename(session->os->name, session->bip_root,
-								path)) == NULL)
-		return -errno;
+							path, &err)) == NULL)
+		return err;
 	img = g_new0(struct pushed_image, 1);
 	img->handle = get_new_handle(session);
 

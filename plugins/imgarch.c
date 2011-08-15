@@ -627,7 +627,7 @@ static void rename_image(struct sarchive_data *data, int err) {
 	}
 	if (data->cur_prop != NULL)
 		name = data->cur_prop->name;
-	new_path = safe_rename(name, bip_dir, data->cur_path);
+	new_path = safe_rename(name, bip_dir, data->cur_path, &err);
 	if (new_path == NULL) {
 		unlink(data->cur_path);
 		get_next_image(data, 0);

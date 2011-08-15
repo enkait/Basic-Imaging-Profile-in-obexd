@@ -190,6 +190,7 @@ static int imgattpush_flush(void *object) {
 	struct imgattpush_data *data = object;
 	struct stat file_stat;
 	char *new_path;
+	int err;
 
 	if (mkdir(data->att_path, 0700) < 0) {
 		if (-errno != EEXIST)
@@ -200,8 +201,8 @@ static int imgattpush_flush(void *object) {
 			return -EBADR;
 	}
 
-	if ((new_path = safe_rename(data->name, data->att_path, data->path))
-								== NULL) {
+	if ((new_path = safe_rename(data->name, data->att_path, data->path,
+							&err)) == NULL) {
 		return -EBADR;
 	}
 	g_free(new_path);
