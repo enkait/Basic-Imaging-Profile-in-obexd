@@ -69,39 +69,31 @@ static char *get_att_path(const char *image_path, const char *name, int *err) {
 	DIR *att_dir = opendir(att_dir_path);
 	char *ret = NULL;
 
-	printf("%s\n", att_dir_path);
-
 	if (att_dir == NULL) {
 		if (err == NULL)
 			*err = -ENOENT;
 		goto done;
 	}
-	
+
 	while ((file = readdir(att_dir)) != NULL) {
 		char *path = g_build_filename(att_dir_path, file->d_name, NULL);
-		printf("path: %s\n", path);
+
 		if (lstat(path, &file_stat) < 0) {
 			g_free(path);
 			continue;
 		}
 		
-		printf("%d\n", file_stat.st_mode);
-
 		if (!S_ISREG(file_stat.st_mode)) {
 			g_free(path);
 			continue;
 		}
 
-		printf("porownojemy: %s %s\n", file->d_name, name);
-
 		if (g_str_equal(file->d_name, name)) {
-			printf("attachment path: %s\n", path);
 			ret = path;
 			goto done;
 		}
 		g_free(path);
 	}
-	printf("attachment not found\n");
 
 done:
 	g_free(att_dir_path);
@@ -134,7 +126,6 @@ static int feed_next_header(void *object, uint8_t hi, obex_headerdata_t hv,
 
 	if (data == NULL)
 		return -EBADR;
-	printf("feed_next_header\n");
 
 	if (hi == IMG_HANDLE_HDR) {
 		unsigned int hdr_len;
@@ -179,11 +170,8 @@ static int feed_next_header(void *object, uint8_t hi, obex_headerdata_t hv,
 static ssize_t imgattpull_read(void *object, void *buf, size_t count)
 {
 	ssize_t ret;
-	
-	printf("imgattpull_read %p %p %u\n", object, buf, count);
-
 	ret = read(GPOINTER_TO_INT(object), buf, count);
-	printf("read %u\n", ret);
+
 	if (ret < 0)
 		return -errno;
 

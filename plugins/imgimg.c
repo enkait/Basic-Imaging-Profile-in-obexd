@@ -180,7 +180,8 @@ static void *remote_display_open(const char *name, int oflag, mode_t mode,
 }
 
 static ssize_t imgimg_get_next_header(void *object, void *buf, size_t mtu,
-								uint8_t *hi) {
+								uint8_t *hi)
+{
 	struct imgimg_data *data = object;
 	ssize_t len;
 	printf("imgimg_get_next_header %d\n", data->handle);
