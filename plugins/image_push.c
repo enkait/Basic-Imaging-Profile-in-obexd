@@ -162,13 +162,11 @@ static int image_push_get(struct obex_session *os, obex_object_t *obj,
 
 static int image_push_chkput(struct obex_session *os, void *user_data)
 {
-	//struct image_push_session *ips = user_data;
 	int ret;
 	printf("IMAGE PUSH CHKPUT\n");
 
 	ret = obex_put_stream_start(os, "");
 	return ret;
-	//return 0;
 }
 
 int obex_handle_write(struct obex_session *os, obex_object_t *obj, const char *data, unsigned int size) {
@@ -191,136 +189,11 @@ int get_new_handle(struct image_push_session *session) {
 	return session->next_handle++;
 }
 
-struct att_desc {
-	char *name;
-};
-
-static void att_element(GMarkupParseContext *ctxt,
-		const gchar *element,
-		const gchar **names,
-		const gchar **values,
-		gpointer user_data,
-		GError **gerr)
-{
-	struct att_desc *desc = user_data;
-	gchar **key;
-
-	printf("element: %s\n", element);
-	printf("names\n");
-
-	if (g_str_equal(element, "attachment") != TRUE)
-		return;
-
-	printf("names: %p\n", names);
-	for (key = (gchar **) names; *key; key++, values++) {
-		printf("key: %s\n", *key);
-		if (g_str_equal(*key, "name")) {
-			desc->name = g_strdup(*values);
-			printf("name: %s\n", desc->name);
-		}
-	}
-}
-
-static const GMarkupParser handles_desc_parser = {
-	att_element,
-	NULL,
-	NULL,
-	NULL,
-	NULL
-};
-
-static struct att_desc *parse_att_desc(char *data, unsigned int length)
-{
-	struct att_desc *desc = g_try_new0(struct att_desc, 1);
-	GMarkupParseContext *ctxt = g_markup_parse_context_new(&handles_desc_parser,
-			0, desc, NULL);
-	g_markup_parse_context_parse(ctxt, data, length, NULL);
-	g_markup_parse_context_free(ctxt);
-	return desc;
-}
-
 static int image_push_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 {
-	//struct pushed_image *img;
-	//printf("IMAGE PUSH PUT %s\n", os->name);
-	printf("%p\n", parse_att_desc);
+	DBG("");
 
-	printf("os->type = %s\n", os->type);
-	if (g_strcmp0(os->type, "x-bt/img-img") == 0) {
-		/*
-		OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE,
-						OBEX_RSP_PARTIAL_CONTENT);
-						*/
-	}
-	else if (g_strcmp0(os->type, "x-bt/img-thm") == 0) {
-		/*
-		int handle = parse_handle(ips->handle_hdr, ips->handle_hdr_len);
-		char *new_path, *name;
-		GString *thmname = NULL;
-
-		if (handle < 0)
-			return -EBADR;
-
-		img = get_pushed_image(ips, handle);
-
-		if (img == NULL)
-			return -EEXIST;
-
-		printf("path: %s\n", img->image);
-		name = g_path_get_basename(img->image);
-		thmname = g_string_new(name);
-		thmname = g_string_append(thmname, "_thm");
-		g_free(name);
-
-		if ((new_path = safe_rename(thmname->str, bip_root, ips->file_path))
-									== NULL) {
-			g_string_free(thmname, TRUE);
-			return -errno;
-		}
-		g_string_free(thmname, TRUE);
-		printf("newpath: %s\n", new_path);
-		*/
-	}
-	else if(g_strcmp0(os->type, "x-bt/img-attachment") == 0) {
-		/*
-		int handle = parse_handle(ips->handle_hdr, ips->handle_hdr_len);
-		char *att_path, *new_path;
-		struct stat file_stat;
-		struct att_desc *desc;
-		printf("handle: %s\n", ips->handle_hdr);
-		printf("%d\n", handle);
-		if (handle < 0)
-			return -EBADR;
-
-		img = get_pushed_image(ips, handle);
-
-		printf("%p\n", img);
-
-		if (img == NULL)
-			return -EEXIST;
-
-		att_path = get_att_dir(img->image);
-
-		printf("att_path = %s\n", att_path);
-
-		if (lstat(att_path, &file_stat) < 0) {
-			if (mkdir(att_path, 0700) < 0)
-				return -errno;
-		}
-		else if (!S_ISDIR(file_stat.st_mode))
-			return -EBADR;
-
-		printf("name: %s\n", os->name);
-
-		desc = parse_att_desc(ips->desc_hdr, ips->desc_hdr_len);
-
-		if ((new_path = safe_rename(desc->name, att_path, ips->file_path)) == NULL) {
-			return -errno;
-		}
-		*/
-	}
 	return 0;
-	//obex_put_stream_start(os, "");
 }
 
 static void image_push_disconnect(struct obex_session *os, void *user_data)
