@@ -93,6 +93,8 @@ static struct imgimg_data *imgimg_open(const char *name, int oflag, mode_t mode,
 	data->context = context;
 	data->handle = -1;
 
+	DBG("");
+
 	if (!name) {
 		if (err != NULL)
 			*err = -errno;
@@ -115,8 +117,8 @@ static int pushcb(void *context, char *path, int *handle_out) {
 	struct pushed_image *img = NULL;
 	char *new_path = NULL;
 	int err;
-	printf("pushcb %p %s\n", context, path);
-	printf("%s %s\n", session->os->name, session->bip_root);
+
+	DBG("");
 
 	if ((new_path = safe_rename(session->os->name, session->bip_root,
 							path, &err)) == NULL)
@@ -138,8 +140,11 @@ static int pushcb(void *context, char *path, int *handle_out) {
 static void *image_push_open(const char *name, int oflag, mode_t mode,
 		void *context, size_t *size, int *err)
 {
-	struct imgimg_data *data =
-		imgimg_open(name, oflag, mode, context, size, err);
+	struct imgimg_data *data;
+
+	DBG("");
+
+	data = imgimg_open(name, oflag, mode, context, size, err);
 	data->finished_cb = pushcb;
 	return data;
 }
@@ -148,8 +153,8 @@ static int remote_display_cb(void *context, char *path, int *handle_out) {
 	struct remote_display_session *session = context;
 	struct img_listing *il = NULL;
 	int err = 0, handle;
-	printf("pushcb %p %s\n", context, path);
-	printf("%s %s\n", session->os->name, session->dir);
+
+	DBG("");
 
 	handle = get_new_handle_rd(session);
 
@@ -166,7 +171,6 @@ static int remote_display_cb(void *context, char *path, int *handle_out) {
 	}
 	session->image_list = g_slist_append(session->image_list, il);
 	*handle_out = il->handle;
-	printf("handle: %d\n", *handle_out);
 cleanup:
 	return err;
 }
@@ -174,8 +178,11 @@ cleanup:
 static void *remote_display_open(const char *name, int oflag, mode_t mode,
 		void *context, size_t *size, int *err)
 {
-	struct imgimg_data *data =
-		imgimg_open(name, oflag, mode, context, size, err);
+	struct imgimg_data *data;
+
+	DBG("");
+
+	data = imgimg_open(name, oflag, mode, context, size, err);
 	data->finished_cb = remote_display_cb;
 	return data;
 }
@@ -186,7 +193,9 @@ static ssize_t imgimg_get_next_header(void *object, void *buf, size_t mtu,
 	struct imgimg_data *data = object;
 	ssize_t len;
 	int err, handle;
-	printf("imgimg_get_next_header %d\n", data->handle);
+
+	DBG("");
+
 	g_assert(data->finished_cb != NULL);
 
 	if ((err = data->finished_cb(data->context, data->path, &handle)) < 0)
@@ -199,7 +208,6 @@ static ssize_t imgimg_get_next_header(void *object, void *buf, size_t mtu,
 	}
 
 	if ((len = add_reply_handle(buf, mtu, hi, data->handle)) < 0) {
-		printf("LEN = %d\n", len);
 		return len;
 	}
 	data->handle_sent = TRUE;
@@ -209,6 +217,9 @@ static ssize_t imgimg_get_next_header(void *object, void *buf, size_t mtu,
 int imgimg_close(void *object)
 {
 	struct imgimg_data *data = object;
+
+	DBG("");
+
 	printf("imgimg_close\n");
 
 	if (close(data->fd) < 0)
@@ -220,7 +231,11 @@ int imgimg_close(void *object)
 ssize_t imgimg_write(void *object, const void *buf, size_t count)
 {
 	struct imgimg_data *data = object;
-	ssize_t ret = write(data->fd, buf, count);
+	ssize_t ret;
+
+	DBG("");
+
+	ret = write(data->fd, buf, count);
 	printf("imgimg_write\n");
 	if (ret < 0)
 		return -errno;
@@ -250,7 +265,11 @@ static struct obex_mime_type_driver imgimg_rd = {
 void *img_capabilities_open(const char *name, int oflag, mode_t mode,
 		void *context, size_t *size, int *err)
 {
-	GString *capabilities = g_string_new(CAPABILITIES_BEGIN);
+	GString *capabilities;
+
+	DBG("");
+
+	capabilities = g_string_new(CAPABILITIES_BEGIN);
 	capabilities = g_string_append(capabilities, IMAGE_FORMATS);
 	capabilities = g_string_append(capabilities, CAPABILITIES_END);
 
@@ -262,6 +281,7 @@ void *img_capabilities_open(const char *name, int oflag, mode_t mode,
 
 ssize_t img_capabilities_read(void *object, void *buf, size_t count)
 {
+	DBG("");
 	return string_read(object, buf, count);
 }
 
