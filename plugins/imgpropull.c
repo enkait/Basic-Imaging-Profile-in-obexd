@@ -144,6 +144,7 @@ static void *imgpropull_open(const char *name, int oflag, mode_t mode,
 	struct imgpropull_data *data = g_new0(struct imgpropull_data, 1);
 	
 	data->handle = -1;
+	data->context = context;
 
 	if (err != NULL)
 		*err = 0;
