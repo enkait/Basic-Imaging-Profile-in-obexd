@@ -76,6 +76,14 @@ struct imgpropull_data {
 	GString *object;
 };
 
+static void imgpropull_data_free(struct imgpropull_data *data)
+{
+	if (data == NULL)
+		return;
+	g_string_free(data->object, TRUE);
+	g_free(data);
+}
+
 static GString *append_attachments(GString *object, char *image_path) {
 	char *att_dir_path = get_att_dir(image_path);
 	DIR *att_dir = opendir(att_dir_path);
@@ -234,12 +242,18 @@ static ssize_t imgpropull_read(void *object, void *buf, size_t count)
 	return string_read(data->object, buf, count);
 }
 
+static int imgpropull_close(void *object) {
+	struct imgpropull_data *data = object;
+	imgpropull_data_free(data);
+	return 0;
+}
+
 static struct obex_mime_type_driver imgpropull = {
 	.target = IMAGE_PULL_TARGET,
 	.target_size = TARGET_SIZE,
 	.mimetype = "x-bt/img-properties",
 	.open = image_pull_open,
-	.close = string_free,
+	.close = imgpropull_close,
 	.read = imgpropull_read,
 	.feed_next_header = feed_next_header,
 };
@@ -249,7 +263,7 @@ static struct obex_mime_type_driver imgpropull_rc = {
 	.target_size = TARGET_SIZE,
 	.mimetype = "x-bt/img-properties",
 	.open = remote_camera_open,
-	.close = string_free,
+	.close = imgpropull_close,
 	.read = imgpropull_read,
 	.feed_next_header = feed_next_header,
 };
@@ -259,7 +273,7 @@ static struct obex_mime_type_driver imgpropull_aos = {
 	.target_size = TARGET_SIZE,
 	.mimetype = "x-bt/img-properties",
 	.open = image_pull_open,
-	.close = string_free,
+	.close = imgpropull_close,
 	.read = imgpropull_read,
 	.feed_next_header = feed_next_header,
 };
