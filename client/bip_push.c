@@ -174,7 +174,7 @@ static void put_image_callback(struct session_data *session, GError *err,
 		return;
 	}
 
-	if (session->obex->obex_rsp)
+	if (session->obex->obex_rsp == OBEX_RSP_PARTIAL_CONTENT)
 		required = TRUE;
 
 	if (transfer->xfer == NULL) {
