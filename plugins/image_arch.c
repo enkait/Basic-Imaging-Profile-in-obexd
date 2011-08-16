@@ -48,6 +48,7 @@
 
 #include <openobex/obex.h>
 #include <openobex/obex_const.h>
+#include <wand/MagickWand.h>
 
 #include "plugin.h"
 #include "log.h"
@@ -225,11 +226,13 @@ static struct obex_service_driver image_arch = {
 
 static int image_arch_init(void)
 {
+	MagickWandGenesis();
 	return obex_service_driver_register(&image_arch);
 }
 
 static void image_arch_exit(void)
 {
+	MagickWandTerminus();
 	obex_service_driver_unregister(&image_arch);
 }
 

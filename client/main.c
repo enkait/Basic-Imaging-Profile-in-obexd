@@ -34,6 +34,8 @@
 #include <glib.h>
 #include <gdbus.h>
 
+#include <wand/MagickWand.h>
+
 #include "log.h"
 #include "transfer.h"
 #include "session.h"
@@ -627,7 +629,11 @@ int main(int argc, char *argv[])
 	sigaction(SIGINT, &sa, NULL);
 	sigaction(SIGTERM, &sa, NULL);
 
+	MagickWandGenesis();
+
 	g_main_loop_run(event_loop);
+
+	MagickWandTerminus();
 
 	g_dbus_unregister_interface(conn, CLIENT_PATH, CLIENT_INTERFACE);
 

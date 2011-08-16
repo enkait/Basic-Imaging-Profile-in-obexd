@@ -133,7 +133,6 @@ struct image_attributes *get_image_attributes(const char *image_file, int *err)
 	MagickWand *wand;
 	MagickSizeType size;
 	char *encoding;
-	MagickWandGenesis();
 	wand = NewMagickWand();
 	if (!MagickPingImage(wand, image_file)) {
 		if (err)
@@ -148,7 +147,6 @@ struct image_attributes *get_image_attributes(const char *image_file, int *err)
 	MagickGetImageLength(wand, &size);
 	attr->length = (unsigned long) size;
 	wand = DestroyMagickWand(wand);
-	MagickWandTerminus();
 
 	if (err)
 		*err = 0;
@@ -371,7 +369,6 @@ gboolean make_modified_image(const char *image_path, const char *modified_path,
 					const char *transform, int *err)
 {
 	MagickWand *wand;
-	MagickWandGenesis();
 	wand = NewMagickWand();
 
 	if (err != NULL)
@@ -380,7 +377,6 @@ gboolean make_modified_image(const char *image_path, const char *modified_path,
 	if (!MagickReadImage(wand, image_path)) {
 		if (err != NULL)
 			*err = -ENOENT;
-		MagickWandTerminus();
 		return FALSE;
 	}
 
@@ -405,11 +401,9 @@ gboolean make_modified_image(const char *image_path, const char *modified_path,
 		goto failed;
 
 	wand = DestroyMagickWand(wand);
-	MagickWandTerminus();
 	return TRUE;
 failed:
 	wand = DestroyMagickWand(wand);
-	MagickWandTerminus();
 	if (err != NULL)
 		*err = -EBADR;
 	return FALSE;
@@ -419,7 +413,6 @@ gboolean make_thumbnail(const char *image_path, const char *modified_path,
 								int *err)
 {
 	MagickWand *wand;
-	MagickWandGenesis();
 	wand = NewMagickWand();
 	
 	if (err != NULL)
@@ -428,7 +421,6 @@ gboolean make_thumbnail(const char *image_path, const char *modified_path,
 	if (!MagickReadImage(wand, image_path)) {
 		if (err != NULL)
 			*err = -ENOENT;
-		MagickWandTerminus();
 		return FALSE;
 	}
 	
@@ -446,10 +438,8 @@ gboolean make_thumbnail(const char *image_path, const char *modified_path,
 		goto failed;
 	
 	wand = DestroyMagickWand(wand);
-	MagickWandTerminus();
 	return TRUE;
 failed:
-	MagickWandTerminus();
 	if (err != NULL)
 		*err = -EBADR;
 	return FALSE;

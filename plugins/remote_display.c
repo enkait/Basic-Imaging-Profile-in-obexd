@@ -43,6 +43,7 @@
 
 #include <openobex/obex.h>
 #include <openobex/obex_const.h>
+#include <wand/MagickWand.h>
 
 #include "gdbus.h"
 #include "plugin.h"
@@ -363,11 +364,13 @@ static int remote_display_init(void)
 {
 	if (!rd_manager_init())
 		return -EPERM;
+	MagickWandGenesis();
 	return obex_service_driver_register(&remote_display);
 }
 
 static void remote_display_exit(void)
 {
+	MagickWandTerminus();
 	obex_service_driver_unregister(&remote_display);
 }
 

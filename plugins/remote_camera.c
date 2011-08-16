@@ -43,6 +43,7 @@
 
 #include <openobex/obex.h>
 #include <openobex/obex_const.h>
+#include <wand/MagickWand.h>
 
 #include "gdbus.h"
 #include "plugin.h"
@@ -387,11 +388,13 @@ static int remote_camera_init(void)
 {
 	if (!rc_manager_init())
 		return -EPERM;
+	MagickWandGenesis();
 	return obex_service_driver_register(&remote_camera);
 }
 
 static void remote_camera_exit(void)
 {
+	MagickWandTerminus();
 	obex_service_driver_unregister(&remote_camera);
 }
 

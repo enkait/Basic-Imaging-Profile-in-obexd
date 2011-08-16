@@ -47,6 +47,7 @@
 
 #include <openobex/obex.h>
 #include <openobex/obex_const.h>
+#include <wand/MagickWand.h>
 
 #include "plugin.h"
 #include "log.h"
@@ -337,6 +338,7 @@ static struct obex_service_driver image_aos = {
 static int image_pull_init(void)
 {
 	int ret;
+	MagickWandGenesis();
 	if ((ret = obex_service_driver_register(&image_pull)) < 0)
 		return ret;
 
@@ -345,6 +347,7 @@ static int image_pull_init(void)
 
 static void image_pull_exit(void)
 {
+	MagickWandTerminus();
 	obex_service_driver_unregister(&image_aos);
 	obex_service_driver_unregister(&image_pull);
 }
