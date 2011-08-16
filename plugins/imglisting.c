@@ -100,7 +100,7 @@ struct img_listing *get_listing(GSList *images, int handle, int *err)
 			return il;
 		images = g_slist_next(images);
 	}
-	
+
 	if (err != NULL)
 		*err = -ENOENT;
 	return NULL;

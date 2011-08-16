@@ -170,7 +170,8 @@ static void free_image_pull_session(struct image_pull_session *session)
 	g_free(session);
 }
 
-static gboolean remove_image(struct image_pull_session *session, struct img_listing *il, int *err) {
+static gboolean remove_image(struct image_pull_session *session, struct img_listing *il, int *err)
+{
 	if (il == NULL) {
 		if (err != NULL)
 			*err = -ENOENT;
