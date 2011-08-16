@@ -218,9 +218,11 @@ static int imgattpush_flush(void *object) {
 static int imgattpush_close(void *object)
 {
 	struct imgattpush_data *data = object;
+
+	DBG("");
+
 	if (data->fd >= 0 && close(data->fd) < 0)
 		return -errno;
-	printf("imgattpush_close\n");
 	return 0;
 }
 

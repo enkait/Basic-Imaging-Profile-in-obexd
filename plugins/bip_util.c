@@ -30,7 +30,7 @@
 #define HANDLE_LEN 7
 #define HANDLE_LIMIT 10000000
 
-static const char *att_suf = "_att";
+static const char *att_suf = "_att/";
 static const char *default_name = "image";
 static const gchar rep_char='_';
 
@@ -53,7 +53,6 @@ uint8_t *encode_img_handle(const char *data, unsigned int length, unsigned int *
 char *decode_img_handle(const uint8_t *data, unsigned int length, unsigned int *newsize) {
 	gsize size;
 	char *handle;
-	unsigned int i;
 
 	if (length == 0) {
 		*newsize = 0;
@@ -70,10 +69,6 @@ char *decode_img_handle(const uint8_t *data, unsigned int length, unsigned int *
 					"UTF8", "UTF16BE", NULL, &size, NULL);
 	if (handle == NULL) {
 		return NULL;
-	}
-	printf("result data %d\n", size);
-	for (i = 0; i < (unsigned int)size; i++) {
-		printf("handle[%d] = (%c,%x)\n", i, handle[i], handle[i]);
 	}
 	*newsize = size;
 	return handle;
@@ -140,7 +135,6 @@ struct image_attributes *get_image_attributes(const char *image_file, int *err)
 	char *encoding;
 	MagickWandGenesis();
 	wand = NewMagickWand();
-	printf("pinging path: %s\n", image_file);
 	if (!MagickPingImage(wand, image_file)) {
 		if (err)
 			*err = -ENOENT;
@@ -249,7 +243,6 @@ gboolean parse_pixel_range(const gchar *dim, unsigned int *lower_ret,
 	}
 	if (dim == NULL)
 		return FALSE;
-	printf("dim=%send\n", dim);
 	if (regexec(&no_range, dim, 0, NULL, 0) == 0) {
 		sscanf(dim, "%u*%u", &lower[0], &lower[1]);
 		upper[0] = lower[0];
@@ -257,7 +250,6 @@ gboolean parse_pixel_range(const gchar *dim, unsigned int *lower_ret,
 		fixed_ratio = FALSE;
 	}
 	else if (regexec(&range, dim, 0, NULL, 0) == 0) {
-		printf("range\n");
 		sscanf(dim, "%u*%u-%u*%u", &lower[0], &lower[1], &upper[0], &upper[1]);
 		fixed_ratio = FALSE;
 	}
@@ -393,17 +385,14 @@ gboolean make_modified_image(const char *image_path, const char *modified_path,
 	}
 
 	if (g_strcmp0(transform, "crop") == 0) {
-		printf("crop\n");
 		if (!MagickCropImage(wand, attr->width, attr->height, 0, 0))
 			goto failed;
 	}
 	else if (g_strcmp0(transform, "fill") == 0) {
-		printf("fill\n");
 		if (!MagickExtentImage(wand, attr->width, attr->height, 0, 0))
 			goto failed;
 	}
 	else {
-		printf("defaulted to: stretch\n");
 		if(MagickResizeImage(wand, attr->width, attr->height,
 					LanczosFilter, 1.0) == MagickFalse)
 			goto failed;
@@ -437,7 +426,6 @@ gboolean make_thumbnail(const char *image_path, const char *modified_path,
 		*err = 0;
 
 	if (!MagickReadImage(wand, image_path)) {
-		printf("read failed\n");
 		if (err != NULL)
 			*err = -ENOENT;
 		MagickWandTerminus();
@@ -641,7 +629,6 @@ ssize_t add_reply_handle(void *buf, size_t mtu, uint8_t *hi, int handle)
 		g_free(handle_hdr);
 		return -ENOMEM;
 	}
-	printf("%p %p %d\n", buf, handle_hdr, handle_hdr_len);
 	g_memmove(buf, handle_hdr, handle_hdr_len);
 	g_free(handle_hdr);
 	return handle_hdr_len;
