@@ -411,7 +411,6 @@ static void get_imaging_capabilities_callback(
 
 done:
 	g_dbus_send_message(session->conn, reply);
-	dbus_message_unref(reply);
 	dbus_message_unref(session->msg);
 
 	transfer_unregister(transfer);
