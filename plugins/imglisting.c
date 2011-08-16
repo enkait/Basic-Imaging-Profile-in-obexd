@@ -84,6 +84,8 @@ struct img_hdesc {
 
 void img_listing_free(struct img_listing *listing)
 {
+	if (listing == NULL)
+		return;
 	g_free(listing->image);
 	free_image_attributes(listing->attr);
 	g_free(listing);
