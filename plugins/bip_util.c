@@ -529,9 +529,8 @@ char *insert_number(const char *path, unsigned int number) {
 char *safe_rename(const char *name, const char *folder, const char *orig_path,
 								int *err)
 {
-	char *new_name, *new_path, *test_path = NULL, *dest_folder;
-	int lock_fd = -1, number = 1;
-	gboolean root;
+	char *new_name, *test_path, *dest_folder, *exp_folder;
+	int lock_fd = -1, number = 1, root;
 
 	if (err != NULL)
 		*err = 0;
@@ -541,29 +540,37 @@ char *safe_rename(const char *name, const char *folder, const char *orig_path,
 	else
 		new_name = (char *) name;
 
-	new_path = g_build_filename(folder, name, NULL);
+	test_path = g_build_filename(folder, name, NULL);
 
-	dest_folder = g_path_get_dirname(new_path);
-	root = g_strcmp0(folder, dest_folder);
+	dest_folder = g_path_get_dirname(test_path);
+	exp_folder = g_path_get_dirname(folder);
+	root = g_strcmp0(exp_folder, dest_folder);
 
-	if (!root) {
+	if (root != 0) {
 		if (err != NULL)
 			*err = -EBADR;
 		goto cleanup;
 	}
 
-	test_path = g_strdup(new_path);
-
 	while ((lock_fd = open(test_path, O_CREAT | O_EXCL, 0600)) < 0 &&
 							errno == EEXIST) {
+		char *test_name;
+
 		number++;
+
 		g_free(test_path);
-		test_path = insert_number(new_path, number);
-		if (test_path == NULL) {
+		test_path = NULL;
+
+		test_name = insert_number(new_name, number);
+
+		if (test_name == NULL) {
 			if (err != NULL)
 				*err = -EBADR;
 			goto cleanup;
 		}
+
+		test_path = g_build_filename(folder, test_name, NULL);
+		g_free(test_name);
 	}
 
 	if (lock_fd < 0) {
@@ -583,7 +590,6 @@ char *safe_rename(const char *name, const char *folder, const char *orig_path,
 cleanup:
 	if (name == NULL || strlen(name) == 0)
 		g_free(new_name);
-	g_free(new_path);
 	return test_path;
 }
 
