@@ -208,10 +208,11 @@ GSList *get_image_list(const char *dir, int *err) {
 	while ((file = readdir(img_dir)) != NULL) {
 		char *path = g_build_filename(bip_dir, file->d_name, NULL);
 		int tmperr;
-		il = get_img_listing(path, handle++, &tmperr);
+		il = get_img_listing(path, handle, &tmperr);
 
 		if (il == NULL)
 			continue;
+		handle++;
 		images = g_slist_append(images, il);
 		printf("image added: %s\n", il->image);
 	}
