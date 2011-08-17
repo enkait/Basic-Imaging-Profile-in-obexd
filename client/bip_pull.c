@@ -1325,7 +1325,9 @@ static gboolean parse_get_image_dict(DBusMessage *msg, char **path,
 			*pixel = g_strdup(val);
 		}
 		else if (g_str_equal(key, "encoding")) {
-			*encoding = g_strdup(convBIP2IM(val));
+			if (!verify_encoding(val))
+				goto failed;
+			*encoding = g_strdup(val);
 			if (*encoding == NULL)
 				goto failed;
 		}
