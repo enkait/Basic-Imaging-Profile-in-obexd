@@ -110,7 +110,7 @@ static gboolean parse_attr(struct image_desc *desc, const gchar *key,
 		printf("maxsize: %u\n", desc->maxsize);
 	}
 	else if (g_str_equal(key, "encoding")) {
-		if (strlen(value) == 0)
+		if (value == NULL || strlen(value) == 0)
 			goto ok;
 		desc->encoding = g_strdup(convBIP2IM(value));
 		if (desc->encoding == NULL)
