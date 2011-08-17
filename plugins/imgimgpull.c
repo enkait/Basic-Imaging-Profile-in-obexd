@@ -469,6 +469,7 @@ static struct obex_mime_type_driver imgimgpull_aos = {
 	.open = image_pull_open,
 	.close = imgimgpull_close,
 	.read = imgimgpull_read,
+	.feed_next_header = feed_next_header,
 	.get_next_header = get_next_header,
 };
 
