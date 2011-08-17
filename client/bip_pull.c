@@ -928,7 +928,6 @@ DBusMessage *delete_image(DBusConnection *connection,
 cleanup:
 	a_header_free(hdesc);
 	g_slist_free(aheaders);
-	dbus_message_unref(message);
 	return reply;
 }
 
@@ -1222,12 +1221,10 @@ DBusMessage *get_image_thumbnail(DBusConnection *connection,
 		goto cleanup;
 	}
 
-	session->msg = dbus_message_ref(message);
 	reply = dbus_message_new_method_return(message);
 cleanup:
 	a_header_free(hdesc);
 	g_slist_free(aheaders);
-	dbus_message_unref(message);
 	return reply;
 }
 
@@ -1274,12 +1271,10 @@ DBusMessage *get_image_attachment(DBusConnection *connection,
 		goto cleanup;
 	}
 
-	session->msg = dbus_message_ref(message);
 	reply = dbus_message_new_method_return(message);
 cleanup:
 	a_header_free(hdesc);
 	g_slist_free(aheaders);
-	dbus_message_unref(message);
 	return reply;
 }
 
@@ -1411,13 +1406,11 @@ DBusMessage *get_image(DBusConnection *connection,
 		goto cleanup;
 	}
 
-	session->msg = dbus_message_ref(message);
 	reply = dbus_message_new_method_return(message);
 cleanup:
 	a_header_free(hdesc);
 	a_header_free(imgdesc);
 	g_slist_free(aheaders);
-	dbus_message_unref(message);
 	return reply;
 }
 
