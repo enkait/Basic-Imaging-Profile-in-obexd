@@ -169,8 +169,9 @@ static int feed_next_header(void *object, uint8_t hi, obex_headerdata_t hv,
 
 static ssize_t imgattpull_read(void *object, void *buf, size_t count)
 {
+	struct imgattpull_data *data = object;
 	ssize_t ret;
-	ret = read(GPOINTER_TO_INT(object), buf, count);
+	ret = read(data->fd, buf, count);
 
 	if (ret < 0)
 		return -errno;
@@ -180,9 +181,9 @@ static ssize_t imgattpull_read(void *object, void *buf, size_t count)
 
 static int imgattpull_close(void *object)
 {
-	if (close(GPOINTER_TO_INT(object)) < 0)
-		return -errno;
-
+	struct imgattpull_data *data = object;
+	close(data->fd);
+	g_free(data);
 	return 0;
 }
 
