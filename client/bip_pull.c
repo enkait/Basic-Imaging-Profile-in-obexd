@@ -1168,7 +1168,6 @@ static void get_image_attachment_callback(struct session_data *session,
 	struct transfer_data *transfer = session->pending->data;
 	printf("get_image_attachment_callback\n");
 	if (err) {
-		printf("emitting message\n");
 		get_attachment_failed(session, err->message);
 		transfer_unregister(transfer);
 		return;
