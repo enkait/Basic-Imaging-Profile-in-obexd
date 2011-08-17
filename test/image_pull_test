@@ -205,7 +205,7 @@ if  __name__ == '__main__':
     
     bus.add_signal_receiver(image_pull_thumbnail_completed,
 	dbus_interface="org.openobex.BipSignal",
-	signal_name="GetImageThumbnailCompleted")
+	signal_name="GetThumbnailCompleted")
     
     bus.add_signal_receiver(image_pull_failed,
 	dbus_interface="org.openobex.BipSignal",
@@ -213,15 +213,15 @@ if  __name__ == '__main__':
     
     bus.add_signal_receiver(image_pull_thumbnail_failed,
 	dbus_interface="org.openobex.BipSignal",
-	signal_name="GetImageThumbnailFailed")
+	signal_name="GetThumbnailFailed")
     
     bus.add_signal_receiver(image_pull_attachment_failed,
 	dbus_interface="org.openobex.BipSignal",
-	signal_name="GetImageAttachmentFailed")
+	signal_name="GetAttachmentFailed")
     
     bus.add_signal_receiver(image_pull_attachment_completed,
 	dbus_interface="org.openobex.BipSignal",
-	signal_name="GetImageAttachmentCompleted")
+	signal_name="GetAttachmentCompleted")
 	
     client = dbus.Interface(bus.get_object("org.openobex.client", "/"),
                             "org.openobex.Client")
