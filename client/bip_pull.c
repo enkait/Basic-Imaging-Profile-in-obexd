@@ -67,6 +67,66 @@ struct images_listing_aparam {
     uint8_t lc;
 } __attribute__ ((packed));
 
+static gboolean get_image_completed(struct session_data *session)
+{
+	return g_dbus_emit_signal(session->conn, session->path,
+			BIP_SIGNAL_INTERFACE, "GetImageCompleted",
+			DBUS_TYPE_INVALID);
+}
+
+static gboolean get_image_failed(struct session_data *session, char *err)
+{
+	return g_dbus_emit_signal(session->conn, session->path,
+				BIP_SIGNAL_INTERFACE, "GetImageFailed",
+				DBUS_TYPE_STRING, &err,
+				DBUS_TYPE_INVALID);
+}
+
+static gboolean get_thumbnail_completed(struct session_data *session)
+{
+	return g_dbus_emit_signal(session->conn, session->path,
+			BIP_SIGNAL_INTERFACE, "GetThumbnailCompleted",
+			DBUS_TYPE_INVALID);
+}
+
+static gboolean get_thumbnail_failed(struct session_data *session, char *err)
+{
+	return g_dbus_emit_signal(session->conn, session->path,
+				BIP_SIGNAL_INTERFACE, "GetThumbnailFailed",
+				DBUS_TYPE_STRING, &err,
+				DBUS_TYPE_INVALID);
+}
+static gboolean get_attachment_completed(struct session_data *session)
+{
+	return g_dbus_emit_signal(session->conn, session->path,
+			BIP_SIGNAL_INTERFACE, "GetAttachmentCompleted",
+			DBUS_TYPE_INVALID);
+}
+
+static gboolean get_attachment_failed(struct session_data *session, char *err)
+{
+	return g_dbus_emit_signal(session->conn, session->path,
+				BIP_SIGNAL_INTERFACE, "GetAttachmentFailed",
+				DBUS_TYPE_STRING, &err,
+				DBUS_TYPE_INVALID);
+}
+
+static DBusMessage *failed(DBusMessage *message)
+{
+	return g_dbus_create_error(message, ERROR_INTERFACE, "Failed");
+}
+
+static DBusMessage *report_error(DBusMessage *message, char *err)
+{
+	return g_dbus_create_error(message, ERROR_INTERFACE, "%s", err);
+}
+
+static DBusMessage *invalid_argument(DBusMessage *message)
+{
+	return g_dbus_create_error(message, ERROR_INTERFACE,
+							"InvalidArgument");
+}
+
 static void free_listing_object(struct listing_object *object) {
 	if (object == NULL)
 		return;
@@ -246,29 +306,25 @@ static void get_images_listing_callback(
 	printf("get_images_listing_callback called\n");
 
 	if (gerr != NULL) {
-		reply = g_dbus_create_error(session->msg, "org.openobex.Error",
-							"%s", gerr->message);
+		reply = report_error(session->msg, gerr->message);
 		goto cleanup;
 	}
 
 	listing = parse_images_listing(transfer->buffer, transfer->filled, &err);
 
 	if (err < 0) {
-		reply = g_dbus_create_error(session->msg,
-				"org.openobex.Error.Failed", "Failed");
+		reply = failed(session->msg);
 		goto cleanup;
 	}
 
 	if ((reply = dbus_message_new_method_return(session->msg)) == NULL) {
-		reply = g_dbus_create_error(session->msg,
-				"org.openobex.Error.Failed", "Failed");
+		reply = failed(session->msg);
 		goto cleanup;
 	}
 	
 	dbus_message_iter_init_append(reply, &iter);
 	if (!append_listing_dict(&iter, listing)) {
-		reply = g_dbus_create_error(session->msg,
-				"org.openobex.Error.Failed", "Failed");
+		reply = failed(session->msg);
 		goto cleanup;
 	}
 
@@ -776,22 +832,19 @@ DBusMessage *get_image_properties(DBusConnection *connection,
 	if (dbus_message_get_args(message, NULL,
 					DBUS_TYPE_STRING, &handle,
 					DBUS_TYPE_INVALID) == FALSE) {
-		reply = g_dbus_create_error(message,
-				"org.openobex.Error.InvalidArguments", NULL);
+		reply = invalid_argument(message);
 		goto cleanup;
 	}
 
 	if (parse_handle(handle) < 0) {
-		reply = g_dbus_create_error(message,
-				"org.openobex.Error.InvalidArguments", NULL);
+		reply = invalid_argument(message);
 		goto cleanup;
 	}
 
 	hdesc = create_handle(handle);
 	
 	if (hdesc == NULL) {
-		reply = g_dbus_create_error(message,
-			"org.openobex.Error.InvalidArguments", NULL);
+		reply = invalid_argument(message);
 		goto cleanup;
 	}
 	
@@ -810,9 +863,7 @@ DBusMessage *get_image_properties(DBusConnection *connection,
 	prop = parse_properties(buffer, length, &err);
 
 	if (prop == NULL) {
-		reply = g_dbus_create_error(message,
-				"org.openobex.Error.Failed",
-				"ParseResultFailed");
+		reply = failed(message);
 		goto cleanup;
 	}
 
@@ -820,9 +871,7 @@ DBusMessage *get_image_properties(DBusConnection *connection,
 	dbus_message_iter_init_append(reply, &iter);
 
 	if (!append_prop(&iter, prop)) {
-		reply = g_dbus_create_error(message,
-				"org.openobex.Error.Failed",
-				"AppendResultFailed");
+		reply = failed(message);
 		goto cleanup;
 	}
 
@@ -850,22 +899,19 @@ DBusMessage *delete_image(DBusConnection *connection,
 	if (dbus_message_get_args(message, NULL,
 					DBUS_TYPE_STRING, &handle,
 					DBUS_TYPE_INVALID) == FALSE) {
-		reply = g_dbus_create_error(message,
-				"org.openobex.Error.InvalidArguments", NULL);
+		reply = invalid_argument(message);
 		goto cleanup;
 	}
 
 	if (parse_handle(handle) < 0) {
-		reply = g_dbus_create_error(message,
-				"org.openobex.Error.InvalidArguments", NULL);
+		reply = invalid_argument(message);
 		goto cleanup;
 	}
 
 	hdesc = create_handle(handle);
 	
 	if (hdesc == NULL) {
-		reply = g_dbus_create_error(message,
-			"org.openobex.Error.Failed", "Out Of Memory");
+		reply = failed(message);
 		goto cleanup;
 	}
 	
@@ -874,9 +920,7 @@ DBusMessage *delete_image(DBusConnection *connection,
 	if (!gw_obex_put_buf_with_aheaders(session->obex, NULL, "x-bt/img-img",
 					NULL, 0, aheaders,
 					NULL, 0, -1, &err)) {
-		reply = g_dbus_create_error(message,
-				"org.openobex.Error.Failed",
-				"Failed");
+		reply = failed(message);
 		goto cleanup;
 	}
 	
@@ -1027,8 +1071,7 @@ DBusMessage *get_images_listing(DBusConnection *connection,
 	dbus_message_iter_recurse(&iter, &dict);
 	if (!parse_filter_dict(&dict, &count, &begin, &latest, &created,
 					&modified, &encoding, &pixel)) {
-		reply = g_dbus_create_error(message,
-					"org.openobex.Error.Failed", "Failed");
+		reply = failed(message);
 		goto cleanup;
 	}
 	
@@ -1036,8 +1079,7 @@ DBusMessage *get_images_listing(DBusConnection *connection,
 									pixel);
 
 	if (handles_desc == NULL) {
-		reply = g_dbus_create_error(message,
-					"org.openobex.Error.Failed", "Failed");
+		reply = failed(message);
 		goto cleanup;
 	}
 
@@ -1052,9 +1094,7 @@ DBusMessage *get_images_listing(DBusConnection *connection,
 					sizeof(struct images_listing_aparam),
 					aheaders, get_images_listing_callback,
 								NULL)) < 0) {
-		reply = g_dbus_create_error(message,
-				"org.openobex.Error.Failed",
-				"Failed");
+		reply = failed(message);
 		goto cleanup;
 	}
 
@@ -1097,17 +1137,12 @@ static void get_image_callback(struct session_data *session, GError *err,
 	struct transfer_data *transfer = session->pending->data;
 	printf("get_image_callback\n");
 	if (err) {
-		g_dbus_emit_signal(session->conn, session->path,
-				IMAGE_PULL_INTERFACE, "GetImageFailed",
-				DBUS_TYPE_STRING, &err->message,
-				DBUS_TYPE_INVALID);
+		get_image_failed(session, err->message);
 		transfer_unregister(transfer);
 		return;
 	}
 
-	g_dbus_emit_signal(session->conn, session->path,
-			IMAGE_PULL_INTERFACE, "GetImageCompleted",
-			DBUS_TYPE_INVALID);
+	get_image_completed(session);
 	transfer_unregister(transfer);
 	return;
 }
@@ -1118,18 +1153,12 @@ static void get_image_thumbnail_callback(struct session_data *session,
 	struct transfer_data *transfer = session->pending->data;
 	printf("get_image_callback\n");
 	if (err) {
-		g_dbus_emit_signal(session->conn, session->path,
-					IMAGE_PULL_INTERFACE,
-					"GetImageThumbnailFailed",
-					DBUS_TYPE_STRING, &err->message,
-					DBUS_TYPE_INVALID);
+		get_thumbnail_failed(session, err->message);
 		transfer_unregister(transfer);
 		return;
 	}
 
-	g_dbus_emit_signal(session->conn, session->path,
-			IMAGE_PULL_INTERFACE, "GetImageThumbnailCompleted",
-			DBUS_TYPE_INVALID);
+	get_thumbnail_completed(session);
 	transfer_unregister(transfer);
 	return;
 }
@@ -1141,18 +1170,12 @@ static void get_image_attachment_callback(struct session_data *session,
 	printf("get_image_attachment_callback\n");
 	if (err) {
 		printf("emitting message\n");
-		g_dbus_emit_signal(session->conn, session->path,
-					IMAGE_PULL_INTERFACE,
-					"GetImageAttachmentFailed",
-					DBUS_TYPE_STRING, &err->message,
-					DBUS_TYPE_INVALID);
+		get_attachment_failed(session, err->message);
 		transfer_unregister(transfer);
 		return;
 	}
 
-	g_dbus_emit_signal(session->conn, session->path, IMAGE_PULL_INTERFACE,
-						"GetImageAttachmentCompleted",
-							DBUS_TYPE_INVALID);
+	get_attachment_completed(session);
 	transfer_unregister(transfer);
 	return;
 }
@@ -1172,14 +1195,12 @@ DBusMessage *get_image_thumbnail(DBusConnection *connection,
 				DBUS_TYPE_STRING, &image_path,
 				DBUS_TYPE_STRING, &handle,
 				DBUS_TYPE_INVALID) == FALSE) {
-		reply = g_dbus_create_error(message,
-				"org.openobex.Error.InvalidArguments", NULL);
+		reply = invalid_argument(message);
 		goto cleanup;
 	}
 	
 	if (parse_handle(handle) < 0) {
-		reply = g_dbus_create_error(message,
-				"org.openobex.Error.InvalidArguments", NULL);
+		reply = invalid_argument(message);
 		goto cleanup;
 	}
 	printf("requested get image thumbnail %s %s\n", image_path, handle);
@@ -1187,8 +1208,7 @@ DBusMessage *get_image_thumbnail(DBusConnection *connection,
 	hdesc = create_handle(handle);
 	
 	if (hdesc == NULL) {
-		reply = g_dbus_create_error(message,
-				"org.openobex.Error.InvalidArguments", NULL);
+		reply = invalid_argument(message);
 		goto cleanup;
 	}
 	
@@ -1198,8 +1218,7 @@ DBusMessage *get_image_thumbnail(DBusConnection *connection,
 						image_path, NULL, 0, aheaders,
 						get_image_thumbnail_callback,
 								NULL)) < 0) {
-		reply = g_dbus_create_error(message,
-					"org.openobex.Error.Failed", "Failed");
+		reply = failed(message);
 		goto cleanup;
 	}
 
@@ -1227,23 +1246,20 @@ DBusMessage *get_image_attachment(DBusConnection *connection,
 				DBUS_TYPE_STRING, &handle,
 				DBUS_TYPE_STRING, &att_name,
 				DBUS_TYPE_INVALID) == FALSE) {
-		reply = g_dbus_create_error(message,
-				"org.openobex.Error.InvalidArguments", NULL);
+		reply = invalid_argument(message);
 		goto cleanup;
 	}
 
 	printf("requested get image attachment %s %s %s\n", file_path, handle, att_name);
 	if (parse_handle(handle) < 0) {
-		reply = g_dbus_create_error(message,
-				"org.openobex.Error.InvalidArguments", NULL);
+		reply = invalid_argument(message);
 		goto cleanup;
 	}
 
 	hdesc = create_handle(handle);
 	
 	if (hdesc == NULL) {
-		reply = g_dbus_create_error(message,
-				"org.openobex.Error.InvalidArguments", NULL);
+		reply = invalid_argument(message);
 		goto cleanup;
 	}
 	
@@ -1254,9 +1270,7 @@ DBusMessage *get_image_attachment(DBusConnection *connection,
 						NULL, 0, aheaders,
 						get_image_attachment_callback,
 						NULL)) < 0) {
-		reply = g_dbus_create_error(message,
-				"org.openobex.Error.Failed",
-				"Failed");
+		reply = failed(message);
 		goto cleanup;
 	}
 
@@ -1370,8 +1384,7 @@ DBusMessage *get_image(DBusConnection *connection,
 
 	if (!parse_get_image_dict(message, &image_path, &handle, &pixel,
 					&encoding, &maxsize, &transform)) {
-		reply = g_dbus_create_error(message,
-			"org.openobex.Error.InvalidArguments", NULL);
+		reply = invalid_argument(message);
 		goto cleanup;
 	}
 
@@ -1382,8 +1395,7 @@ DBusMessage *get_image(DBusConnection *connection,
 	hdesc = create_handle(handle);
 
 	if (imgdesc == NULL || hdesc == NULL) {
-		reply = g_dbus_create_error(message,
-			"org.openobex.Error.InvalidArguments", NULL);
+		reply = invalid_argument(message);
 		goto cleanup;
 	}
 	
@@ -1395,9 +1407,8 @@ DBusMessage *get_image(DBusConnection *connection,
 	if ((err=session_get_with_aheaders(session, "x-bt/img-img", NULL,
 					image_path, NULL, 0, aheaders,
 					get_image_callback, NULL)) < 0) {
-		return g_dbus_create_error(message,
-				"org.openobex.Error.Failed",
-				"Failed");
+		reply = failed(message);
+		goto cleanup;
 	}
 
 	session->msg = dbus_message_ref(message);
@@ -1426,10 +1437,10 @@ GDBusMethodTable image_pull_methods[] = {
 GDBusSignalTable image_pull_signals[] = {
 	{ "GetImageCompleted", "" },
 	{ "GetImageFailed", "s" },
-	{ "GetImageThumbnailCompleted", "" },
-	{ "GetImageThumbnailFailed", "s" },
-	{ "GetImageAttachmentCompleted", "" },
-	{ "GetImageAttachmentFailed", "s" },
+	{ "GetThumbnailCompleted", "" },
+	{ "GetThumbnailFailed", "s" },
+	{ "GetAttachmentCompleted", "" },
+	{ "GetAttachmentFailed", "s" },
 	{ }
 };
 
