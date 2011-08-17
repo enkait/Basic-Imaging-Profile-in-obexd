@@ -83,7 +83,7 @@ struct imgimgpull_data {
 	char * (*get_image_path) (void *context, int handle);
 	int fd, handle;
 	size_t size;
-	gboolean size_sent;
+	gboolean size_sent, write;
 	struct image_desc *desc;
 };
 
@@ -265,6 +265,9 @@ static struct imgimgpull_data *imgimgpull_open(const char *name, int oflag, mode
 	if (err != NULL)
 		*err = 0;
 
+	if (oflag & O_WRONLY)
+		data->write = TRUE;
+
 	data->context = context;
 
 	return data;
@@ -350,6 +353,9 @@ static int feed_next_header(void *object, uint8_t hi, obex_headerdata_t hv,
 	if (data == NULL)
 		return -EBADR;
 	printf("feed_next_header\n");
+
+	if (data->write)
+		return 0;
 
 	if (hi == IMG_HANDLE_HDR) {
 		header = decode_img_handle(hv.bs, hv_size, &hdr_len);

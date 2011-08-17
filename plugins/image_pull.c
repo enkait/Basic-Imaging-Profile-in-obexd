@@ -265,7 +265,7 @@ int image_pull_chkput(struct obex_session *os, void *user_data)
 	printf("IMAGE PULL CHKPUT\n");
 
 	if (obex_get_size(os) == OBJECT_SIZE_DELETE)
-		return 0;
+		return obex_put_stream_start(os, os->name);
 
 	return -EBADR;
 }
