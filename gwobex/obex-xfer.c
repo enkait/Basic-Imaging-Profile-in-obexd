@@ -499,6 +499,8 @@ struct a_header *make_a_header(uint8_t hi, obex_headerdata_t hv,
 }
 
 void a_header_free(struct a_header *ah) {
+    if (ah == NULL)
+        return;
     switch (ah->hi & OBEX_HDR_TYPE_MASK) {
         case OBEX_HDR_TYPE_BYTES:
         case OBEX_HDR_TYPE_UNICODE:
