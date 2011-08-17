@@ -269,6 +269,7 @@ static struct imgimgpull_data *imgimgpull_open(const char *name, int oflag, mode
 		data->write = TRUE;
 
 	data->context = context;
+	data->fd = -1;
 
 	return data;
 }
