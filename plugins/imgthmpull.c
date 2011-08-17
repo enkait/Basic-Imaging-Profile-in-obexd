@@ -91,6 +91,7 @@ static struct imgthmpull_data *imgthmpull_open(const char *name, int oflag,
 	struct imgthmpull_data *data = g_new0(struct imgthmpull_data, 1);
 	data->fd = -1;
 	data->handle = -1;
+	data->context = context;
 	return data;
 }
 
