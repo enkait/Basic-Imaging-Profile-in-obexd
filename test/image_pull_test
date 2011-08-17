@@ -97,26 +97,31 @@ def parse_options():
 
     return parser.parse_args()
 
+def get_and_print_listing(session, args):
+    listing = session.GetImagesListing(args)
+    print "Listing for: " + str(args)
+    for r in listing:
+        print "Handle: " + r[dbus.String(u'handle')]
+        print "\tCreated: " + r[dbus.String(u'created')]
+        print "\tModified: " + r[dbus.String(u'modified')]
+    print
+
+
 def images_listing(session):
     print "listing\n"
-    print session.GetImagesListing({"count" : dbus.UInt16(1), "offset" : dbus.UInt16(1)})
-    print session.GetImagesListing({"count" : dbus.UInt16(2), "offset" : dbus.UInt16(2)})
-    print session.GetImagesListing({"count" : dbus.UInt16(3), "offset" : dbus.UInt16(3)})
-    print "pixel 100*200-400*400"
-    print session.GetImagesListing({"pixel" : "100*200-400*400"})
-    print "pixel 100*200-1600*1600"
-    print session.GetImagesListing({"pixel" : "100*200-1600*1600"})
-    print "pixel 1680*1050"
-    print session.GetImagesListing({"pixel" : "1680*1050"})
-    print "pixel 168**-3360*2100"
-    print session.GetImagesListing({"pixel" : "168**-3360*2100"})
-    print "encoding BMP"
-    print session.GetImagesListing({"encoding" : "BMP"})
-    print "created: 20110621T184115Z-20110621T184115Z"
-    print session.GetImagesListing({"created" : "20110621T184115Z-20110621T184115Z"})
-    print "created: 20110621T184116Z-20110621T184116Z"
-    print session.GetImagesListing({"created" : "20110621T184116Z-20110621T184116Z"})
-    print session.GetImagesListing({"latest" : True})
+    get_and_print_listing(session, {"count" : dbus.UInt16(1), "offset" : dbus.UInt16(0)})
+    get_and_print_listing(session, {"count" : dbus.UInt16(1), "offset" : dbus.UInt16(0)})
+    get_and_print_listing(session, {"count" : dbus.UInt16(1), "offset" : dbus.UInt16(1)})
+    get_and_print_listing(session, {"count" : dbus.UInt16(2), "offset" : dbus.UInt16(2)})
+    get_and_print_listing(session, {"count" : dbus.UInt16(3), "offset" : dbus.UInt16(3)})
+    get_and_print_listing(session, {"pixel" : "100*200-400*400"})
+    get_and_print_listing(session, {"pixel" : "100*200-1600*1600"})
+    get_and_print_listing(session, {"pixel" : "1680*1050"})
+    get_and_print_listing(session, {"pixel" : "168**-3360*2100"})
+    get_and_print_listing(session, {"encoding" : "BMP"})
+    get_and_print_listing(session, {"created" : "20110815T235915-20110816T235915"})
+    get_and_print_listing(session, {"created" : "20110621T184116Z-20110621T184116Z"})
+    get_and_print_listing(session, {"latest" : True})
 
 def imaging_capabilities(session):
     print session.GetImagingCapabilities()
