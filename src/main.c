@@ -51,6 +51,7 @@
 #include "obex-priv.h"
 #include "server.h"
 #include "service.h"
+#include "options.h"
 
 #define DEFAULT_ROOT_PATH "/tmp"
 
@@ -120,16 +121,6 @@ static GOptionEntry options[] = {
 	{ NULL },
 };
 
-const char *obex_option_root_folder(void)
-{
-	return option_root;
-}
-
-gboolean obex_option_symlinks(void)
-{
-	return option_symlinks;
-}
-
 static gboolean is_dir(const char *dir) {
 	struct stat st;
 
@@ -193,6 +184,9 @@ int main(int argc, char *argv[])
 	}
 
 	g_option_context_free(context);
+
+	set_obex_option_root_folder(option_root);
+	set_obex_option_symlinks(option_symlinks);
 
 	if (option_detach == TRUE) {
 		if (daemon(0, 0)) {
