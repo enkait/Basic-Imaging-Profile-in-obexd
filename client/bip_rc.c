@@ -152,8 +152,8 @@ GDBusSignalTable remote_camera_signals[] = {
 	{ "GetImageFailed", "s" },
 	{ "GetMonitImageCompleted", "s" },
 	{ "GetMonitImageFailed", "s" },
-	{ "GetImageThumbnailCompleted", "" },
-	{ "GetImageThumbnailFailed", "s" },
+	{ "GetThumbnailCompleted", "" },
+	{ "GetThumbnailFailed", "s" },
 	{ }
 };
 
