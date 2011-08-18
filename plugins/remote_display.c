@@ -108,7 +108,6 @@
 
 #define HANDLE_LIMIT 10000000
 
-//static const char * bip_root="/tmp/bip/";
 #define RD_MANAGER_SERVICE "org.openobex.RDManager"
 #define RD_MANAGER_PATH "/rdmanager"
 #define RD_MANAGER_INTERFACE RD_MANAGER_SERVICE ".RDManager"

@@ -41,8 +41,6 @@
 #define FILTERING_ENCODING "encoding=\"%s\" "
 #define FILTERING_PIXEL "pixel=\"%s\" "
 
-#define BIP_TEMP_FOLDER /tmp/bip/
-
 #define NBRETURNEDHANDLES_TAG 0x01
 #define NBRETURNEDHANDLES_LEN 0x02
 #define LISTSTARTOFFSET_TAG 0x02

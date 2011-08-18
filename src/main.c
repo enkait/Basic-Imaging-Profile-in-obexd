@@ -54,6 +54,7 @@
 #include "options.h"
 
 #define DEFAULT_ROOT_PATH "/tmp"
+#define DEFAULT_BIP_ROOT_PATH "/tmp/bip"
 
 #define DEFAULT_CAP_FILE CONFIGDIR "/capability.xml"
 
@@ -74,6 +75,7 @@ static gboolean option_detach = TRUE;
 static char *option_debug = NULL;
 
 static char *option_root = NULL;
+static char *option_bip_root = NULL;
 static char *option_root_setup = NULL;
 static char *option_capability = NULL;
 static char *option_plugin = NULL;
@@ -102,6 +104,11 @@ static GOptionEntry options[] = {
 				"Enable debug information output", "DEBUG" },
 	{ "root", 'r', 0, G_OPTION_ARG_STRING, &option_root,
 				"Specify root folder location. Both absolute "
+				"and relative can be used, but relative paths "
+				"are assumed to be relative to user $HOME "
+				"folder", "PATH" },
+	{ "bip-root", 'b', 0, G_OPTION_ARG_STRING, &option_bip_root,
+				"Specify root folder location for BIP. Both absolute "
 				"and relative can be used, but relative paths "
 				"are assumed to be relative to user $HOME "
 				"folder", "PATH" },
@@ -185,9 +192,6 @@ int main(int argc, char *argv[])
 
 	g_option_context_free(context);
 
-	set_obex_option_root_folder(option_root);
-	set_obex_option_symlinks(option_symlinks);
-
 	if (option_detach == TRUE) {
 		if (daemon(0, 0)) {
 			perror("Can't start daemon");
@@ -220,6 +224,18 @@ int main(int argc, char *argv[])
 		char *old_root = option_root, *home = getenv("HOME");
 		if (home) {
 			option_root = g_strdup_printf("%s/%s", home, old_root);
+			g_free(old_root);
+		}
+	}
+
+	if (option_bip_root == NULL)
+		option_bip_root = g_strdup(DEFAULT_ROOT_PATH);
+
+	if (option_bip_root[0] != '/') {
+		char *old_root = option_bip_root, *home = getenv("HOME");
+		if (home) {
+			option_bip_root = g_strdup_printf("%s/%s", home,
+								old_root);
 			g_free(old_root);
 		}
 	}
@@ -257,6 +273,10 @@ int main(int argc, char *argv[])
 		error("Unable to setup root folder %s", option_root);
 		exit(EXIT_FAILURE);
 	}
+
+	set_obex_option_root_folder(option_root);
+	set_obex_option_bip_root_folder(option_bip_root);
+	set_obex_option_symlinks(option_symlinks);
 
 	memset(&sa, 0, sizeof(sa));
 	sa.sa_handler = sig_term;

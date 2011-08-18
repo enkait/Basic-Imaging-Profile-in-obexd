@@ -55,6 +55,7 @@
 #include "dbus.h"
 #include "mimetype.h"
 #include "service.h"
+#include "options.h"
 #include "obex-priv.h"
 #include "image_pull.h"
 #include "imglisting.h"
@@ -154,8 +155,6 @@
   </attribute>								\
 </record>"
 
-static const char * bip_dir="/tmp/bip/";
-
 static void free_image_pull_session(struct image_pull_session *session)
 {
 	GSList *image_list;
@@ -206,7 +205,8 @@ GSList *get_image_list(const char *dir, int *err) {
 	}
 
 	while ((file = readdir(img_dir)) != NULL) {
-		char *path = g_build_filename(bip_dir, file->d_name, NULL);
+		const char *bip_root = obex_option_bip_root_folder();
+		char *path = g_build_filename(bip_root, file->d_name, NULL);
 		int tmperr;
 		il = get_img_listing(path, handle, &tmperr);
 
@@ -227,12 +227,13 @@ void *image_pull_connect(struct obex_session *os, int *err)
 {
 	struct image_pull_session *session;
 	int priv_err = 0;
+	const char *bip_root = obex_option_bip_root_folder();
 	printf("IMAGE PULL CONNECT\n");
 	manager_register_session(os);
 
 	session = g_new0(struct image_pull_session, 1);
 	session->os = os;
-	session->image_list = get_image_list(bip_dir, &priv_err);
+	session->image_list = get_image_list(bip_root, &priv_err);
 
 	if (priv_err < 0) {
 		if (err != NULL)

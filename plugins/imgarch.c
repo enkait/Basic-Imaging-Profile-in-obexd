@@ -58,6 +58,7 @@
 #include "dbus.h"
 #include "mimetype.h"
 #include "service.h"
+#include "options.h"
 #include "obex-priv.h"
 #include "image_arch.h"
 #include "bip_util.h"
@@ -95,8 +96,6 @@ const char *bip_aos = "BIP:AOS";
 static const uint8_t IMAGE_ARCH_TARGET[TARGET_SIZE] = {
 			0x94, 0x01, 0x26, 0xC0, 0x46, 0x08, 0x11, 0xD5,
 			0x84, 0x1A, 0x00, 0x02, 0xA5, 0x32, 0x5B, 0x4E };
-
-static const char * bip_dir="/tmp/bip/";
 
 struct properties_object {
 	char *handle, *name;
@@ -612,7 +611,9 @@ static void reset_data(struct sarchive_data *data) {
 
 static void rename_image(struct sarchive_data *data, int err) {
 	char *new_path = NULL, *name = NULL;
+	const char *bip_root = obex_option_bip_root_folder();
 	printf("rename_image, err: %d\n", err);
+
 	if (err == -EBADR) {
 		//critical error - abort
 		data->session->status = -EBADR;
@@ -625,9 +626,11 @@ static void rename_image(struct sarchive_data *data, int err) {
 		get_next_image(data, 0);
 		return;
 	}
+
 	if (data->cur_prop != NULL)
 		name = data->cur_prop->name;
-	new_path = safe_rename(name, bip_dir, data->cur_path, &err);
+	new_path = safe_rename(name, bip_root, data->cur_path, &err);
+
 	if (new_path == NULL) {
 		unlink(data->cur_path);
 		get_next_image(data, 0);

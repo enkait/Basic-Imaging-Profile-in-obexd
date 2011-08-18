@@ -54,11 +54,17 @@
 #include "options.h"
 
 static const char *option_root = NULL;
+static const char *option_bip_root = NULL;
 static gboolean option_symlinks = FALSE;
 
 const char *obex_option_root_folder(void)
 {
 	return option_root;
+}
+
+const char *obex_option_bip_root_folder(void)
+{
+	return option_bip_root;
 }
 
 gboolean obex_option_symlinks(void)
@@ -69,6 +75,11 @@ gboolean obex_option_symlinks(void)
 void set_obex_option_root_folder(const char *val)
 {
 	option_root = val;
+}
+
+void set_obex_option_bip_root_folder(const char *val)
+{
+	option_bip_root = val;
 }
 
 void set_obex_option_symlinks(gboolean val)
