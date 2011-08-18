@@ -10,7 +10,10 @@ doc_files = doc/obexd-api.txt doc/agent-api.txt doc/client-api.txt
 test_files = test/simple-agent test/send-files \
 		test/pull-business-card test/exchange-business-cards \
 		test/list-folders test/pbap-client test/ftp-client \
-		test/image_push_test
+		test/image_push_test test/image_pull_test \
+		test/remote_display_test test/remote_camera_test \
+		test/remote_display_agent test/remote_camera_agent \
+		test/image_arch_test
 
 gdbus_sources = gdbus/gdbus.h gdbus/mainloop.c gdbus/watch.c \
 					gdbus/object.c gdbus/polkit.c
@@ -122,6 +125,7 @@ builtin_sources += plugins/imgmonitoring.c
 
 builtin_nodist += plugins/phonebook.c
 builtin_nodist += plugins/messages.c
+builtin_sources += plugins/bip_util.c plugins/bip_util.h
 
 libexec_PROGRAMS += src/obexd
 
@@ -134,7 +138,7 @@ src_obexd_SOURCES = $(gdbus_sources) $(builtin_sources) $(btio_sources) \
 			src/service.h src/service.c \
 			src/transport.h src/transport.c \
 			src/server.h src/server.c \
-			plugins/bip_util.c plugins/bip_util.h
+			src/options.h src/options.c
 
 src_obexd_LDADD = @DBUS_LIBS@ @GLIB_LIBS@ @GTHREAD_LIBS@ \
 					@EBOOK_LIBS@ @OPENOBEX_LIBS@ \
