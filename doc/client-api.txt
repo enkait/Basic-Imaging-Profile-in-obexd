@@ -151,9 +151,8 @@ Methods		string GetImagingCapabilities()
 		void PutImage(string path)
 
 			Sends the image at the specified path to the remote device.
-			This method returns immediately. The PutImageCompleted
-			and PutImageFailed signals are used to notify that
-			the upload has ended.
+			This method returns immediately. Upon completion/failure
+			the PutImageCompleted/PutImageFailed signals are sent.
 
 		void PutModifiedImage(string path, string encoding, uint32 width,
 					uint32 height, string transformation)
@@ -162,7 +161,7 @@ Methods		string GetImagingCapabilities()
 			but first converts it to make sure it is in the given
 			encoding, and has the given width and height. The conversion
 			is done using ImageMagick.
-			
+
 			path : where the image is currently located
 
 			encoding : what encoding should be used, possible values:
@@ -172,16 +171,18 @@ Methods		string GetImagingCapabilities()
 
 			height : the desired height
 
-			transform : method to be used to change the image
+			transformation : method to be used to change the image
 					dimensions if necessary, possible values:
 				"stretch"
 				"fill"
 				"crop"
 
 		void PutImageAttachment(string path, string handle)
-		
+
 			Sends the specified file as an attachment to the image
-			specified by handle.
+			specified by handle. Upon completion/failure
+			the PutAttachmentCompleted/PutAttachmentFailed signals
+			are sent.
 
 			path : where the file is placed
 
@@ -190,19 +191,467 @@ Methods		string GetImagingCapabilities()
 					must have been sent within the current
 					session
 
-Signals		PutImageCompleted(string handle, boolean thumbnail)
-		
-			Informs that the image was successfully sent.
+Signals		PutImageCompleted(string handle)
 
-			handle : a 7 digit number being the handle given
-					to the image by the server
+			Informs that the image was successfully pushed.
 
-			thumbnail : true if the server requests a thumbnail
-					for the image to be sent
-		
+			string handle : a 7 digit number that can be used to
+				push attachments to this image
+
 		PutImageFailed(string err)
 
-			Informs there was an error while sending the message.
+			Informs there was an error while pulling the image.
+
+			err : the error encountered
+
+		PutAttachmentCompleted(string handle)
+
+			Informs that the image was successfully pushed.
+
+			string handle : a 7 digit number that can be used to
+				push attachments to this image
+
+		PutAttachmentFailed(string err)
+
+			Informs there was an error while pulling the image.
+
+			err : the error encountered
+
+Basic Imaging Pull hierarchy
+=======================
+
+Service		org.openobex.client
+Interface	org.openobex.ImagePull
+Object path	[variable prefix]/{session0,session1,...}
+
+Methods		string GetImagingCapabilities()
+
+			Get the imaging capabilities object of the remote device.
+
+		void GetImage(string path, string handle, dict parameters)
+
+			Pulls an image. This method returns immediately.
+			Upon completion/failure the GetImageCompleted/GetImageFailed
+			signals are sent.
+
+			path : where the image should be stored
+
+			handle : a 7 digit number representing the image
+
+			parameters : additional details about the desired image
+			
+			The following keys are defined:
+
+			string pixel : expected pixel size range. Possible values:
+				W*H : exact width and height
+				W1*H1-W2*H2 : pixel size range, where
+					W1/H1 are the minimum width/height,
+					W2/H2 are the maximum width/height
+				W1**-W2*H2 : also pixel size range, but additionally
+					a fixed aspect ratio is required.
+					The height of an image is given as:
+					h = (w * H2) / W2
+				W, H, W1, H1, W2, H2 are all numbers in the range
+				[0-65535], but an upper limit of 65535*65535 means
+				no upper limit
+
+			string encoding : what encoding should be used,
+					possible values:
+				"JPEG", "GIF", "WBMP", "PNG", "JPEG2000", "BMP"
+
+			string maxsize : maximum size expected (this does
+				not have to be respected)
+
+			string transform : method to be used to change the image
+					dimensions if necessary, possible values:
+				"stretch"
+				"fill"
+				"crop"
+
+		void GetImageAttachment(string path, string handle, string name)
+
+			Pulls an image attachment. This method returns immediately.
+			Upon completion/failure
+			the GetAttachmentCompleted/GetAttachmentFailed
+			signals are sent.
+
+			path : where the file should be stored
+
+			handle : a 7 digit number being the handle of the image
+				to which the file is an attachment
+
+			name : the name of the attachment
+
+		void GetImageThumbnail(string path, string handle)
+
+			Pulls an imaging thumbnail. This method returns immediately.
+			Upon completion/failure
+			the GetThumbnailCompleted/GetThumbnailFailed
+			signals are sent. The file is not verified to make sure
+			it is precisely in the imaging thumbnail format.
+
+			string path : where the thumbnail should be stored
+
+			string handle : a 7 digit number being the handle of the image
+				to which the file is an attachment
+
+		array {dict} GetImagesListing(dict parameters)
+
+			Filter and list images on the device.
+
+			parameters : list of filters to apply on the device
+				before returning it.
+
+			The following keys are defined:
+
+			string pixel : filter by pixel size range.
+				Possible values:
+				W*H : exact width and height
+				W1*H1-W2*H2 : pixel size range, where
+					W1/H1 are the minimum width/height,
+					W2/H2 are the maximum width/height
+				W1**-W2*H2 : also pixel size range, but additionally
+					a fixed aspect ratio is required.
+					The height of an image is given as:
+					h = (w * H2) / W2
+				W, H, W1, H1, W2, H2 are all numbers in the range
+				[0-65535].
+				Default: 0*0-65535*65535 (unrestricted).
+
+			string encoding : filter by encoding, possible values:
+				"JPEG", "GIF", "WBMP", "PNG", "JPEG2000",
+				"BMP". Default: unrestricted.
+
+			string created : range of creation dates to include.
+				The format is YYYYMMDDTHHMMSS-YYYYMMDDTHHMMSS,
+				where the capital letter 'T' is explicitly
+				inserted between the day and hour fields.
+				If UTC time is to be used, the letter 'Z' is
+				appended to the end of the string.
+				It is possible to replace one side of the
+				expression with a '*' to specify all images
+				created before or after a given date.
+				Default: unrestricted.
+
+			string modified : filter by modification date.
+				The format here is the same as in the created
+				parameter. Default: unrestricted.
+
+			uint16 count : the number of images to include
+				in the result. Default: unlimited (65535).
+
+			uint16 offset : zero-based offset from beginning of image
+				list. This, combined with the count parameter,
+				can be used to receive the list in pieces.
+				Default: 0.
+
+			bool latest : true if the list should be restricted
+				to only images captured locally by the device.
+				Setting this to true invalidates any setting
+				made to the offset parameter. Default: false.
+
+			The result is an array of dictionaries, one for each
+			image. They have the following keys:
+			string handle : 7 digit number identifying the image.
+
+			string created : time of creation given in the format:
+				YYYYMMDDTHHMMSS(optionally Z) as described
+				in the created parameter above. This key
+				may not always be present.
+
+			string modified : time of modification in the same
+				format as the created attribute above. This
+				key may not allways be present.
+
+		array { array {dict} } GetImageProperties(string handle)
+
+			Get properties of an image.
+
+			The return array contains at least one element.
+			The first elemement is a dictionary with the
+			following keys:
+
+			string handle : a 7 digit number representing the image
+
+			string name : name of the image
+
+			The remaining dictionaries of the array describe the
+			various native or variant versions of the image,
+			or an attachment to the image. All dictionaries have
+			a 'type' key, which can be used to distinguish them.
+
+			Native version dictionaries have the following keys:
+
+			string type : always set to "native".
+
+			string encoding : the encoding of the available image.
+				Possible values:
+				"JPEG", "GIF", "WBMP", "PNG", "JPEG2000", "BMP".
+
+			string pixel : the pixel size of the image, given as
+				width*height. Values are limited to the 
+				range [0-65535].
+
+			string size : the size of the image in bytes.
+				This key is optional.
+
+			Variant version:
+
+			string type : always set to "variant".
+
+			string encoding : the encoding of the available image.
+				The values available are the same as for native.
+
+			string pixel : the pixel size range available.
+				The formats this can be in are:
+				W*H : exact width and height
+				W1*H1-W2*H2 : any pixel size range bounded by:
+					W1/H1 are the minimum width/height,
+					W2/H2 are the maximum width/height
+				W1**-W2*H2 : as above, but also restricted
+					to a fixed aspect ratio.
+					The height of an image is given as:
+					h = (w * H2) / W2.
+				W, H, W1, H1, W2, H2 are all numbers in the range
+				[0-65535].
+
+			string maxsize : the maximum size of the image in bytes.
+
+			string transformation : the transformation methods that
+				can be used to create the variant image.
+				Possible values are a space separated list
+				of any of the following:
+					"stretch", "crop", "fill".
+
+			Attachment:
+
+			string type : always set to "attachment".
+
+			string content-type : MIME type of file.
+
+			string charset : MIME character set of file.
+				This key is optional.
+
+			string name : file name.
+
+			string size : size of file in bytes.
+				This key is optional.
+
+			string created : time of creation given in the format:
+				YYYYMMDDTHHMMSS(optionally Z) as described
+				in the created parameter above.
+				This key is optional.
+
+			string modified : time of modification in the same
+				format as the created attribute above.
+				This key is optional.
+
+		void DeleteImage(string handle)
+
+			Removes an image.
+
+			string handle : 7 digit number identifying the image.
+
+Signals		GetImageCompleted(void)
+
+			Informs that the image was successfully pulled.
+
+		GetImageFailed(string err)
+
+			Informs there was an error while pulling the image.
+
+			err : the error encountered
+
+		GetThumbnailCompleted(void)
+
+			Informs that the thumbnail was successfully pulled.
+
+		GetThumbnailFailed(string err)
+
+			Informs there was an error while pulling the thumbnail.
+
+			err : the error encountered
+
+		GetAttachmentCompleted(void)
+
+			Informs that the attachment was successfully pulled.
+
+		GetAttachmentFailed(string err)
+
+			Informs there was an error while pulling the attachment.
+
+			err : the error encountered
+
+Automatic Archive hierarchy
+=======================
+
+Service		org.openobex.client
+Interface	org.openobex.Archive
+Object path	[variable prefix]/{session0,session1,...}
+
+Methods		void StartArchive()
+
+			Tells the server to begin archiving images. The server
+			is given access to all images located in the BIP root
+			folder.
+
+		string GetStatus()
+
+			Requests an update on the status of the archiving
+			operation. Return values are one of the following:
+			"Continue" - indicates that the operation is ongoing,
+			"Success" - indicates that the operation has ended
+				successfully,
+			"Failure" - indicates that an error ocurred
+
+Remote Camera hierarchy
+=======================
+
+Service		org.openobex.client
+Interface	org.openobex.RemoteCamera
+Object path	[variable prefix]/{session0,session1,...}
+
+Methods		void GetMonitoringImage(string path, bool store)
+
+			Pulls the monitoring image from the server.
+			It is also possible to tell the device to capture
+			and store an image. Upon completion/failure
+			the GetMonitImageCompleted/GetMonitImageFailed signals
+			are sent.
+
+			string path : path where to place the received image.
+
+			bool store : true if the camera should capture
+				and store theimage and store for retrieval.
+
+		void GetImage(string path, string handle, dict parameters)
+
+			Pull the specified image.
+			The handle should be one of the handles received
+			as a result of a GetMonitoringImage call.
+			This function behaves identically to the GetImage
+			function in the Basic Image Pull hierarchy.
+
+		void GetImageThumbnail(string path, string handle)
+
+			Pulls a thumbnail of the specified image.
+			The handle should be one of the handles received
+			as a result of a GetMonitoringImage call. This
+			function behaves identically to the GetImageThumbnail
+			function in the Basic Image Pull hierarchy.
+
+		array { array {dict} } GetImageProperties(string handle)
+
+			Get properties of an image.
+			The handle should be one of the handles received
+			as a result of a GetMonitoringImage call. This
+			function behaves identically to the GetImageProperties
+			function in the Basic Image Pull hierarchy.
+
+Signals		GetImageCompleted(void)
+
+			Informs that the image was successfully pulled.
+
+		GetImageFailed(string err)
+
+			Informs there was an error while pulling the image.
+
+			err : the error encountered
+
+		GetMonitImageCompleted(string handle)
+
+			Informs that the monitoring image was successfully
+			pulled.
+
+			string handle : If the GetMonitoringImage store
+				argument was set to true, this argument
+				will be the handle of the stored image.
+				Otherwise, it will be an empty string.
+
+		GetMonitImageFailed(string err)
+
+			Informs there was an error while pulling the image.
+
+			err : the error encountered
+
+		GetAttachmentCompleted(void)
+
+			Informs that the attachment was successfully pulled.
+
+		GetAttachmentFailed(string err)
+
+			Informs there was an error while pulling the attachment.
+
+			err : the error encountered
+
+Remote Display hierarchy
+=======================
+
+Service		org.openobex.client
+Interface	org.openobex.RemoteDisplay
+Object path	[variable prefix]/{session0,session1,...}
+
+Methods		void PutImage(string path)
+
+			Sends the image at the specified path to the remote
+			device. This method returns immediately. Upon
+			completion/failure the PutImageCompleted/PutImageFailed
+			signals are sent. This function behaves identically
+			to the PutImage function in the Basic Image Push
+			hierarchy.
+
+		void PutModifiedImage(string path, string encoding,
+					uint32 width, uint32 height,
+					string transformation)
+
+			Sends the image at the specified path to the remote
+			device, but first converts it to make sure it is in
+			the given encoding, and has the given width and height.
+			The conversion is done using ImageMagick. This function
+			behaves identically to the PutModifiedImage function
+			in the Basic Image Push hierarchy.
+
+		array {dict} GetImagesListing(dict parameters)
+
+			Filter and list images on the device.
+
+		string SelectImage(string handle)
+
+			Select image to be displayed. The displayed handle
+			is returned.
+
+			handle : 7 digit identifier of image
+
+		string NextImage(string handle)
+
+			Displays the next image. The device decides which image
+			that is. Returns currently displayed image handle.
+
+			handle : 7 digit identifier of image
+
+		string PreviousImage(string handle)
+
+			Displays the previous image. The device decides which image
+			that is. Returns currently displayed image handle.
+
+			handle : 7 digit identifier of image
+
+		string CurrentImage(string handle)
+
+			Returns currently displayed image handle.
+
+			handle : 7 digit identifier of image
+
+Signals		PutImageCompleted(string handle)
+
+			Informs that the image was successfully pushed.
+
+			string handle : a 7 digit number that can be used to
+				select this image for display
+
+		PutImageFailed(string err)
+
+			Informs there was an error while pulling the image.
 
 			err : the error encountered
 
