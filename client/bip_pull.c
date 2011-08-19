@@ -1003,6 +1003,9 @@ static gboolean parse_filter_dict(DBusMessageIter *iter,
 		dbus_message_iter_next(iter);
 	}
 
+	if (latest)
+		*start = 0;
+
 	printf("c: %s\nm: %s\ne: %s\np: %s\nc: %u\no: %u\nl: %u\n",
 			(*created)?(*created):(""),
 			(*modified)?(*modified):(""),
