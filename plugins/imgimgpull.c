@@ -332,6 +332,12 @@ static ssize_t get_next_header(void *object, void *buf, size_t mtu,
 		return -EBADR;
 	}
 
+	if (data->size_sent) {
+		data->size_sent = TRUE;
+		*hi = OBEX_HDR_LENGTH;
+		return put_hdr_u32(buf, mtu, data->size);
+	}
+
 	*hi = OBEX_HDR_EMPTY;
 	return 0;
 }
