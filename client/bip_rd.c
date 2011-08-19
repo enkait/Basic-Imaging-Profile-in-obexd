@@ -214,7 +214,6 @@ GDBusMethodTable remote_display_methods[] = {
 	{ "PutModifiedImage", "ssuus", "", put_modified_image },
 	{ "GetImagesListing",	"a{sv}", "aa{ss}", get_images_listing,
 		G_DBUS_METHOD_FLAG_ASYNC },
-	{ "RemoteDisplay",	"a{sv}", "s", get_images_listing },
 	{ }
 };
 
