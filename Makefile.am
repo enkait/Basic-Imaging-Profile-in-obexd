@@ -228,11 +228,11 @@ plugins/messages.c: plugins/@MESSAGES_DRIVER@
 
 TESTS = unit/test-gobex-header unit/test-gobex-packet unit/test-gobex \
 		unit/test-gobex-transfer unit/test-gobex-transfer \
-		unit/test-bip
+		unit/test-bip unit/test-bip-plugins
 
 noinst_PROGRAMS += unit/test-gobex-header unit/test-gobex-packet \
 		unit/test-gobex unit/test-gobex-transfer \
-		unit/test-bip
+		unit/test-bip unit/test-bip-plugins
 
 unit_test_gobex_SOURCES = $(gobex_sources) unit/test-gobex.c \
 							unit/util.c unit/util.h
@@ -253,6 +253,23 @@ unit_test_gobex_transfer_LDADD = @GLIB_LIBS@
 unit_test_bip_SOURCES = client/bip_util.c $(gwobex_sources) $(gobex_sources) client/bip_util.h unit/util.c unit/util.h \
 						unit/test-bip.c
 unit_test_bip_LDADD = $(client_obex_client_LDADD)
+
+unit_test_bip_plugins_SOURCES = $(nodist_src_obexd_SOURCES) \
+				$(gdbus_sources) $(builtin_sources) $(btio_sources) \
+				$(gobex_sources) \
+				src/obexd.h \
+				src/plugin.h src/plugin.c \
+				src/log.h src/log.c src/dbus.h src/manager.c \
+				src/obex.h src/obex.c src/obex-priv.h \
+				src/mimetype.h src/mimetype.c \
+				src/service.h src/service.c \
+				src/transport.h src/transport.c \
+				src/server.h src/server.c \
+				src/options.h src/options.c \
+				unit/util.c unit/util.h \
+				unit/test-bip-plugins.c
+
+unit_test_bip_plugins_LDADD = $(src_obexd_LDADD)
 
 if READLINE
 noinst_PROGRAMS += tools/test-client
