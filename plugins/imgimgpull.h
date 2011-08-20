@@ -4,6 +4,9 @@ struct img_desc {
 	gboolean fixed_ratio;
 	unsigned int maxsize;
 	char *transform;
+
+	// state flags for parser, unused later
+	gboolean recv_enc, recv_pixel;
 };
 
 gboolean img_elem_attr(struct img_desc *desc, const gchar *key,

@@ -104,6 +104,10 @@ gboolean img_elem_attr(struct img_desc *desc, const gchar *key,
 			goto invalid;
 	}
 	else if (g_str_equal(key, "encoding")) {
+		if (desc->recv_enc)
+			goto invalid;
+		desc->recv_enc = TRUE;
+
 		if (value == NULL || strlen(value) == 0)
 			goto ok;
 
@@ -123,8 +127,13 @@ gboolean img_elem_attr(struct img_desc *desc, const gchar *key,
 		desc->transform = g_strdup(value);
 	}
 	else if (g_str_equal(key, "pixel")) {
-		if (strlen(value) == 0)
+		if (desc->recv_pixel)
+			goto invalid;
+		desc->recv_pixel = TRUE;
+
+		if (value == NULL || strlen(value) == 0)
 			goto ok;
+
 		if (!parse_pixel_range(value, desc->lower, desc->upper,
 							&desc->fixed_ratio))
 			goto invalid;
@@ -139,6 +148,7 @@ ok:
 invalid:
 	g_set_error(gerr, G_MARKUP_ERROR, G_MARKUP_ERROR_INVALID_CONTENT,
 									NULL);
+
 	return FALSE;
 }
 
@@ -149,14 +159,22 @@ void img_elem(GMarkupParseContext *ctxt,
 		gpointer user_data,
 		GError **gerr)
 {
-	struct img_desc *desc = user_data;
+	struct img_desc **desc = user_data;
 	gchar **key;
 
 	if (g_str_equal(element, "image") != TRUE)
 		return;
 
+	if (*desc != NULL) {
+		g_set_error(gerr, G_MARKUP_ERROR,
+				G_MARKUP_ERROR_INVALID_CONTENT, NULL);
+		return;
+	}
+
+	*desc = create_img_desc();
+
 	for (key = (gchar **) names; *key; key++, values++)
-		if (!img_elem_attr(desc, *key, *values, gerr))
+		if (!img_elem_attr(*desc, *key, *values, gerr))
 			return;
 }
 
@@ -171,17 +189,23 @@ static const GMarkupParser img_desc_parser = {
 struct img_desc *parse_img_desc(char *data, unsigned int length,
 								int *err)
 {
-	struct img_desc *desc = create_img_desc();
+	struct img_desc *desc = NULL;
+	GError *gerr = NULL;
 	GMarkupParseContext *ctxt = g_markup_parse_context_new(
-					&img_desc_parser, 0, desc, NULL);
+					&img_desc_parser, 0, &desc, NULL);
 	if (err != NULL)
 		*err = 0;
-	if (!g_markup_parse_context_parse(ctxt, data, length, NULL)) {
-		if (err != NULL)
-			*err = -EINVAL;
-		free_img_desc(desc);
-		desc = NULL;
+
+	if (g_markup_parse_context_parse(ctxt, data, length, &gerr)) {
+		if (desc->recv_pixel && desc->recv_enc)
+			goto cleanup;
 	}
+
+	if (err != NULL)
+		*err = -EINVAL;
+	free_img_desc(desc);
+	desc = NULL;
+cleanup:
 	g_markup_parse_context_free(ctxt);
 	return desc;
 }
