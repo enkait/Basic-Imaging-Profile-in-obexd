@@ -54,8 +54,8 @@ endif
 builtin_modules += filesystem
 builtin_sources += plugins/filesystem.c plugins/filesystem.h
 
-builtin_modules += imgimg
-builtin_sources += plugins/imgimg.c plugins/imgimg.h
+builtin_modules += imgimgpush
+builtin_sources += plugins/imgimgpush.c plugins/imgimgpush.h
 
 builtin_modules += imglisting
 builtin_sources += plugins/imglisting.c plugins/imglisting.h
