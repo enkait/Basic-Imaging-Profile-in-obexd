@@ -25,41 +25,37 @@ uint8_t *encode_img_descriptor(const char *data, unsigned int length,
 char *decode_img_descriptor(const uint8_t *data, unsigned int length,
 						unsigned int *newsize);
 
-const gchar *convBIP2IM(const gchar *encoding);
-const gchar *convIM2BIP(const gchar *encoding);
-gboolean verify_transform(const char *transform);
 struct image_attributes *get_image_attributes(const char *image_file, int *err);
 void free_image_attributes(struct image_attributes *attr);
-
-/** Convert a time string in ISO8601 format to time_t
- * @param str Time string in ISO8601 format
- * @param len Length of string
- * @returns time as time_t format
- */
-time_t parse_iso8601_bip(const gchar *str, int len);
-gboolean parse_pixel_range(const gchar *dim, unsigned int *lower,
-				unsigned int *upper, gboolean *fixed_ratio);
 int make_modified_image(const char *image_path, const char *modified_path,
 			struct image_attributes *attr, const char *transform,
 			int *err);
+
+const gchar *convBIP2IM(const gchar *encoding);
+const gchar *convIM2BIP(const gchar *encoding);
+gboolean verify_transform(const char *transform);
+time_t parse_iso8601_bip(const gchar *str, int len);
+gboolean parse_pixel_range(const gchar *dim, unsigned int *lower,
+				unsigned int *upper, gboolean *fixed_ratio);
 gboolean make_thumbnail(const char *image_path, const char *modified_path,
 								int *err);
 int parse_handle(const char *data);
-//gboolean parse_bip_header(char **header, unsigned int *hdr_len,
-//			uint8_t hi, const uint8_t *data, unsigned int hlen);
+char *parse_transform(const char *transform);
+char *parse_transform_list(const char *transform);
 gboolean verify_unsignednumber(const char *size);
+char *parse_unsignednumber(const char *size);
+
 void parse_bip_user_headers(const struct obex_session *os, obex_object_t *obj,
 				char **desc_hdr,
 				unsigned int *desc_hdr_len,
 				char **handle_hdr,
 				unsigned int *handle_hdr_len);
-char *parse_transform(const char *transform);
-char *parse_transform_list(const char *transform);
-char *parse_unsignednumber(const char *size);
+
 char *get_att_dir(const char *image_path);
 char *safe_rename(const char *name, const char *folder, const char *orig_path,
 								int *err);
-struct a_header *create_handle(const char *handle);
 char *insert_number(const char *path, unsigned int number);
-char *get_null_terminated(char *buffer, int len);
+
+struct a_header *create_handle(const char *handle);
 ssize_t add_reply_handle(void *buf, size_t mtu, uint8_t *hi, int handle);
+char *get_null_terminated(char *buffer, int len);
