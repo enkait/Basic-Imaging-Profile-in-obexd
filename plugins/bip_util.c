@@ -352,7 +352,7 @@ failure:
 	return NULL;
 }
 
-char *parse_unsignednumber(const char *size) {
+gboolean verify_unsignednumber(const char *size) {
 	static regex_t unumber;
 	static int regex_initialized = 0;
 	if (!regex_initialized) {
@@ -360,7 +360,14 @@ char *parse_unsignednumber(const char *size) {
 		regex_initialized = 1;
 	}
 	if (regexec(&unumber, size, 0, NULL, 0) != 0)
+		return FALSE;
+	return TRUE;
+}
+
+char *parse_unsignednumber(const char *size) {
+	if (!verify_unsignednumber(size)) {
 		return NULL;
+	}
 	return g_strdup(size);
 }
 
