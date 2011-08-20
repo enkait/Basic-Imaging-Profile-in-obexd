@@ -58,15 +58,24 @@
 #include "bip_util.h"
 
 #define EOL_CHARS "\n"
-
 #define CAPABILITIES_BEGIN "<imaging-capabilities version=\"1.0\">" EOL_CHARS
 
-#define IMAGE_FORMATS "<image-formats encoding=\"JPEG\" pixel=\"0*0-65535*65535\">" EOL_CHARS \
-                      "<image-formats encoding=\"GIF\" pixel=\"0*0-65535*65535\">" EOL_CHARS \
-                      "<image-formats encoding=\"WBMP\" pixel=\"0*0-65535*65535\">" EOL_CHARS \
-                      "<image-formats encoding=\"PNG\" pixel=\"0*0-65535*65535\">" EOL_CHARS \
-                      "<image-formats encoding=\"JPEG2000\" pixel=\"0*0-65535*65535\">" EOL_CHARS \
-                      "<image-formats encoding=\"BMP\" pixel=\"0*0-65535*65535\">" EOL_CHARS \
+#define IMAGE_FORMATS "" \
+	"<image-formats encoding=\"JPEG\" pixel=\"0*0-65535*65535\"/>" \
+								EOL_CHARS \
+	"<image-formats encoding=\"GIF\" pixel=\"0*0-65535*65535\"/>" \
+								EOL_CHARS \
+	"<image-formats encoding=\"WBMP\" pixel=\"0*0-65535*65535\"/>" \
+								EOL_CHARS \
+	"<image-formats encoding=\"PNG\" pixel=\"0*0-65535*65535\"/>" \
+								EOL_CHARS \
+	"<image-formats encoding=\"JPEG2000\" pixel=\"0*0-65535*65535\"/>" \
+								EOL_CHARS \
+	"<image-formats encoding=\"BMP\" pixel=\"0*0-65535*65535\"/>" \
+								EOL_CHARS
+
+#define FILTERING_PARAM "<filtering-parameters created=\"1\" modified=\"1\"" \
+			" pixel=\"1\" encoding=\"1\"/>" EOL_CHARS
 
 #define CAPABILITIES_END "</imaging-capabilities>" EOL_CHARS
 
@@ -271,6 +280,7 @@ void *img_capabilities_open(const char *name, int oflag, mode_t mode,
 
 	capabilities = g_string_new(CAPABILITIES_BEGIN);
 	capabilities = g_string_append(capabilities, IMAGE_FORMATS);
+	capabilities = g_string_append(capabilities, FILTERING_PARAM);
 	capabilities = g_string_append(capabilities, CAPABILITIES_END);
 
 	if (err)
