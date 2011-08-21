@@ -66,7 +66,9 @@ struct imgthmpull_data {
 static int get_thumbnail_fd(char *image_path, int *err) {
 	char *thm_path;
 	int fd = g_file_open_tmp(NULL, &thm_path, NULL);
-	
+
+	DBG("");
+
 	if (fd < 0) {
 		if (err != NULL)
 			*err = -errno;
@@ -89,6 +91,9 @@ static struct imgthmpull_data *imgthmpull_open(const char *name, int oflag,
 		mode_t mode, void *context, size_t *size, int *err)
 {
 	struct imgthmpull_data *data = g_new0(struct imgthmpull_data, 1);
+
+	DBG("");
+
 	data->fd = -1;
 	data->handle = -1;
 	data->context = context;
@@ -100,6 +105,8 @@ static char *image_pull_cb(void *context, int handle)
 	int err = 0;
 	struct image_pull_session *session = context;
 	struct img_listing *il = NULL;
+
+	DBG("");
 
 	if (session == NULL)
 		return NULL;
@@ -117,6 +124,9 @@ static void *image_pull_open(const char *name, int oflag,
 {
 	struct imgthmpull_data *data = imgthmpull_open(name, oflag, mode,
 							context, size, err);
+
+	DBG("");
+
 	data->get_image_path = image_pull_cb;
 	return data;
 }
@@ -126,6 +136,8 @@ static char *remote_camera_cb(void *context, int handle)
 	int err = 0;
 	struct remote_camera_session *session = context;
 	struct img_listing *il = NULL;
+
+	DBG("");
 
 	if (session == NULL)
 		return NULL;
@@ -143,6 +155,9 @@ static void *remote_camera_open(const char *name, int oflag,
 {
 	struct imgthmpull_data *data = imgthmpull_open(name, oflag, mode,
 							context, size, err);
+
+	DBG("");
+
 	data->get_image_path = remote_camera_cb;
 	return data;
 }
@@ -156,7 +171,8 @@ static int feed_next_header(void *object, uint8_t hi, obex_headerdata_t hv,
 	int err, handle;
 	if (data == NULL)
 		return -EBADR;
-	printf("feed_next_header\n");
+
+	DBG("");
 
 	if (hi == IMG_HANDLE_HDR) {
 		header = decode_img_handle(hv.bs, hv_size, &hdr_len);
@@ -183,7 +199,6 @@ static int feed_next_header(void *object, uint8_t hi, obex_headerdata_t hv,
 			return -EBADR;
 
 		data->fd = get_thumbnail_fd(image_path, &err);
-		printf("fd = %d\n", data->fd);
 
 		if (data->fd == -1)
 			return -EBADR;
