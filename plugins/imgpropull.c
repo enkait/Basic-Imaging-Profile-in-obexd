@@ -78,28 +78,31 @@ struct imgpropull_data {
 
 static void imgpropull_data_free(struct imgpropull_data *data)
 {
+	DBG("");
+
 	if (data == NULL)
 		return;
 	g_string_free(data->object, TRUE);
 	g_free(data);
 }
 
-static GString *append_attachments(GString *object, char *image_path) {
+static GString *append_attachments(GString *object, char *image_path)
+{
 	char *att_dir_path = get_att_dir(image_path);
 	DIR *att_dir = opendir(att_dir_path);
 	struct dirent *file;
 	struct stat file_stat;
 	char mtime[18], ctime[18];
-	
+
+	DBG("");
+
 	if (att_dir == NULL)
 		goto done;
 
 	while ((file = readdir(att_dir)) != NULL) {
 		char *path = g_build_filename(att_dir_path, file->d_name,
 									NULL);
-		printf("path: %s\n", path);
 		if (lstat(path, &file_stat) < 0 || !S_ISREG(file_stat.st_mode)) {
-			printf("nie baldzo: %s\n", path);
 			g_free(path);
 			continue;
 		}
@@ -113,7 +116,6 @@ static GString *append_attachments(GString *object, char *image_path) {
 					ctime, mtime);
 		g_free(path);
 	}
-	printf("attachment not found\n");
 	closedir(att_dir);
 
 done:
@@ -125,8 +127,10 @@ static GString *create_image_properties(struct img_listing *il)
 {
 	struct encconv_pair * ep = encconv_table;
 	char *image_name = g_path_get_basename(il->image);
-
 	GString *object = g_string_new("");
+
+	DBG("");
+
 	g_string_append_printf(object, IMG_PROPERTIES_BEGIN, il->handle,
 								image_name);
 	g_free(image_name);
@@ -150,7 +154,9 @@ static void *imgpropull_open(const char *name, int oflag, mode_t mode,
 					void *context, size_t *size, int *err)
 {
 	struct imgpropull_data *data = g_new0(struct imgpropull_data, 1);
-	
+
+	DBG("");
+
 	data->handle = -1;
 	data->context = context;
 
@@ -164,6 +170,9 @@ static struct img_listing *image_pull_cb(void *context, int handle)
 {
 	struct image_pull_session *session = context;
 	int err;
+
+	DBG("");
+
 	return get_listing(session->image_list, handle, &err);
 }
 
@@ -203,9 +212,11 @@ static int feed_next_header(void *object, uint8_t hi, obex_headerdata_t hv,
 	char *header;
 	unsigned int hdr_len;
 	int handle;
+
+	DBG("");
+
 	if (data == NULL)
 		return -EBADR;
-	printf("feed_next_header\n");
 
 	if (hi == IMG_HANDLE_HDR) {
 		header = decode_img_handle(hv.bs, hv_size, &hdr_len);
@@ -238,12 +249,23 @@ static int feed_next_header(void *object, uint8_t hi, obex_headerdata_t hv,
 static ssize_t imgpropull_read(void *object, void *buf, size_t count)
 {
 	struct imgpropull_data *data = object;
-	printf("imgpropull_read\n");
+
+	DBG("");
+
+	if (data == NULL)
+		return -EBADR;
+
 	return string_read(data->object, buf, count);
 }
 
 static int imgpropull_close(void *object) {
 	struct imgpropull_data *data = object;
+
+	DBG("");
+
+	if (data == NULL)
+		return -EBADR;
+
 	imgpropull_data_free(data);
 	return 0;
 }
