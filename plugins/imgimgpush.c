@@ -95,25 +95,37 @@ struct imgimg_data {
 	gboolean handle_sent;
 };
 
+static void free_imgimg_data(struct imgimg_data *data)
+{
+	DBG("");
+
+	if (data == NULL)
+		return;
+	g_free(data->path);
+	g_free(data);
+}
+
 static struct imgimg_data *imgimg_open(const char *name, int oflag, mode_t mode,
 		void *context, size_t *size, int *err)
 {
 	struct imgimg_data *data = g_new0(struct imgimg_data, 1);
-	printf("imgimg_open\n");
-	data->context = context;
-	data->handle = -1;
 
 	DBG("");
 
+	data->context = context;
+	data->handle = -1;
+
 	if (!name) {
 		if (err != NULL)
-			*err = -errno;
+			*err = -EINVAL;
 		return NULL;
 	}
 
 	data->fd = g_file_open_tmp(NULL, &data->path, NULL);
 
 	if (data->fd < 0) {
+		error("g_file_open_tmp(NULL, %p, NULL) %s (%d)",
+					&data->path, strerror(errno), errno);
 		if (err != NULL)
 			*err = -errno;
 		return NULL;
@@ -122,7 +134,8 @@ static struct imgimg_data *imgimg_open(const char *name, int oflag, mode_t mode,
 	return data;
 }
 
-static int pushcb(void *context, char *path, int *handle_out) {
+static int image_push_cb(void *context, char *path, int *handle_out)
+{
 	struct image_push_session *session = context;
 	struct pushed_image *img = NULL;
 	char *new_path = NULL;
@@ -133,6 +146,7 @@ static int pushcb(void *context, char *path, int *handle_out) {
 	if ((new_path = safe_rename(session->os->name, session->bip_root,
 							path, &err)) == NULL)
 		return err;
+
 	img = g_new0(struct pushed_image, 1);
 	img->handle = get_new_handle(session);
 
@@ -155,11 +169,12 @@ static void *image_push_open(const char *name, int oflag, mode_t mode,
 	DBG("");
 
 	data = imgimg_open(name, oflag, mode, context, size, err);
-	data->finished_cb = pushcb;
+	data->finished_cb = image_push_cb;
 	return data;
 }
 
-static int remote_display_cb(void *context, char *path, int *handle_out) {
+static int remote_display_cb(void *context, char *path, int *handle_out)
+{
 	struct remote_display_session *session = context;
 	struct img_listing *il = NULL;
 	int err = 0, handle;
@@ -206,6 +221,9 @@ static ssize_t imgimg_get_next_header(void *object, void *buf, size_t mtu,
 
 	DBG("");
 
+	if (data == NULL)
+		return -EBADR;
+
 	if (data->handle_sent) {
 		*hi = OBEX_HDR_EMPTY;
 		return 0;
@@ -230,10 +248,15 @@ int imgimg_close(void *object)
 
 	DBG("");
 
-	printf("imgimg_close\n");
+	if (data == NULL)
+		return -EBADR;
 
-	if (close(data->fd) < 0)
+	if (close(data->fd) < 0) {
+		error("close(%d) %s (%d)", data->fd, strerror(errno), errno);
 		return -errno;
+	}
+
+	free_imgimg_data(data);
 
 	return 0;
 }
@@ -245,14 +268,16 @@ ssize_t imgimg_write(void *object, const void *buf, size_t count)
 
 	DBG("");
 
+	if (data == NULL)
+		return -EBADR;
+
 	ret = write(data->fd, buf, count);
-	printf("imgimg_write\n");
 	if (ret < 0)
 		return -errno;
 	return ret;
 }
 
-static struct obex_mime_type_driver imgimg = {
+static struct obex_mime_type_driver imgimgpush = {
 	.target = IMAGE_PUSH_TARGET,
 	.target_size = TARGET_SIZE,
 	.mimetype = "x-bt/img-img",
@@ -262,7 +287,7 @@ static struct obex_mime_type_driver imgimg = {
 	.get_next_header = imgimg_get_next_header,
 };
 
-static struct obex_mime_type_driver imgimg_rd = {
+static struct obex_mime_type_driver imgimgpush_rd = {
 	.target = REMOTE_DISPLAY_TARGET,
 	.target_size = TARGET_SIZE,
 	.mimetype = "x-bt/img-img",
@@ -305,25 +330,25 @@ static struct obex_mime_type_driver img_capabilities = {
 	.read = img_capabilities_read,
 };
 
-static int imgimg_init(void)
+static int imgimgpush_init(void)
 {
 	int res;
 	if ((res = obex_mime_type_driver_register(&img_capabilities)) < 0) {
 		return res;
 	}
 
-	if ((res = obex_mime_type_driver_register(&imgimg_rd)) < 0) {
+	if ((res = obex_mime_type_driver_register(&imgimgpush_rd)) < 0) {
 		return res;
 	}
 
-	return obex_mime_type_driver_register(&imgimg);
+	return obex_mime_type_driver_register(&imgimgpush);
 }
 
-static void imgimg_exit(void)
+static void imgimgpush_exit(void)
 {
-	obex_mime_type_driver_unregister(&imgimg);
-	obex_mime_type_driver_unregister(&imgimg_rd);
+	obex_mime_type_driver_unregister(&imgimgpush);
+	obex_mime_type_driver_unregister(&imgimgpush_rd);
 	obex_mime_type_driver_unregister(&img_capabilities);
 }
 
-OBEX_PLUGIN_DEFINE(imgimg, imgimg_init, imgimg_exit)
+OBEX_PLUGIN_DEFINE(imgimgpush, imgimgpush_init, imgimgpush_exit)
