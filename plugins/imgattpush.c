@@ -60,29 +60,24 @@ static const uint8_t IMAGE_PUSH_TARGET[TARGET_SIZE] = {
 	0xE3, 0x3D, 0x95, 0x45, 0x83, 0x74, 0x4A, 0xD7,
 	0x9E, 0xC5, 0xC1, 0x6B, 0xE3, 0x1E, 0xDE, 0x8E };
 
-struct imgattpush_data {
-	int fd;
-	struct image_push_session *context;
-	char *path, *att_path, *name;
-	int handle;
-};
+void free_imgattpush_data(struct imgattpush_data *data)
+{
+	if (data == NULL)
+		return;
+	g_free(data->path);
+	g_free(data->att_path);
+	g_free(data->name);
+	g_free(data);
+}
 
-struct att_desc {
-	char *name;
-};
-
-static void att_element(GMarkupParseContext *ctxt,
-		const gchar *element,
-		const gchar **names,
-		const gchar **values,
-		gpointer user_data,
-		GError **gerr)
+static void att_element(GMarkupParseContext *ctxt, const gchar *element,
+			const gchar **names, const gchar **values,
+			gpointer user_data, GError **gerr)
 {
 	char **desc = user_data;
 	gchar **key;
 
-	printf("element: %s\n", element);
-	printf("names\n");
+	DBG("");
 
 	if (g_str_equal(element, "attachment") != TRUE)
 		return;
@@ -92,6 +87,7 @@ static void att_element(GMarkupParseContext *ctxt,
 				G_MARKUP_ERROR_INVALID_CONTENT, NULL);
 		return;
 	}
+
 	for (key = (gchar **) names; *key; key++, values++)
 		if (g_str_equal(*key, "name"))
 			*desc = g_strdup(*values);
@@ -110,16 +106,20 @@ static char *parse_att_desc(const char *data, unsigned int length)
 	char *desc = NULL;
 	GMarkupParseContext *ctxt = g_markup_parse_context_new(&handles_desc_parser,
 			0, &desc, NULL);
+
+	DBG("");
+
 	g_markup_parse_context_parse(ctxt, data, length, NULL);
 	g_markup_parse_context_free(ctxt);
 	return desc;
 }
 
 static void *imgattpush_open(const char *name, int oflag, mode_t mode,
-		void *context, size_t *size, int *err)
+				void *context, size_t *size, int *err)
 {
 	struct imgattpush_data *data = NULL;
-	printf("imgattpush_open\n");
+
+	DBG("");
 
 	if (err != NULL)
 		*err = 0;
@@ -137,6 +137,8 @@ static int feed_next_header(void *object, uint8_t hi, obex_headerdata_t hv,
 	struct imgattpush_data *data = object;
 	struct image_push_session *session = data->context;
 	int handle;
+
+	DBG("");
 
 	if (data == NULL)
 		return -EBADR;
@@ -190,13 +192,17 @@ static int feed_next_header(void *object, uint8_t hi, obex_headerdata_t hv,
 	return 0;
 }
 
-static int imgattpush_flush(void *object) {
+static int imgattpush_flush(void *object)
+{
 	struct imgattpush_data *data = object;
 	struct stat file_stat;
 	char *new_path;
 	int err;
 
 	DBG("");
+
+	if (data != NULL)
+		return -EBADR;
 
 	if (mkdir(data->att_path, 0700) < 0) {
 		if (errno != EEXIST)
@@ -221,16 +227,27 @@ static int imgattpush_close(void *object)
 
 	DBG("");
 
-	if (data->fd >= 0 && close(data->fd) < 0)
-		return -errno;
+	if (data != NULL)
+		return -EBADR;
+
+	close(data->fd);
+	free_imgattpush_data(data);
+
 	return 0;
 }
 
 static ssize_t imgattpush_write(void *object, const void *buf, size_t count)
 {
 	struct imgattpush_data *data = object;
-	ssize_t ret = write(data->fd, buf, count);
-	printf("imgattpush_write\n");
+	ssize_t ret;
+
+	DBG("");
+
+	if (data != NULL)
+		return -EBADR;
+
+	ret = write(data->fd, buf, count);
+
 	if (ret < 0)
 		return -errno;
 	return ret;
