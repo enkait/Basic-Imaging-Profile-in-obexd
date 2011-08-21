@@ -50,13 +50,14 @@
 #include "obex.h"
 #include "mimetype.h"
 #include "service.h"
+
 #include "imgimgpull.h"
+#include "imgimgpush.h"
 #include "imglisting.h"
 #include "image_pull.h"
 #include "remote_camera.h"
 #include "filesystem.h"
 #include "bip_util.h"
-#include "imgimg.h"
 
 #define EOL_CHARS "\n"
 #define CAPABILITIES_BEGIN "<imaging-capabilities version=\"1.0\">" EOL_CHARS
@@ -74,23 +75,34 @@
 
 #define CAPABILITIES_END "</imaging-capabilities>" EOL_CHARS
 
-struct imgimgpull_data {
-	void *context;
-	char * (*get_image_path) (void *context, int handle);
-	int fd, handle;
-	size_t size;
-	gboolean size_sent, write;
-	struct img_desc *desc;
-};
+void free_imgimgpull_data(struct imgimgpull_data *data)
+{
+	DBG("");
 
-static struct img_desc *create_img_desc() {
+	if (data == NULL)
+		return;
+	free_img_desc(data->desc);
+	g_free(data);
+}
+
+static struct img_desc *create_img_desc()
+{
 	struct img_desc *desc = g_new0(struct img_desc, 1);
+
+	DBG("");
+
 	desc->upper[0] = desc->upper[1] = UINT_MAX;
 	desc->maxsize = UINT_MAX;
 	return desc;
 }
 
-static void free_img_desc(struct img_desc *desc) {
+void free_img_desc(struct img_desc *desc)
+{
+	DBG("");
+
+	if (desc == NULL)
+		return;
+
 	g_free(desc->encoding);
 	g_free(desc->transform);
 	g_free(desc);
@@ -99,7 +111,11 @@ static void free_img_desc(struct img_desc *desc) {
 gboolean img_elem_attr(struct img_desc *desc, const gchar *key,
 					const gchar *value, GError **gerr)
 {
+	DBG("");
+
 	if (g_str_equal(key, "maxsize")) {
+		if (!verify_unsignednumber(value))
+			goto invalid;
 		if (sscanf(value, "%u", &desc->maxsize) < 1)
 			goto invalid;
 	}
@@ -152,15 +168,14 @@ invalid:
 	return FALSE;
 }
 
-void img_elem(GMarkupParseContext *ctxt,
-		const gchar *element,
-		const gchar **names,
-		const gchar **values,
-		gpointer user_data,
-		GError **gerr)
+void img_elem(GMarkupParseContext *ctxt, const gchar *element,
+		const gchar **names, const gchar **values,
+		gpointer user_data, GError **gerr)
 {
 	struct img_desc **desc = user_data;
 	gchar **key;
+
+	DBG("");
 
 	if (g_str_equal(element, "image") != TRUE)
 		return;
@@ -196,6 +211,8 @@ struct img_desc *parse_img_desc(char *data, unsigned int length,
 	if (err != NULL)
 		*err = 0;
 
+	DBG("");
+
 	if (g_markup_parse_context_parse(ctxt, data, length, &gerr)) {
 		if (desc->recv_pixel && desc->recv_enc)
 			goto cleanup;
@@ -210,8 +227,12 @@ cleanup:
 	return desc;
 }
 
-static gboolean get_file_size(int fd, unsigned int *size, int *err) {
+static gboolean get_file_size(int fd, unsigned int *size, int *err)
+{
 	struct stat st;
+
+	DBG("");
+
 	if (fstat(fd, &st) < 0) {
 		if (err != NULL)
 			*err = -EBADR;
@@ -227,6 +248,9 @@ struct image_attributes *new_image_attr(struct image_attributes *orig,
 					struct img_desc *desc)
 {
 	struct image_attributes *attr = g_new0(struct image_attributes, 1);
+
+	DBG("");
+
 	attr->encoding = g_strdup(desc->encoding);
 
 	if (orig->width >= desc->lower[0] && orig->height >= desc->lower[1] &&
@@ -249,6 +273,8 @@ static int get_image_fd(char *image_path, struct img_desc *desc, int *err)
 	char *new_image_path;
 	gboolean res;
 	GError *gerr;
+
+	DBG("");
 
 	if ((fd = g_file_open_tmp(NULL, &new_image_path, &gerr)) < 0) {
 		if (err != NULL)
@@ -277,10 +303,13 @@ static int get_image_fd(char *image_path, struct img_desc *desc, int *err)
 	return fd;
 }
 
-static struct imgimgpull_data *imgimgpull_open(const char *name, int oflag, mode_t mode,
-		void *context, size_t *size, int *err)
+static struct imgimgpull_data *imgimgpull_open(const char *name, int oflag,
+						mode_t mode, void *context,
+						size_t *size, int *err)
 {
 	struct imgimgpull_data *data = g_new0(struct imgimgpull_data, 1);
+
+	DBG("");
 
 	if (err != NULL)
 		*err = 0;
@@ -300,6 +329,8 @@ static char *image_pull_cb(void *context, int handle)
 	struct image_pull_session *session = context;
 	struct img_listing *il = NULL;
 
+	DBG("");
+
 	if (session == NULL)
 		return NULL;
 
@@ -317,6 +348,8 @@ static void *image_pull_open(const char *name, int oflag, mode_t mode,
 	struct imgimgpull_data *data = imgimgpull_open(name, oflag, mode,
 							context, size, err);
 
+	DBG("");
+
 	data->get_image_path = image_pull_cb;
 
 	return data;
@@ -327,6 +360,8 @@ static char *remote_camera_cb(void *context, int handle)
 	int err = 0;
 	struct remote_camera_session *session = context;
 	struct img_listing *il = NULL;
+
+	DBG("");
 
 	if (session == NULL)
 		return NULL;
@@ -345,6 +380,8 @@ static void *remote_camera_open(const char *name, int oflag, mode_t mode,
 	struct imgimgpull_data *data = imgimgpull_open(name, oflag, mode,
 							context, size, err);
 
+	DBG("");
+
 	data->get_image_path = remote_camera_cb;
 
 	return data;
@@ -354,11 +391,11 @@ static ssize_t get_next_header(void *object, void *buf, size_t mtu,
 								uint8_t *hi)
 {
 	struct imgimgpull_data *data = object;
-	printf("imgimg_get_next_header\n");
 
-	if (data == NULL) {
+	DBG("");
+
+	if (data == NULL)
 		return -EBADR;
-	}
 
 	if (data->size_sent) {
 		data->size_sent = TRUE;
@@ -377,9 +414,11 @@ static int feed_next_header(void *object, uint8_t hi, obex_headerdata_t hv,
 	char *header;
 	unsigned int hdr_len;
 	int err, handle;
+
+	DBG("");
+
 	if (data == NULL)
 		return -EBADR;
-	printf("feed_next_header\n");
 
 	if (data->write)
 		return 0;
@@ -427,7 +466,6 @@ static int feed_next_header(void *object, uint8_t hi, obex_headerdata_t hv,
 			return -EBADR;
 
 		data->fd = get_image_fd(image_path, data->desc, &err);
-		printf("fd = %d\n", data->fd);
 
 		if (data->fd == -1)
 			return -EBADR;
@@ -447,10 +485,12 @@ static ssize_t imgimgpull_read(void *object, void *buf, size_t count)
 	struct imgimgpull_data *data = object;
 	ssize_t ret;
 
-	printf("imgimgpull_read %p %p %u\n", object, buf, count);
+	DBG("");
+
+	if (data == NULL)
+		return -EBADR;
 
 	ret = read(data->fd, buf, count);
-	printf("read %u\n", ret);
 	if (ret < 0)
 		return -errno;
 
@@ -460,8 +500,16 @@ static ssize_t imgimgpull_read(void *object, void *buf, size_t count)
 static int imgimgpull_close(void *object)
 {
 	struct imgimgpull_data *data = object;
+
+	DBG("");
+
+	if (data == NULL)
+		return -EBADR;
+
 	if (close(data->fd) < 0)
 		return -errno;
+
+	free_imgimgpull_data(data);
 
 	return 0;
 }
