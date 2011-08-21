@@ -62,12 +62,15 @@ struct imgattpull_data {
 	const char *name;
 };
 
-static char *get_att_path(const char *image_path, const char *name, int *err) {
+static char *get_att_path(const char *image_path, const char *name, int *err)
+{
 	struct dirent *file;
 	struct stat file_stat;
 	char *att_dir_path = get_att_dir(image_path);
 	DIR *att_dir = opendir(att_dir_path);
 	char *ret = NULL;
+
+	DBG("");
 
 	if (att_dir == NULL) {
 		if (err == NULL)
@@ -105,6 +108,8 @@ static void *imgattpull_open(const char *name, int oflag, mode_t mode,
 {
 	struct imgattpull_data *data = g_new0(struct imgattpull_data, 1);
 
+	DBG("");
+
 	data->handle = -1;
 	data->fd = -1;
 	data->context = context;
@@ -123,6 +128,8 @@ static int feed_next_header(void *object, uint8_t hi, obex_headerdata_t hv,
 	struct image_pull_session *session = data->context;
 	struct img_listing *il;
 	int err, handle;
+
+	DBG("");
 
 	if (data == NULL)
 		return -EBADR;
@@ -171,6 +178,12 @@ static ssize_t imgattpull_read(void *object, void *buf, size_t count)
 {
 	struct imgattpull_data *data = object;
 	ssize_t ret;
+
+	DBG("");
+
+	if (data == NULL)
+		return -EBADR;
+
 	ret = read(data->fd, buf, count);
 
 	if (ret < 0)
@@ -182,6 +195,12 @@ static ssize_t imgattpull_read(void *object, void *buf, size_t count)
 static int imgattpull_close(void *object)
 {
 	struct imgattpull_data *data = object;
+
+	DBG("");
+
+	if (data == NULL)
+		return -EBADR;
+
 	close(data->fd);
 	g_free(data);
 	return 0;
