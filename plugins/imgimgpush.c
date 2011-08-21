@@ -50,7 +50,8 @@
 #include "obex.h"
 #include "mimetype.h"
 #include "service.h"
-#include "imgimg.h"
+
+#include "imgimgpush.h"
 #include "imglisting.h"
 #include "image_push.h"
 #include "remote_display.h"
