@@ -1,3 +1,12 @@
+struct imgattpush_data {
+	int fd;
+	struct image_push_session *context;
+	char *path, *att_path, *name;
+	int handle;
+};
+
+void free_imgattpush_data(struct imgattpush_data *data);
+
 static void *imgattpush_open(const char *name, int oflag, mode_t mode,
 					void *context, size_t *size, int *err);
 
