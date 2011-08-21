@@ -87,14 +87,14 @@ static void att_element(GMarkupParseContext *ctxt,
 	if (g_str_equal(element, "attachment") != TRUE)
 		return;
 
-	printf("names: %p\n", names);
-	for (key = (gchar **) names; *key; key++, values++) {
-		printf("key: %s\n", *key);
-		if (g_str_equal(*key, "name")) {
-			*desc = g_strdup(*values);
-			printf("name: %s\n", *desc);
-		}
+	if (*desc != NULL) {
+		g_set_error(gerr, G_MARKUP_ERROR,
+				G_MARKUP_ERROR_INVALID_CONTENT, NULL);
+		return;
 	}
+	for (key = (gchar **) names; *key; key++, values++)
+		if (g_str_equal(*key, "name"))
+			*desc = g_strdup(*values);
 }
 
 static const GMarkupParser handles_desc_parser = {
