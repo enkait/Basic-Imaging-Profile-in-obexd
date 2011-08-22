@@ -140,7 +140,6 @@ def get_image_properties(session, handle):
             else:
                     print o
     print "get image properties"
-    print resp
 
 def delete_image(session, handle):
         print "deleting"
