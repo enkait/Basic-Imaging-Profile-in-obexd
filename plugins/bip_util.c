@@ -530,6 +530,8 @@ char *safe_rename(const char *name, const char *folder, const char *orig_path,
 	dest_folder = g_path_get_dirname(test_path);
 	exp_folder = g_path_get_dirname(folder);
 	root = g_strcmp0(exp_folder, dest_folder);
+	g_free(dest_folder);
+	g_free(exp_folder);
 
 	if (root != 0) {
 		if (err != NULL)
