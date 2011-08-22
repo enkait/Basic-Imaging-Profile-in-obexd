@@ -28,10 +28,10 @@ static char *remote_display(DBusConnection *conn, struct session_data *session,
 	char *handle = NULL, *ret = NULL;
 	unsigned int handle_len = 0;
 
+	DBG("");
+
 	if (err != NULL)
 		*err = 0;
-
-	printf("requested remote display %x\n", aparam->rd);
 
 	aheaders = g_slist_append(NULL, handles_desc);
 
@@ -49,9 +49,6 @@ static char *remote_display(DBusConnection *conn, struct session_data *session,
 	parse_client_user_headers(session->obex->xfer->aheaders, NULL, NULL,
 					&handle, &handle_len);
 
-	printf("parse_client_user_headers\n");
-	printf("GOT HANDLE LEN: %d\n", handle_len);
-
 	if (handle_len == 0) {
 		ret = g_strdup("");
 	}
@@ -61,9 +58,7 @@ static char *remote_display(DBusConnection *conn, struct session_data *session,
 		goto cleanup;
 	}
 
-	printf("get_null_terminated %u\n", handle_len);
 	ret = get_null_terminated(handle, handle_len);
-	printf("%d %s\n", handle_len, ret);
 cleanup:
 	g_free(handle);
 	return ret;
@@ -90,7 +85,8 @@ static DBusMessage *rd_operation(DBusConnection *connection,
 	DBusMessage *reply = NULL;
 	DBusMessageIter iter;
 	struct rd_aparam *aparam = NULL;
-	printf("select_image\n");
+
+	DBG("");
 
 	ah = create_handle("");
 
@@ -114,7 +110,6 @@ static DBusMessage *rd_operation(DBusConnection *connection,
 				"org.openobex.Error", "Failed");
 		goto cleanup;
 	}
-	printf("%s\n", ret_handle);
 	reply = dbus_message_new_method_return(message);
 	dbus_message_iter_init_append(reply, &iter);
 	if (!dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &ret_handle)) {
@@ -130,21 +125,21 @@ cleanup:
 static DBusMessage *next_image(DBusConnection *connection,
 				DBusMessage *message, void *user_data)
 {
-	printf("NEXT IMAGE\n");
+	DBG("");
 	return rd_operation(connection, message, user_data, RD_OP_NEXT);
 }
 
 static DBusMessage *previous_image(DBusConnection *connection,
 				DBusMessage *message, void *user_data)
 {
-	printf("PREVIOUS IMAGE\n");
+	DBG("");
 	return rd_operation(connection, message, user_data, RD_OP_PREVIOUS);
 }
 
 static DBusMessage *current_image(DBusConnection *connection,
 				DBusMessage *message, void *user_data)
 {
-	printf("CURRENT IMAGE\n");
+	DBG("");
 	return rd_operation(connection, message, user_data, RD_OP_CURRENT);
 }
 
@@ -158,7 +153,8 @@ static DBusMessage *select_image(DBusConnection *connection,
 	DBusMessage *reply = NULL;
 	DBusMessageIter iter;
 	struct rd_aparam *aparam = NULL;
-	printf("select_image\n");
+
+	DBG("");
 
 	if (dbus_message_get_args(message, NULL,
 				DBUS_TYPE_STRING, &handle,
@@ -191,8 +187,6 @@ static DBusMessage *select_image(DBusConnection *connection,
 		goto cleanup;
 	}
 
-	printf("remote_display returned\n");
-	printf("%p\n", ret_handle);
 	reply = dbus_message_new_method_return(message);
 	dbus_message_iter_init_append(reply, &iter);
 	if (!dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &ret_handle)) {
