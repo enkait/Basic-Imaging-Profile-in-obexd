@@ -102,6 +102,9 @@ static void put_thumbnail_callback(struct session_data *session, GError *err,
 {
 	struct transfer_data *transfer = session->pending->data;
 	char *handle = user_data;
+
+	DBG("");
+
 	transfer_unregister(transfer);
 
 	if (err != NULL) {
@@ -122,6 +125,8 @@ static DBusMessage *put_thumbnail(struct session_data *session,
 	GSList *aheaders = NULL;
 	DBusMessage *reply = NULL;
 	int fd = -1, err = 0;
+
+	DBG("");
 
 	ah = create_handle(handle);
 	aheaders = g_slist_append(NULL, ah);
@@ -168,6 +173,8 @@ static void put_image_callback(struct session_data *session, GError *err,
 	char *image_path = user_data, *handle = NULL;
 	gboolean required = FALSE;
 
+	DBG("");
+
 	if (err != NULL) {
 		put_image_failed(session, err->message);
 		transfer_unregister(transfer);
@@ -202,6 +209,9 @@ static void put_attachment_callback(struct session_data *session, GError *err,
 							void *user_data)
 {
 	struct transfer_data *transfer = session->pending->data;
+
+	DBG("");
+
 	transfer_unregister(transfer);
 
 	if (err != NULL) {
@@ -215,6 +225,9 @@ static void put_attachment_callback(struct session_data *session, GError *err,
 static struct a_header *create_image_descriptor(const struct image_attributes *attr, const char *transform) {
 	GString *descriptor = g_string_new(IMG_DESC_BEGIN);
 	struct a_header *ah;
+
+	DBG("");
+
 	if (transform != NULL) {
 		g_string_append_printf(descriptor,
 				IMG_DESC_WITH_TRANSFORM_FORMAT,
@@ -239,6 +252,8 @@ static struct a_header *create_att_descriptor(const char *att_path) {
 	unsigned long size;
 	struct a_header *ah = NULL;
 	GString *descriptor = g_string_new("");
+
+	DBG("");
 
 	if (lstat(att_path, &file_stat) < 0) {
 		return NULL;
@@ -271,6 +286,8 @@ static DBusMessage *put_transformed_image(DBusMessage *message, struct session_d
 	struct a_header *descriptor = NULL;
 	DBusMessage *reply;
 	GSList * aheaders = NULL;
+
+	DBG("");
 
 	if ((attr = get_image_attributes(local_image, &err)) == NULL) {
 		reply = invalid_argument(message);
@@ -308,6 +325,8 @@ DBusMessage *put_modified_image(DBusConnection *connection,
 	GString *new_image_path = NULL;
 	DBusMessage *reply = NULL;
 
+	DBG("");
+
 	if (dbus_message_get_args(message, NULL,
 				DBUS_TYPE_STRING, &image_path,
 				DBUS_TYPE_STRING, &encoding,
@@ -330,7 +349,6 @@ DBusMessage *put_modified_image(DBusConnection *connection,
 		goto cleanup;
 	}
 
-	printf("requested put_modified_image on file %s\n", image_path);
 	new_image_path = g_string_new(image_path);
 	new_image_path = g_string_append(new_image_path, "XXXXXX");
 	if ((fd = mkstemp(new_image_path->str)) < 0) {
@@ -338,8 +356,6 @@ DBusMessage *put_modified_image(DBusConnection *connection,
 		goto cleanup;
 	}
 	close(fd);
-
-	printf("new path: %s\n", new_image_path->str);
 
 	if (make_modified_image(image_path, new_image_path->str, attr,
 							transform, &err) < 0) {
@@ -363,6 +379,8 @@ DBusMessage *put_image(DBusConnection *connection,
 	struct session_data *session = user_data;
 	char *image_path, *remote_image;
 	DBusMessage *reply;
+
+	DBG("");
 
 	if (dbus_message_get_args(message, NULL,
 				DBUS_TYPE_STRING, &image_path,
@@ -391,8 +409,10 @@ static void get_imaging_capabilities_callback(
 	DBusMessageIter iter;
 	char *capabilities = NULL;
 	struct transfer_data *transfer = session->pending->data;
-	printf("get_imaging_capabilities_callback called\n");
-	if(err) {
+
+	DBG("");
+
+	if (err) {
 		reply = report_error(session->msg, err->message);
 		goto done;
 	}
@@ -423,7 +443,7 @@ DBusMessage *get_imaging_capabilities(DBusConnection *connection,
 	struct session_data *session = user_data;
 	int err;
 
-	printf("requested get imaging capabilities\n");
+	DBG("");
 
 	if ((err=session_get(session, "x-bt/img-capabilities", NULL, NULL,
 			NULL, 0, get_imaging_capabilities_callback)) < 0)
@@ -444,6 +464,8 @@ static DBusMessage *put_image_attachment(DBusConnection *connection,
 	DBusMessage *reply;
 	int err;
 
+	DBG("");
+
 	if (dbus_message_get_args(message, NULL,
 				DBUS_TYPE_STRING, &att_path,
 				DBUS_TYPE_STRING, &handle,
@@ -458,10 +480,8 @@ static DBusMessage *put_image_attachment(DBusConnection *connection,
 	}
 
 	ah = create_handle(handle);
-	printf("handle: %p\n", ah);
 	aheaders = g_slist_append(NULL, ah);
 	ah = create_att_descriptor(att_path);
-	printf("att: %p\n", ah);
 	aheaders = g_slist_append(aheaders, ah);
 
 	if ((err=session_put_with_aheaders(session, "x-bt/img-attachment",
