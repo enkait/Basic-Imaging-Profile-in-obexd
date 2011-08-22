@@ -63,7 +63,8 @@ struct imgthmpull_data {
 	int fd, handle;
 };
 
-static int get_thumbnail_fd(char *image_path, int *err) {
+static int get_thumbnail_fd(char *image_path, int *err)
+{
 	char *thm_path;
 	int fd = g_file_open_tmp(NULL, &thm_path, NULL);
 
@@ -75,14 +76,11 @@ static int get_thumbnail_fd(char *image_path, int *err) {
 		return -1;
 	}
 
-	printf("fd = %d\n", fd);
-	
 	if (!make_thumbnail(image_path, thm_path, err)) {
 		close(fd);
 		return -1;
 	}
 	
-	printf("thumbnail path: %s\n", thm_path);
 	unlink(thm_path);
 	return fd;
 }
@@ -210,11 +208,10 @@ static ssize_t imgthmpull_read(void *object, void *buf, size_t count)
 {
 	struct imgthmpull_data *data = object;
 	ssize_t ret;
-	
-	printf("imgthmpull_read %p %p %u\n", object, buf, count);
+
+	DBG("");
 
 	ret = read(data->fd, buf, count);
-	printf("read %u\n", ret);
 	if (ret < 0)
 		return -errno;
 
@@ -224,6 +221,9 @@ static ssize_t imgthmpull_read(void *object, void *buf, size_t count)
 static int imgthmpull_close(void *object)
 {
 	struct imgthmpull_data *data = object;
+
+	DBG("");
+
 	if (close(data->fd) < 0)
 		return -errno;
 
