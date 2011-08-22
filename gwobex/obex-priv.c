@@ -150,8 +150,6 @@ static gboolean gw_obex_request_sync(GwObex *ctx, obex_object_t *object) {
 
     gw_obex_set_error(ctx);
 
-    printf("error: %d\n", ctx->error);
-
     if (ctx->error == OBEX_RSP_SUCCESS || ctx->error == OBEX_RSP_CONTINUE ||
 		    ctx->error == OBEX_RSP_PARTIAL_CONTENT) {
         /* It is possible that a EV_PROGRESS doesn't arrive after all data has
@@ -529,7 +527,6 @@ static void obex_writestream(GwObex *ctx, obex_object_t *object) {
 static void obex_event_handler(obex_t *handle, obex_object_t *object, int mode,
                                int event, int obex_cmd, int obex_rsp) {
     GwObex *ctx = OBEX_GetUserData(handle);
-    printf("obex_rsp: %x\n", obex_rsp);
     switch (event) {
         case OBEX_EV_ABORT:
             debug("OBEX_EV_ABORT\n");

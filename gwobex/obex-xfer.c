@@ -528,7 +528,6 @@ void _gw_obex_xfer_free(struct gw_obex_xfer *xfer) {
 }
 
 void gw_obex_xfer_free(struct gw_obex_xfer *xfer) {
-    printf("freeing!!!!!!!!!!!!!1111\n");
     if (xfer->ctx)
         gw_obex_xfer_close(xfer, NULL);
     _gw_obex_xfer_free(xfer);
@@ -537,8 +536,6 @@ void gw_obex_xfer_free(struct gw_obex_xfer *xfer) {
 gboolean gw_obex_xfer_close(GwObexXfer *xfer, gint *err) {
     gboolean ret = TRUE;
     struct gw_obex *ctx = xfer->ctx;
-
-    printf("closing!!!!!!!!!!!!!1111\n");
 
     /* If previous close() failed, just signal success so caller can continue */
     if (!ctx)
@@ -575,11 +572,9 @@ gboolean gw_obex_xfer_close(GwObexXfer *xfer, gint *err) {
     /* Check for error but ignore ERROR_ABORT since we can still do a proper
      * xfer_close() in that case */
     if (gw_obex_set_error(ctx) && ctx->error != GW_OBEX_ERROR_ABORT) {
-        printf("abort\n");
         gw_obex_get_error(ctx, err);
         ret = FALSE;
     }
-    printf("continue\n");
 
     /* Remove the idle function related to this transfer (if there is one) */
     if (xfer->idle_source) {
