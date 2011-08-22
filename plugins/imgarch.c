@@ -615,8 +615,8 @@ static void end_aos_session(struct sarchive_data *data)
 {
 	DBusMessageIter args;
 	DBusMessage *msg = dbus_message_new_method_call(CLIENT_ADDRESS,
-					data->aos_path,
-					AOS_INTERFACE, "RemoveSession");
+					CLIENT_PATH, CLIENT_INTERFACE,
+					"RemoveSession");
 
 	DBG("");
 
