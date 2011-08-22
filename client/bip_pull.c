@@ -125,7 +125,10 @@ static DBusMessage *invalid_argument(DBusMessage *message)
 							"InvalidArgument");
 }
 
-static void free_listing_object(struct listing_object *object) {
+static void free_listing_object(struct listing_object *object)
+{
+	DBG("");
+
 	if (object == NULL)
 		return;
 	g_free(object->handle);
@@ -137,14 +140,14 @@ static void free_listing_object(struct listing_object *object) {
 static gboolean listing_parse_attr(struct listing_object *object, const gchar *key,
 					const gchar *value, GError **gerr)
 {
-	printf("key: %s\n", key);
+	DBG("");
+
 	if (g_str_equal(key, "handle")) {
 		if (value == NULL)
 			goto invalid;
 		if (parse_handle(value) < 0)
 			goto invalid;
 		object->handle = g_strdup(value);
-		printf("handle: %s\n", object->handle);
 	}
 	else if (g_str_equal(key, "created")) {
 		if (parse_iso8601_bip(value, strlen(value)) == -1)
@@ -161,7 +164,6 @@ static gboolean listing_parse_attr(struct listing_object *object, const gchar *k
 				G_MARKUP_ERROR_UNKNOWN_ATTRIBUTE, NULL);
 		return FALSE;
 	}
-	printf("ok\n");
 	return TRUE;
 invalid:
 	g_set_error(gerr, G_MARKUP_ERROR, G_MARKUP_ERROR_INVALID_CONTENT, NULL);
@@ -180,8 +182,7 @@ static void listing_element(GMarkupParseContext *ctxt,
 	struct listing_object *obj;
 	gchar **key;
 
-	printf("element: %s\n", element);
-	printf("names\n");
+	DBG("");
 
 	if (g_str_equal(element, "image") != TRUE) {
 		return;
@@ -189,7 +190,6 @@ static void listing_element(GMarkupParseContext *ctxt,
 	
 	obj = g_new0(struct listing_object, 1);
 
-	printf("names: %p\n", names);
 	for (key = (gchar **) names; *key; key++, values++) {
 		if (!listing_parse_attr(obj, *key, *values, gerr)) {
 			free_listing_object(obj);
@@ -214,6 +214,8 @@ static GSList *parse_images_listing(char *data,	unsigned int length, int *err)
 	GError *gerr = NULL;
 	GMarkupParseContext *ctxt = g_markup_parse_context_new(
 					&images_listing_parser, 0, &listing, NULL);
+	DBG("");
+
 	if (err != NULL)
 		*err = 0;
 	status = g_markup_parse_context_parse(ctxt, data, length, &gerr);
@@ -234,6 +236,8 @@ static gboolean append_ss_dict_entry(DBusMessageIter *dict, const char *key,
 								const char *val)
 {
 	DBusMessageIter entry;
+	DBG("");
+
 	if (val == NULL)
 		return TRUE;
 
@@ -257,6 +261,8 @@ static gboolean append_listing_dict(DBusMessageIter *args,
 							const GSList *listing)
 {
 	DBusMessageIter dict;
+	DBG("");
+
 	if (!dbus_message_iter_open_container(args, DBUS_TYPE_ARRAY, "a{ss}",
 									&dict))
 		return FALSE;
@@ -301,7 +307,8 @@ static void get_images_listing_callback(
 	int err;
 	struct transfer_data *transfer = session->pending->data;
 	GSList *listing = NULL;
-	printf("get_images_listing_callback called\n");
+
+	DBG("");
 
 	if (gerr != NULL) {
 		reply = report_error(session->msg, gerr->message);
@@ -345,6 +352,8 @@ static struct images_listing_aparam *new_images_listing_aparam(uint16_t nb,
 {
 	struct images_listing_aparam *aparam =
 				g_new0(struct images_listing_aparam, 1);
+	DBG("");
+
 	aparam->nbtag = NBRETURNEDHANDLES_TAG;
 	aparam->nblen = NBRETURNEDHANDLES_LEN;
 	aparam->nb = GUINT16_TO_BE(nb);
@@ -378,6 +387,8 @@ struct prop_object {
 };
 
 static void free_native_prop(struct native_prop *prop) {
+	DBG("");
+
 	if (prop == NULL)
 		return;
 	g_free(prop->encoding);
@@ -387,6 +398,8 @@ static void free_native_prop(struct native_prop *prop) {
 }
 
 static void free_variant_prop(struct variant_prop *prop) {
+	DBG("");
+
 	if (prop == NULL)
 		return;
 	g_free(prop->encoding);
@@ -397,6 +410,8 @@ static void free_variant_prop(struct variant_prop *prop) {
 }
 
 static void free_att_prop(struct att_prop *prop) {
+	DBG("");
+
 	if (prop == NULL)
 		return;
 	g_free(prop->content_type);
@@ -410,6 +425,8 @@ static void free_att_prop(struct att_prop *prop) {
 
 static void free_prop_object(struct prop_object *object) {
 	GSList *list;
+
+	DBG("");
 
 	if (object == NULL)
 		return;
@@ -430,6 +447,8 @@ static void free_prop_object(struct prop_object *object) {
 static gboolean parse_attrib_native(struct native_prop *prop, const gchar *key,
 					const gchar *value, GError **gerr)
 {
+	DBG("");
+
 	if (g_str_equal(key, "encoding")) {
 		if (convBIP2IM(value) == NULL)
 			goto invalid;
@@ -459,6 +478,8 @@ invalid:
 static gboolean parse_attrib_variant(struct variant_prop *prop, const gchar *key,
 					const gchar *value, GError **gerr)
 {
+	DBG("");
+
 	if (g_str_equal(key, "encoding")) {
 		if (convBIP2IM(value) == NULL)
 			goto invalid;
@@ -493,6 +514,8 @@ invalid:
 static gboolean parse_attrib_att(struct att_prop *prop, const gchar *key,
 					const gchar *value, GError **gerr)
 {
+	DBG("");
+
 	if (g_str_equal(key, "content-type")) {
 		prop->content_type = g_strdup(value);
 	}
@@ -533,6 +556,8 @@ static struct att_prop *parse_elem_att(const gchar **names,
 {
 	gchar **key;
 	struct att_prop *prop = g_new0(struct att_prop, 1);
+	DBG("");
+
 	for (key = (gchar **) names; *key; key++, values++) {
 		if (!parse_attrib_att(prop, *key, *values, gerr)) {
 			free_att_prop(prop);
@@ -547,6 +572,8 @@ static struct variant_prop *parse_elem_variant(const gchar **names,
 {
 	gchar **key;
 	struct variant_prop *prop = g_new0(struct variant_prop, 1);
+	DBG("");
+
 	for (key = (gchar **) names; *key; key++, values++) {
 		if (!parse_attrib_variant(prop, *key, *values, gerr)) {
 			free_variant_prop(prop);
@@ -563,9 +590,10 @@ static struct native_prop *parse_elem_native(const gchar **names,
 {
 	gchar **key;
 	struct native_prop *prop = g_new0(struct native_prop, 1);
+	DBG("");
+
 	for (key = (gchar **) names; *key; key++, values++) {
 		if (!parse_attrib_native(prop, *key, *values, gerr)) {
-			printf("freeing\n");
 			free_native_prop(prop);
 			return NULL;
 		}
@@ -576,7 +604,8 @@ static struct native_prop *parse_elem_native(const gchar **names,
 static gboolean parse_attrib_prop(struct prop_object *prop, const gchar *key,
 					const gchar *value, GError **gerr)
 {
-	printf("key: %s\n", key);
+	DBG("");
+
 	if (g_str_equal(key, "handle")) {
 		if (parse_handle(value) < 0)
 			goto invalid;
@@ -604,6 +633,8 @@ static struct prop_object *parse_elem_prop(const gchar **names,
 {
 	gchar **key;
 	struct prop_object *prop = g_new0(struct prop_object, 1);
+	DBG("");
+
 	for (key = (gchar **) names; *key; key++, values++) {
 		if (!parse_attrib_prop(prop, *key, *values, gerr)) {
 			free_prop_object(prop);
@@ -622,7 +653,7 @@ static void prop_element(GMarkupParseContext *ctxt,
 {
 	struct prop_object **obj = user_data;
 
-	printf("element: %s\n", element);
+	DBG("");
 
 	if (g_str_equal(element, "image-properties")) {
 		if (*obj != NULL) {
@@ -684,6 +715,9 @@ static struct prop_object *parse_properties(char *data, unsigned int length, int
 	GError *gerr = NULL;
 	GMarkupParseContext *ctxt = g_markup_parse_context_new(
 					&properties_parser, 0, &prop, NULL);
+
+	DBG("");
+
 	if (err != NULL)
 		*err = 0;
 	status = g_markup_parse_context_parse(ctxt, data, length, &gerr);
@@ -702,6 +736,9 @@ static gboolean append_prop(DBusMessageIter *args,
 {
 	DBusMessageIter dict, iter;
 	GSList *list;
+
+	DBG("");
+
 	if (!dbus_message_iter_open_container(args, DBUS_TYPE_ARRAY, "a{ss}",
 									&dict))
 		return FALSE;
@@ -825,8 +862,8 @@ DBusMessage *get_image_properties(DBusConnection *connection,
 	int err, length;
 	struct prop_object *prop = NULL;
 
-	printf("requested get image properties\n");
-	
+	DBG("");
+
 	if (dbus_message_get_args(message, NULL,
 					DBUS_TYPE_STRING, &handle,
 					DBUS_TYPE_INVALID) == FALSE) {
@@ -876,7 +913,6 @@ DBusMessage *get_image_properties(DBusConnection *connection,
 cleanup:
 	g_free(buffer);
 	//dbus_message_unref(message);
-	printf("reply: %p\n", reply);
 	a_header_free(hdesc);
 	g_slist_free(aheaders);
 	return reply;
@@ -892,8 +928,8 @@ DBusMessage *delete_image(DBusConnection *connection,
 	GSList *aheaders = NULL;
 	int err;
 
-	printf("requested delete image\n");
-	
+	DBG("");
+
 	if (dbus_message_get_args(message, NULL,
 					DBUS_TYPE_STRING, &handle,
 					DBUS_TYPE_INVALID) == FALSE) {
@@ -934,6 +970,9 @@ static gboolean parse_filter_arg(const char *key, DBusMessageIter *value, uint16
 			char **modified, char **encoding, char **pixel)
 {
 	char *val = NULL;
+
+	DBG("");
+
 	switch (dbus_message_iter_get_arg_type(value)) {
 	case DBUS_TYPE_STRING:
 		dbus_message_iter_get_basic(value, &val);
@@ -976,6 +1015,8 @@ static gboolean parse_filter_dict(DBusMessageIter *iter,
 		char **created, char **modified, char **encoding,
 		char **pixel)
 {
+	DBG("");
+
 	*count = 65535;
 	*start = 0;
 	*latest = FALSE;
@@ -989,11 +1030,9 @@ static gboolean parse_filter_dict(DBusMessageIter *iter,
 		char *key;
 
 		dbus_message_iter_recurse(iter, &entry);
-		printf("get basic\n");
 		dbus_message_iter_get_basic(&entry, &key);
 
 		dbus_message_iter_next(&entry);
-		printf("recurse\n");
 		dbus_message_iter_recurse(&entry, &value);
 
 		if (!parse_filter_arg(key, &value, count, start, latest,
@@ -1006,7 +1045,7 @@ static gboolean parse_filter_dict(DBusMessageIter *iter,
 	if (latest)
 		*start = 0;
 
-	printf("c: %s\nm: %s\ne: %s\np: %s\nc: %u\no: %u\nl: %u\n",
+	DBG("c: %s\nm: %s\ne: %s\np: %s\nc: %u\no: %u\nl: %u\n",
 			(*created)?(*created):(""),
 			(*modified)?(*modified):(""),
 			(*encoding)?(*encoding):(""),
@@ -1024,6 +1063,8 @@ static struct a_header *create_filtering_descriptor(char *created, char *modifie
 	guint8 *encoded_data;
 	unsigned int length;
 	struct a_header *ah;
+
+	DBG("");
 
 	if (created)
 		g_string_append_printf(filter, FILTERING_CREATED, created);
@@ -1065,7 +1106,7 @@ DBusMessage *get_images_listing(DBusConnection *connection,
 	GSList *aheaders = NULL;
 	int err;
 
-	printf("requested get images listing with range and filtering\n");
+	DBG("");
 
 	dbus_message_iter_init(message, &iter);
 	dbus_message_iter_recurse(&iter, &dict);
@@ -1113,6 +1154,9 @@ static struct a_header *create_img_desc(const char *encoding, const char *pixel,
 	struct a_header *ah;
 	unsigned int length;
 	GString *descriptor = g_string_new(IMG_DESC_BEGIN);
+
+	DBG("");
+
 	g_string_append_printf(descriptor,IMG_BEGIN, encoding, pixel);
 	if (transform != NULL)
 		g_string_append_printf(descriptor,IMG_TRANSFORM, transform);
@@ -1135,7 +1179,9 @@ static void get_image_callback(struct session_data *session, GError *err,
 		void *user_data)
 {
 	struct transfer_data *transfer = session->pending->data;
-	printf("get_image_callback\n");
+
+	DBG("");
+
 	if (err) {
 		get_image_failed(session, err->message);
 		transfer_unregister(transfer);
@@ -1151,7 +1197,9 @@ static void get_image_thumbnail_callback(struct session_data *session,
 						GError *err, void *user_data)
 {
 	struct transfer_data *transfer = session->pending->data;
-	printf("get_image_callback\n");
+
+	DBG("");
+
 	if (err) {
 		get_thumbnail_failed(session, err->message);
 		transfer_unregister(transfer);
@@ -1167,7 +1215,9 @@ static void get_image_attachment_callback(struct session_data *session,
 						GError *err, void *user_data)
 {
 	struct transfer_data *transfer = session->pending->data;
-	printf("get_image_attachment_callback\n");
+
+	DBG("");
+
 	if (err) {
 		get_attachment_failed(session, err->message);
 		transfer_unregister(transfer);
@@ -1190,6 +1240,8 @@ DBusMessage *get_image_thumbnail(DBusConnection *connection,
 	DBusMessage *reply = NULL;
 	int err;
 
+	DBG("");
+
 	if (dbus_message_get_args(message, NULL,
 				DBUS_TYPE_STRING, &image_path,
 				DBUS_TYPE_STRING, &handle,
@@ -1202,7 +1254,6 @@ DBusMessage *get_image_thumbnail(DBusConnection *connection,
 		reply = invalid_argument(message);
 		goto cleanup;
 	}
-	printf("requested get image thumbnail %s %s\n", image_path, handle);
 
 	hdesc = create_handle(handle);
 	
@@ -1238,6 +1289,8 @@ DBusMessage *get_image_attachment(DBusConnection *connection,
 	DBusMessage *reply = NULL;
 	int err;
 
+	DBG("");
+
 	if (dbus_message_get_args(message, NULL,
 				DBUS_TYPE_STRING, &file_path,
 				DBUS_TYPE_STRING, &handle,
@@ -1247,7 +1300,6 @@ DBusMessage *get_image_attachment(DBusConnection *connection,
 		goto cleanup;
 	}
 
-	printf("requested get image attachment %s %s %s\n", file_path, handle, att_name);
 	if (parse_handle(handle) < 0) {
 		reply = invalid_argument(message);
 		goto cleanup;
@@ -1284,7 +1336,9 @@ static gboolean parse_get_image_dict(DBusMessage *msg, char **path,
 							char **transform)
 {
 	DBusMessageIter iter, array;
-	
+
+	DBG("");
+
 	*path = NULL;
 	*handle = NULL;
 	*pixel = NULL;
@@ -1349,7 +1403,7 @@ static gboolean parse_get_image_dict(DBusMessage *msg, char **path,
 	if (*encoding == NULL)
 		*encoding = strdup("");
 
-	printf("p: %s\ne: %s\nm: %s\nt: %s\n",
+	DBG("p: %s\ne: %s\nm: %s\nt: %s\n",
 			(*pixel)?(*pixel):("(null)"),
 			(*encoding)?(*encoding):("(null)"),
 			(*maxsize)?(*maxsize):("(null)"),
@@ -1379,14 +1433,13 @@ DBusMessage *get_image(DBusConnection *connection,
 	struct DBusMessage *reply = NULL;
 	int err;
 
+	DBG("");
+
 	if (!parse_get_image_dict(message, &image_path, &handle, &pixel,
 					&encoding, &maxsize, &transform)) {
 		reply = invalid_argument(message);
 		goto cleanup;
 	}
-
-	printf("requested get image %s %s %s %s %s %s\n", image_path, handle,
-			encoding, transform, pixel, maxsize);
 
 	imgdesc = create_img_desc(encoding, pixel, transform);
 	hdesc = create_handle(handle);
@@ -1398,8 +1451,6 @@ DBusMessage *get_image(DBusConnection *connection,
 	
 	aheaders = g_slist_append(NULL, hdesc);
 	aheaders = g_slist_append(aheaders, imgdesc);
-
-	printf("rozmiar aparam: %u\n", sizeof(struct images_listing_aparam));
 
 	if ((err=session_get_with_aheaders(session, "x-bt/img-img", NULL,
 					image_path, NULL, 0, aheaders,
@@ -1501,13 +1552,8 @@ gboolean aos_sdp_filter(const void *user_data, const sdp_record_t *record,
 	if (sdp_uuid2strn(&uuid, temp, MAX_LEN_UUID_STR) < 0)
 		return FALSE;
 
-	printf("remote: %s\n", temp);
-	printf("params: %s\n", params);
-
 	if (g_strcmp0(temp, params) != 0)
 		return FALSE;
-
-	printf("jest ok\n");
 
 	return TRUE;
 }
