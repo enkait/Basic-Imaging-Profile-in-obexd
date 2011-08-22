@@ -105,7 +105,6 @@ def select(session, handle):
     print "calling selectimage"
     try:
         print session.SelectImage(handle)
-        print "Lol"
     except Exception:
         print "DBUSEXCEPTION"
     execute()
