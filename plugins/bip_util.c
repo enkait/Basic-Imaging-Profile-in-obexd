@@ -615,11 +615,10 @@ ssize_t add_reply_handle(void *buf, size_t mtu, uint8_t *hi, int handle)
 	handle_hdr = encode_img_handle(handle_str->str, handle_str->len,
 							&handle_hdr_len);
 	g_string_free(handle_str, TRUE);
+	*hi = IMG_HANDLE_HDR;
 
 	if (handle_hdr == NULL)
-		return -ENOMEM;
-
-	*hi = IMG_HANDLE_HDR;
+		return 0;
 
 	if (handle_hdr_len > mtu) {
 		g_free(handle_hdr);
