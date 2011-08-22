@@ -360,7 +360,7 @@ int get_monitoring_image(gboolean store, monit_image_cb cb, void *user_data)
 		return -ENOMEM;
 	}
 
-	if (!dbus_connection_send_with_reply(connection, msg, &call, -1)) {
+	if (!dbus_connection_send_with_reply(connection, msg, &call, 30000)) {
 		dbus_message_unref(msg);
 		return -ENOMEM;
 	}
