@@ -201,7 +201,7 @@ static int imgattpush_flush(void *object)
 
 	DBG("");
 
-	if (data != NULL)
+	if (data == NULL)
 		return -EBADR;
 
 	if (mkdir(data->att_path, 0700) < 0) {
@@ -227,7 +227,7 @@ static int imgattpush_close(void *object)
 
 	DBG("");
 
-	if (data != NULL)
+	if (data == NULL)
 		return -EBADR;
 
 	close(data->fd);
@@ -243,7 +243,7 @@ static ssize_t imgattpush_write(void *object, const void *buf, size_t count)
 
 	DBG("");
 
-	if (data != NULL)
+	if (data == NULL)
 		return -EBADR;
 
 	ret = write(data->fd, buf, count);
