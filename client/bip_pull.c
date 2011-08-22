@@ -1351,10 +1351,12 @@ static gboolean parse_get_image_dict(DBusMessage *msg, char **path,
 	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_STRING)
 		goto failed;
 	dbus_message_iter_get_basic(&iter, path);
+	*path = g_strdup(*path);
 	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_STRING)
 		goto failed;
 	dbus_message_iter_next(&iter);
 	dbus_message_iter_get_basic(&iter, handle);
+	*handle = g_strdup(*handle);
 	dbus_message_iter_next(&iter);
 	if (dbus_message_iter_get_arg_type(&iter) != DBUS_TYPE_ARRAY)
 		goto failed;
