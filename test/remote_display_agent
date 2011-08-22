@@ -1,4 +1,6 @@
 #!/usr/bin/python
+# A proof of concept implementation of remote display agent that uses okular
+# for the actual displaying
 
 import gobject
 
@@ -7,17 +9,41 @@ import dbus
 import dbus.service
 import dbus.mainloop.glib
 import os.path
+import subprocess
 from optparse import OptionParser
 
+# A special thanks to remuco-okular for showing the way with
+# okular's dbus
 class Agent(dbus.service.Object):
     def __init__(self, conn=None, obj_path=None, verbose=False):
         dbus.service.Object.__init__(self, conn, obj_path)
         self.verbose = verbose
+        self.bus = dbus.SessionBus()
+        bus.add_signal_receiver(self.NameOwnerChanged,
+	        signal_name="NameOwnerChanged")
+        proxy = self.bus.get_object("org.freedesktop.DBus",  "/")
+        self.dbusiface = dbus.Interface(proxy, "org.freedesktop.DBus")
+        self.okularexec = subprocess.Popen("okular")
+        self.expected = "org.kde.okular-"+str(self.okularexec.pid)
+        print "expecting " + self.expected
+        self.NameOwnerChanged()
+
+    def NameOwnerChanged(self, path="", old="", new=""):
+        print "Changed " + path + " " + old + " " + new
+        ok = False
+        for iface in self.dbusiface.ListNames():
+            if iface == self.expected:
+                print "Found"
+                ok = True
+        if ok:
+            proxy = bus.get_object(self.expected, "/okular")
+            self.okular = dbus.Interface(proxy, "org.kde.okular")
 
     @dbus.service.method("org.openobex.DisplayImage",
                     in_signature="su", out_signature="")
     def DisplayImage(self, path, id):
         print "Display Image: path = " + str(path) + ", id = " + str(id)
+        self.okular.openDocument(path)
         return
 
 tasks = []
