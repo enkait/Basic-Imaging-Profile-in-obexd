@@ -68,6 +68,7 @@
 #define CLIENT_PATH "/"
 #define CLIENT_INTERFACE "org.openobex.Client"
 #define AOS_INTERFACE "org.openobex.ImagePull"
+#define BIP_SIGNAL_INTERFACE "org.openobex.BipSignal"
 
 struct sarchive_data {
 	struct archive_session *session;
@@ -514,7 +515,7 @@ static gboolean reg_get_image_watches(struct sarchive_data *data, aos_callback c
 
 	data->completed_watch = g_dbus_add_signal_watch(data->conn, NULL,
 						data->aos_path,
-						AOS_INTERFACE, "GetImageCompleted",
+						BIP_SIGNAL_INTERFACE, "GetImageCompleted",
 						get_image_completed, cb_data, NULL);
 
 	if (data->completed_watch == 0) {
@@ -524,7 +525,7 @@ static gboolean reg_get_image_watches(struct sarchive_data *data, aos_callback c
 
 	data->failed_watch = g_dbus_add_signal_watch(data->conn, NULL,
 						data->aos_path,
-						AOS_INTERFACE, "GetImageFailed",
+						BIP_SIGNAL_INTERFACE, "GetImageFailed",
 						&get_image_failed, cb_data, g_free);
 
 	if (data->failed_watch == 0) {
