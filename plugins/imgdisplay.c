@@ -95,6 +95,8 @@ static int parse_aparam(const uint8_t *buffer, uint32_t hlen)
 	uint32_t len = 0;
 	int ret = -EBADR;
 
+	DBG("");
+
 	while (len < hlen) {
 		hdr = (void *) buffer + len;
 
@@ -127,7 +129,8 @@ static int feed_next_header(void *object, uint8_t hi, obex_headerdata_t hv,
 	char *header;
 	unsigned int hdr_len;
 	int err = 0;
-	printf("feed_next_header %x\n", hi);
+
+	DBG("");
 
 	if (hi == IMG_HANDLE_HDR) {
 		if (data->handle != -1)
@@ -144,7 +147,6 @@ static int feed_next_header(void *object, uint8_t hi, obex_headerdata_t hv,
 	}
 	else if (hi == OBEX_HDR_APPARAM) {
 		int rd = parse_aparam(hv.bs, hv_size);
-		printf("apparam header\n");
 
 		if (rd < 0)
 			return err;
@@ -156,6 +158,8 @@ static int feed_next_header(void *object, uint8_t hi, obex_headerdata_t hv,
 
 static int imgdisplay_close(void *object)
 {
+	DBG("");
+
 	return 0;
 }
 
@@ -165,7 +169,8 @@ static ssize_t get_next_header(void *object, void *buf, size_t mtu,
 	struct imgdisplay_data *data = object;
 	struct remote_display_session *session = data->context;
 	ssize_t len;
-	printf("imgdisplay_get_next_header\n");
+
+	DBG("");
 
 	if (data == NULL)
 		return -EBADR;
@@ -178,7 +183,6 @@ static ssize_t get_next_header(void *object, void *buf, size_t mtu,
 	if ((len = add_reply_handle(buf, mtu, hi, session->displayed_handle)) < 0) {
 		return len;
 	}
-	printf("LEN = %d\n", len);
 
 	data->handle_sent = TRUE;
 	return len;
@@ -186,6 +190,9 @@ static ssize_t get_next_header(void *object, void *buf, size_t mtu,
 
 static int get_max_handle(GSList *image_list) {
 	int handle = -1;
+
+	DBG("");
+
 	while (image_list != NULL) {
 		struct img_listing *il = image_list->data;
 		handle = (il->handle > handle) ? (il->handle) : (handle);
@@ -201,12 +208,11 @@ static int imgdisplay_flush(void *object)
 	struct img_listing *il = NULL;
 	int new_handle = -1, err;
 
+	DBG("");
+
 	if (data == NULL)
 		return -EBADR;
 
-	printf("flush\n");
-
-	printf("old image displayed: %d\n", session->displayed_handle);
 	switch (data->rd) {
 	case RD_OP_NEXT:
 		new_handle = session->displayed_handle + 1;
@@ -236,8 +242,6 @@ static int imgdisplay_flush(void *object)
 	case RD_OP_CURRENT:
 		new_handle = session->displayed_handle;
 	}
-	printf("IMGDISPLAY ------------------------------------------------------------\n");
-	printf("next displayed handle: %d\n", new_handle);
 	if (new_handle != -1) {
 		il = get_listing(session->image_list, new_handle, &err);
 		if ((err = display_image(session->os->cid, il->image)) < 0) {
@@ -245,7 +249,6 @@ static int imgdisplay_flush(void *object)
 		}
 		session->displayed_handle = new_handle;
 	}
-	printf("displaying %d\n", session->displayed_handle);
 	return 0;
 }
 
