@@ -158,6 +158,9 @@
 static void free_image_pull_session(struct image_pull_session *session)
 {
 	GSList *image_list;
+
+	DBG("");
+
 	if (session == NULL)
 		return;
 	image_list = session->image_list;
@@ -171,6 +174,8 @@ static void free_image_pull_session(struct image_pull_session *session)
 
 static gboolean remove_image(struct image_pull_session *session, struct img_listing *il, int *err)
 {
+	DBG("");
+
 	if (il == NULL) {
 		if (err != NULL)
 			*err = -ENOENT;
@@ -197,8 +202,10 @@ GSList *get_image_list(const char *dir, int *err) {
 	int handle = 0;
 	DIR *img_dir = opendir(dir);
 
+	DBG("");
+
 	if (img_dir == NULL) {
-		printf("no folder, errno: %d\n", errno);
+		DBG("no folder, errno: %d", errno);
 		if (err != NULL)
 			*err = -errno;
 		return NULL;
@@ -214,7 +221,6 @@ GSList *get_image_list(const char *dir, int *err) {
 			continue;
 		handle++;
 		images = g_slist_append(images, il);
-		printf("image added: %s\n", il->image);
 	}
 
 	closedir(img_dir);
@@ -228,7 +234,9 @@ void *image_pull_connect(struct obex_session *os, int *err)
 	struct image_pull_session *session;
 	int priv_err = 0;
 	const char *bip_root = obex_option_bip_root_folder();
-	printf("IMAGE PULL CONNECT\n");
+
+	DBG("");
+
 	manager_register_session(os);
 
 	session = g_new0(struct image_pull_session, 1);
@@ -252,7 +260,7 @@ int image_pull_get(struct obex_session *os, obex_object_t *obj,
 {
 	int ret;
 
-	printf("IMAGE PULL GET\n");
+	DBG("");
 
 	ret = obex_get_stream_start(os, os->name);
 
@@ -263,7 +271,7 @@ int image_pull_get(struct obex_session *os, obex_object_t *obj,
 
 int image_pull_chkput(struct obex_session *os, void *user_data)
 {
-	printf("IMAGE PULL CHKPUT\n");
+	DBG("");
 
 	if (obex_get_size(os) == OBJECT_SIZE_DELETE)
 		return obex_put_stream_start(os, os->name);
@@ -279,7 +287,8 @@ int image_pull_put(struct obex_session *os, obex_object_t *obj,
 	int handle, err;
 	char *handle_hdr;
 	unsigned int handle_hdr_len;
-	printf("IMAGE PULL PUT\n");
+
+	DBG("");
 
 	if (obex_get_size(os) != OBJECT_SIZE_DELETE ||
 					!g_str_equal(os->type, "x-bt/img-img"))
@@ -305,7 +314,9 @@ int image_pull_put(struct obex_session *os, obex_object_t *obj,
 void image_pull_disconnect(struct obex_session *os, void *user_data)
 {
 	struct image_pull_session *session = user_data;
-	printf("IMAGE PULL DISCONNECT\n");
+
+	DBG("");
+
 	free_image_pull_session(session);
 	manager_unregister_session(os);
 }
