@@ -540,13 +540,16 @@ static gboolean reg_get_image_watches(struct sarchive_data *data, aos_callback c
 
 static void unreg_get_image_watches(struct sarchive_data *data)
 {
+	gboolean c, f;
+
 	DBG("");
 
 	if (!data->reg_watches)
 		return;
 
-	g_assert(g_dbus_remove_watch(data->conn, data->completed_watch));
-	g_assert(g_dbus_remove_watch(data->conn, data->failed_watch));
+	c = g_dbus_remove_watch(data->conn, data->completed_watch);
+	f = g_dbus_remove_watch(data->conn, data->failed_watch);
+	g_assert(c && f);
 }
 
 static void get_image(struct sarchive_data *data, char *path,
