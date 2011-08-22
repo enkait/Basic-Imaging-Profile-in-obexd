@@ -124,11 +124,17 @@ static DBusConnection *connection = NULL;
 static struct rd_agent *agent = NULL;
 
 
-static void free_remote_display_session(struct remote_display_session *session) {
+static void free_remote_display_session(struct remote_display_session *session)
+{
+	DBG("");
+
 	g_free(session);
 }
 
-int get_new_handle_rd(struct remote_display_session *session) {
+int get_new_handle_rd(struct remote_display_session *session)
+{
+	DBG("");
+
 	if (session->next_handle >= HANDLE_LIMIT) {
 		return -1;
 	}
@@ -138,7 +144,9 @@ int get_new_handle_rd(struct remote_display_session *session) {
 static void *remote_display_connect(struct obex_session *os, int *err)
 {
 	struct remote_display_session *session;
-	printf("REMOTE_DISPLAY CONNECT\n");
+
+	DBG("");
+
 	manager_register_session(os);
 
 	session = g_new0(struct remote_display_session, 1);
@@ -156,7 +164,9 @@ static int remote_display_get(struct obex_session *os, obex_object_t *obj,
 							void *user_data)
 {
 	int ret;
-	printf("REMOTE_DISPLAY_GET\n");
+
+	DBG("");
+
 	ret = obex_get_stream_start(os, "");
 	if (ret < 0)
 		return ret;
@@ -165,9 +175,9 @@ static int remote_display_get(struct obex_session *os, obex_object_t *obj,
 
 static int remote_display_chkput(struct obex_session *os, void *user_data)
 {
-	//struct image_push_session *ips = user_data;
 	int ret;
-	printf("REMOTE DISPLAY CHKPUT\n");
+
+	DBG("");
 
 	ret = obex_put_stream_start(os, "");
 	return ret;
@@ -175,16 +185,16 @@ static int remote_display_chkput(struct obex_session *os, void *user_data)
 
 static int remote_display_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 {
-	//struct remote_display_session *session = user_data;
-	printf("REMOTE DISPLAY PUT\n");
-
+	DBG("");
 	return 0;
 }
 
 static void remote_display_disconnect(struct obex_session *os, void *user_data)
 {
 	struct remote_display_session *ips = user_data;
-	printf("REMOTE DISPLAY DISCONNECT\n");
+
+	DBG("");
+
 	free_remote_display_session(ips);
 	manager_unregister_session(os);
 }
@@ -305,7 +315,7 @@ int display_image(unsigned int id, char *image_path) {
 		return -EINVAL;
 
 	if (agent == NULL) {
-		printf("Display IMage Failed\n");
+		DBG("display image failed");
 		return -EBADR;
 	}
 
@@ -348,10 +358,6 @@ static gboolean rd_manager_init(void)
 			fprintf(stderr, "Can't register with session bus\n");
 		return FALSE;
 	}
-
-	printf("Service: %s\n", RD_MANAGER_SERVICE);
-	printf("Interface: %s\n", RD_MANAGER_INTERFACE);
-	printf("Path: %s\n", RD_MANAGER_PATH);
 
 	return g_dbus_register_interface(connection, RD_MANAGER_PATH,
 					RD_MANAGER_INTERFACE,
