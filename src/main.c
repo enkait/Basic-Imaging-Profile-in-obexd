@@ -54,7 +54,7 @@
 #include "options.h"
 
 #define DEFAULT_ROOT_PATH "/tmp"
-#define DEFAULT_BIP_ROOT_PATH "/tmp/bip"
+#define DEFAULT_BIP_ROOT_PATH "/tmp/bip/"
 
 #define DEFAULT_CAP_FILE CONFIGDIR "/capability.xml"
 
@@ -172,6 +172,7 @@ int main(int argc, char *argv[])
 	GOptionContext *context;
 	GError *err = NULL;
 	struct sigaction sa;
+	struct stat bipstat;
 
 #ifdef NEED_THREADS
 	if (g_thread_supported() == FALSE)
@@ -229,15 +230,19 @@ int main(int argc, char *argv[])
 	}
 
 	if (option_bip_root == NULL)
-		option_bip_root = g_strdup(DEFAULT_ROOT_PATH);
+		option_bip_root = g_strdup(DEFAULT_BIP_ROOT_PATH);
 
 	if (option_bip_root[0] != '/') {
 		char *old_root = option_bip_root, *home = getenv("HOME");
 		if (home) {
-			option_bip_root = g_strdup_printf("%s/%s", home,
+			option_bip_root = g_strdup_printf("%s/%s/", home,
 								old_root);
 			g_free(old_root);
 		}
+	}
+	if (stat(option_bip_root, &bipstat) < 0 || !S_ISDIR(bipstat.st_mode)) {
+		error("BIP root folder doesn't exist");
+		exit(EXIT_FAILURE);
 	}
 
 	if (option_capability == NULL)
