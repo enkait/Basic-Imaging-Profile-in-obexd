@@ -1448,7 +1448,7 @@ DBusMessage *get_image(DBusConnection *connection,
 		reply = invalid_argument(message);
 		goto cleanup;
 	}
-	
+
 	aheaders = g_slist_append(NULL, hdesc);
 	aheaders = g_slist_append(aheaders, imgdesc);
 
