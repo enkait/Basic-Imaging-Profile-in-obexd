@@ -99,7 +99,7 @@ cur = 0
 bip = None
 
 def image_push(session, filename):
-    session.PutModifiedImage(os.path.abspath(filename),"BMP",1000,200,"fill")
+    session.PutImage(os.path.abspath(filename))
 
 def select(session, handle):
     print "calling selectimage"
