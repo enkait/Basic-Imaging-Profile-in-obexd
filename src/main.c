@@ -259,7 +259,7 @@ int main(int argc, char *argv[])
 				option_capability);
 
 	obex_server_init(OBEX_BIP, NULL, TRUE, FALSE, FALSE, NULL);
-	
+
 	obex_server_init(OBEX_PCSUITE, option_root, TRUE,
 				option_autoaccept, option_symlinks,
 				option_capability);
