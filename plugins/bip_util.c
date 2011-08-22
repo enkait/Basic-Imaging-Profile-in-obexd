@@ -534,6 +534,9 @@ char *safe_rename(const char *name, const char *folder, const char *orig_path,
 	g_free(exp_folder);
 
 	if (root != 0) {
+		error("file path would change folder");
+		g_free(test_path);
+		test_path = NULL;
 		if (err != NULL)
 			*err = -EBADR;
 		goto cleanup;
