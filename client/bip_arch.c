@@ -33,8 +33,8 @@ static DBusMessage *start_archive(DBusConnection *connection,
 	struct sa_aparam *aparam;
 	int err;
 
-	printf("requested start archive\n");
-	
+	DBG("");
+
 	aparam = create_sa_aparam(AOS_SID);
 
 	if (!gw_obex_put_buf_with_aheaders(session->obex, NULL,
@@ -64,13 +64,12 @@ DBusMessage *get_status(DBusConnection *connection,
 	char *data;
 	const char *cont = "Continue", *failed = "Failed", *success = "Success";
 
-	printf("requested start archive\n");
-	
+	DBG("");
+
 	if (!gw_obex_get_buf_with_aheaders(session->obex, NULL,
 						"x-bt/img-status",
 						NULL, 0, NULL, &data,
 						&size, &err)) {
-		printf("err = %d\n", err);
 		return g_dbus_create_error(message,
 				"org.openobex.Error.Failed",
 				"Failed");
@@ -78,7 +77,6 @@ DBusMessage *get_status(DBusConnection *connection,
 	reply = dbus_message_new_method_return(message);
 	dbus_message_iter_init_append(reply, &iter);
 
-	printf("status = %d\n", session->obex->obex_rsp);
 	if (session->obex->obex_rsp == OBEX_RSP_CONTINUE)
 		dbus_message_iter_append_basic(&iter, DBUS_TYPE_STRING, &cont);
 	else if (session->obex->obex_rsp == OBEX_RSP_SUCCESS)
