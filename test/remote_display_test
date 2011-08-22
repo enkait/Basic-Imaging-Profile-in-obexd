@@ -72,25 +72,25 @@ def parse_options():
                       help="Device to connect", metavar="DEVICE")
     parser.add_option("-p", "--push", type="string", action="callback",
                       callback=put_image_callback,
-                      help="Push image\nExample: -p [path to file]")
+                      help="Push image - Example: -p [path to file]")
     parser.add_option("-s", "--select", type="string", action="callback",
                       callback=select_callback,
-                      help="Select image\nExample: -s [handle]")
+                      help="Select image - Example: -s [handle]")
     parser.add_option("-n", "--next", action="callback",
                       callback=next_callback,
-                      help="Next image\nExample: -n")
+                      help="Next image - Example: -n")
     parser.add_option("-r", "--prev", action="callback",
                       callback=previous_callback,
-                      help="Previous image\nExample: -r")
+                      help="Previous image - Example: -r")
     parser.add_option("-t", "--current", action="callback",
                       callback=current_callback,
-                      help="Current image\nExample: -t")
+                      help="Current image - Example: -t")
     parser.add_option("-l", "--listing", action="callback",
                       callback=images_listing_callback,
-                      help="Get images listing\nExample: -l")
+                      help="Get images listing - Example: -l")
     parser.add_option("-c", "--capabilities", action="callback",
                       callback=cap_callback,
-                      help="Get imaging capabilities\n")
+                      help="Get imaging capabilities")
     parser.add_option("-v", "--verbose", action="store_true", dest="verbose")
 
     return parser.parse_args()
@@ -197,7 +197,8 @@ if  __name__ == '__main__':
 
     dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 
-    parser = OptionParser()
+    parser = OptionParser("usage: %prog [options / commands]\n" +
+                    "Example: %prog -p image.jpg -s 0000000 -p image2.jpg -n")
 
     (options, args) = parse_options()
 

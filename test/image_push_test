@@ -127,7 +127,8 @@ if  __name__ == '__main__':
 
     dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 
-    parser = OptionParser()
+    parser = OptionParser("usage: %prog [options / commands]\n" +
+                    "Example: %prog -p image.jpg -a att1,0000000 -p image2.jpg")
 
     (options, args) = parse_options()
 

@@ -80,7 +80,7 @@ def parse_options():
                       help="Get images listing\nExample: -l")
     parser.add_option("-g", "--getimage", type="string", action="callback",
                       callback=get_image_callback,
-                      help="Get image\nExample: -g [where to put the image],[handle],[encoding],[acceptable width*height],[maxsize],[transform]")
+                      help="Get image\nExample: -g [where to put the image],[handle (mandatory)],[encoding],[acceptable width*height],[maxsize],[transform]")
     parser.add_option("-t", "--getimagethumbnail", type="string", action="callback",
                       callback=get_image_thumbnail_callback,
                       help="Get image thumbnail\nExample: -t [where to put the image],[handle]")
@@ -189,7 +189,10 @@ if  __name__ == '__main__':
 
     dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 
-    parser = OptionParser()
+    parser = OptionParser("usage: %prog [options / commands]\n" +
+                    "Examples: %prog -l\n" +
+                    "%prog -p 0000000\n" +
+                    "%prog -g image.jpg,0000000,BMP,1000*1000,100000,stretch")
 
     (options, args) = parse_options()
 

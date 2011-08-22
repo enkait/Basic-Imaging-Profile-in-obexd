@@ -63,16 +63,16 @@ def parse_options():
                       help="Device to connect", metavar="DEVICE")
     parser.add_option("-g", "--getimage", type="string", action="callback",
                       callback=get_image_callback,
-                      help="Get image\nExample: -g [where to put the image],[handle],[encoding],[acceptable width*height],[maxsize],[transform]")
+                      help="Get image - Example: -g [where to put the image],[handle (mandatory)],[encoding],[acceptable width*height],[maxsize],[transform]")
     parser.add_option("-m", "--getmonitoringimage", type="string", action="callback",
                       callback=get_monitoring_image_callback,
-                      help="Get image\nExample: -m [where to put the image],[store?]")
+                      help="Get image - Example: -m [where to put the image],[store?]")
     parser.add_option("-t", "--getimagethumbnail", type="string", action="callback",
                       callback=get_image_thumbnail_callback,
-                      help="Get image thumbnail\nExample: -t [where to put the image],[handle]")
+                      help="Get image thumbnail - Example: -t [where to put the image],[handle (mandatory)]")
     parser.add_option("-p", "--getimageproperties", type="string", action="callback",
                       callback=get_image_properties_callback,
-                      help="Get image properties\nExample: -p [handle]")
+                      help="Get image properties - Example: -p [handle]")
     parser.add_option("-v", "--verbose", action="store_true", dest="verbose")
 
     return parser.parse_args()
@@ -107,7 +107,6 @@ def get_image(session, path, handle, encoding, pixel, maxsize, transform):
         D["transformation"] = transform
     session.GetImage(path, handle, D)
     print "GetImage returned"
-    execute()
 
 def get_monitoring_image(session, path, store):
     session.GetMonitoringImage(path, store=="1")
@@ -161,7 +160,9 @@ if  __name__ == '__main__':
 
     dbus.mainloop.glib.DBusGMainLoop(set_as_default=True)
 
-    parser = OptionParser()
+    parser = OptionParser("usage: %prog [options / commands]\n" +
+                    "Examples: %prog -l\n" +
+                    "%prog -g image.jpg,0000000,BMP,1000*1000,100000,stretch")
 
     (options, args) = parse_options()
 
