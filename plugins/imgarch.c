@@ -633,7 +633,6 @@ cleanup_msg:
 	dbus_message_unref(msg);
 cleanup:
 	unreg_get_image_watches(data);
-	free_sarchive_data(data);
 }
 
 static void reset_data(struct sarchive_data *data)
