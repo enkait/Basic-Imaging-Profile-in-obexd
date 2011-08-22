@@ -125,9 +125,12 @@ static void free_archive_session(struct archive_session *session)
 	g_free(session);
 }
 
-void *image_arch_connect(struct obex_session *os, int *err) {
+void *image_arch_connect(struct obex_session *os, int *err)
+{
 	struct archive_session *as;
-	printf("ARCHIVE CONNECT\n");
+
+	DBG("");
+
 	manager_register_session(os);
 
 	as = g_new0(struct archive_session, 1);
@@ -143,12 +146,12 @@ void *image_arch_connect(struct obex_session *os, int *err) {
 int image_arch_get(struct obex_session *os, obex_object_t *obj,
 							void *user_data)
 {
-	struct archive_session *session = user_data;
+	//struct archive_session *session = user_data;
 	int ret = -EBADR;
 
-	printf("IMAGE ARCH GET\n");
+	DBG("");
+
 	if (g_str_equal(os->type,"x-bt/img-status")) {
-		printf("%d\n", session->status);
 		//OBEX_ObjectSetRsp(obj, OBEX_RSP_CONTINUE,
 		//					OBEX_RSP_CONTINUE);
 		/*
@@ -167,6 +170,9 @@ int image_arch_get(struct obex_session *os, obex_object_t *obj,
 
 static gboolean get_ret_address(struct obex_session *os, char *address) {
 	GError *err = NULL;
+
+	DBG("");
+
 	bt_io_get(os->io, BT_IO_RFCOMM, &err, BT_IO_OPT_DEST, address,
 							BT_IO_OPT_INVALID);
 	if (err != NULL) {
@@ -178,8 +184,8 @@ static gboolean get_ret_address(struct obex_session *os, char *address) {
 
 int image_arch_chkput(struct obex_session *os, void *user_data) {
 	struct archive_session *session = user_data;
-	int i;
-	printf("IMAGE ARCH CHKPUT\n");
+
+	DBG("");
 
 	if (obex_get_size(os) == OBJECT_SIZE_DELETE) {
 		if (g_str_equal(os->type, "x-bt/img-status"))
@@ -189,10 +195,6 @@ int image_arch_chkput(struct obex_session *os, void *user_data) {
 		if (!get_ret_address(os, session->address))
 			return -EBADR;
 
-		for (i = 0;i<10;i++)
-			printf("%c\n", session->address[i]);
-		printf("%p\n", session->address);
-
 		return obex_put_stream_start(os, NULL);
 	}
 
@@ -201,8 +203,8 @@ int image_arch_chkput(struct obex_session *os, void *user_data) {
 
 int image_arch_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 {
-	//struct archive_session *session = user_data;
-	printf("IMAGE ARCH PUT\n");
+
+	DBG("");
 
 	if (obex_get_size(os) != OBJECT_SIZE_DELETE)
 		return -EBADR;
@@ -212,7 +214,9 @@ int image_arch_put(struct obex_session *os, obex_object_t *obj, void *user_data)
 void image_arch_disconnect(struct obex_session *os, void *user_data)
 {
 	struct archive_session *as = user_data;
-	printf("IMAGE PULL DISCONNECT\n");
+
+	DBG("");
+
 	free_archive_session(as);
 	manager_unregister_session(os);
 }
