@@ -115,7 +115,14 @@ static const uint8_t IMAGE_ARCH_TARGET[TARGET_SIZE] = {
 			0x94, 0x01, 0x26, 0xC0, 0x46, 0x08, 0x11, 0xD5,
 			0x84, 0x1A, 0x00, 0x02, 0xA5, 0x32, 0x5B, 0x4E };
 
-static void free_archive_session(struct archive_session *session) {
+static void free_archive_session(struct archive_session *session)
+{
+	DBG("");
+
+	if (session == NULL)
+		return;
+	g_free(session->address);
+	g_free(session);
 }
 
 void *image_arch_connect(struct obex_session *os, int *err) {
