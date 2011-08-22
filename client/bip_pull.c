@@ -302,7 +302,7 @@ static void get_images_listing_callback(
 		struct session_data *session, GError *gerr,
 		void *user_data)
 {
-	DBusMessage *reply;
+	DBusMessage *reply, *message = user_data;
 	DBusMessageIter iter;
 	int err;
 	struct transfer_data *transfer = session->pending->data;
@@ -311,31 +311,31 @@ static void get_images_listing_callback(
 	DBG("");
 
 	if (gerr != NULL) {
-		reply = report_error(session->msg, gerr->message);
+		reply = report_error(message, gerr->message);
 		goto cleanup;
 	}
 
 	listing = parse_images_listing(transfer->buffer, transfer->filled, &err);
 
 	if (err < 0) {
-		reply = failed(session->msg);
+		reply = failed(message);
 		goto cleanup;
 	}
 
-	if ((reply = dbus_message_new_method_return(session->msg)) == NULL) {
-		reply = failed(session->msg);
+	if ((reply = dbus_message_new_method_return(message)) == NULL) {
+		reply = failed(message);
 		goto cleanup;
 	}
 	
 	dbus_message_iter_init_append(reply, &iter);
 	if (!append_listing_dict(&iter, listing)) {
-		reply = failed(session->msg);
+		reply = failed(message);
 		goto cleanup;
 	}
 
 cleanup:
 	g_dbus_send_message(session->conn, reply);
-	dbus_message_unref(session->msg);
+	dbus_message_unref(message);
 	
 	while (listing != NULL) {
 		struct listing_object *obj = listing->data;
@@ -1128,13 +1128,11 @@ DBusMessage *get_images_listing(DBusConnection *connection,
 
 	aparam = new_images_listing_aparam(count, begin, latest);
 
-	session->msg = dbus_message_ref(message);
-
 	if ((err=session_get_with_aheaders(session, "x-bt/img-listing", NULL,
 					NULL, (const guint8 *)aparam,
 					sizeof(struct images_listing_aparam),
 					aheaders, get_images_listing_callback,
-								NULL)) < 0) {
+					dbus_message_ref(message))) < 0) {
 		reply = failed(message);
 		goto cleanup;
 	}
