@@ -112,19 +112,27 @@ static const uint8_t IMAGE_PUSH_TARGET[TARGET_SIZE] = {
 
 #define HANDLE_LIMIT 10000000
 
-void free_pushed_image(struct pushed_image *pi) {
+void free_pushed_image(struct pushed_image *pi)
+{
+	DBG("");
+
 	if (pi == NULL)
 		return;
 	g_free(pi->image);
 	g_free(pi);
 }
 
-void free_image_push_session(struct image_push_session *session) {
+void free_image_push_session(struct image_push_session *session)
+{
+	DBG("");
+
 	g_free(session);
 }
 
 struct pushed_image *get_pushed_image(GSList *image_list, int handle)
 {
+	DBG("");
+
 	while (image_list != NULL) {
 		struct pushed_image *image = image_list->data;
 		if (image->handle == handle)
@@ -137,7 +145,9 @@ struct pushed_image *get_pushed_image(GSList *image_list, int handle)
 static void *image_push_connect(struct obex_session *os, int *err)
 {
 	struct image_push_session *ips;
-	printf("IMAGE PUSH CONNECT\n");
+
+	DBG("");
+
 	manager_register_session(os);
 
 	ips = g_new0(struct image_push_session, 1);
@@ -154,7 +164,9 @@ static int image_push_get(struct obex_session *os, obex_object_t *obj,
 							void *user_data)
 {
 	int ret = obex_get_stream_start(os, "");
-	printf("IMAGE PUSH GET\n");
+
+	DBG("");
+
 	if (ret < 0)
 		return ret;
 	return 0;
@@ -163,7 +175,8 @@ static int image_push_get(struct obex_session *os, obex_object_t *obj,
 static int image_push_chkput(struct obex_session *os, void *user_data)
 {
 	int ret;
-	printf("IMAGE PUSH CHKPUT\n");
+
+	DBG("");
 
 	ret = obex_put_stream_start(os, "");
 	return ret;
@@ -172,6 +185,8 @@ static int image_push_chkput(struct obex_session *os, void *user_data)
 int obex_handle_write(struct obex_session *os, obex_object_t *obj, const char *data, unsigned int size) {
 	obex_headerdata_t hd;
 	unsigned int headersize;
+
+	DBG("");
 
 	hd.bs = encode_img_handle(data, size, &headersize);
 
@@ -183,6 +198,8 @@ int obex_handle_write(struct obex_session *os, obex_object_t *obj, const char *d
 }
 
 int get_new_handle(struct image_push_session *session) {
+	DBG("");
+
 	if (session->next_handle >= HANDLE_LIMIT) {
 		return -1;
 	}
@@ -199,7 +216,6 @@ static int image_push_put(struct obex_session *os, obex_object_t *obj, void *use
 static void image_push_disconnect(struct obex_session *os, void *user_data)
 {
 	struct image_push_session *ips = user_data;
-	printf("IMAGE PUSH DISCONNECT\n");
 	free_image_push_session(ips);
 	manager_unregister_session(os);
 }
