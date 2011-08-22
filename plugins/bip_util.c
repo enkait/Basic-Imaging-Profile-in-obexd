@@ -297,6 +297,18 @@ char *transforms[] = {
 	NULL
 };
 
+gboolean verify_encoding(const char *encoding)
+{
+	struct encconv_pair *et = encconv_table;
+	while (et->bip) {
+		if (g_strcmp0(encoding, et->bip) == 0) {
+			return TRUE;
+		}
+		et++;
+	}
+	return FALSE;
+}
+
 gboolean verify_transform(const char *transform) {
 	char **str = transforms;
 	while (*str != NULL) {

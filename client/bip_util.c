@@ -364,7 +364,7 @@ failure:
 	return NULL;
 }
 
-char *parse_unsignednumber(const char *size) {
+gboolean verify_unsignednumber(const char *size) {
 	static regex_t unumber;
 	static int regex_initialized = 0;
 	if (!regex_initialized) {
@@ -372,7 +372,14 @@ char *parse_unsignednumber(const char *size) {
 		regex_initialized = 1;
 	}
 	if (regexec(&unumber, size, 0, NULL, 0) != 0)
+		return FALSE;
+	return TRUE;
+}
+
+char *parse_unsignednumber(const char *size) {
+	if (!verify_unsignednumber(size)) {
 		return NULL;
+	}
 	return g_strdup(size);
 }
 
@@ -568,8 +575,13 @@ char *safe_rename(const char *name, const char *folder, const char *orig_path,
 	dest_folder = g_path_get_dirname(test_path);
 	exp_folder = g_path_get_dirname(folder);
 	root = g_strcmp0(exp_folder, dest_folder);
+	g_free(dest_folder);
+	g_free(exp_folder);
 
 	if (root != 0) {
+		error("file path would change folder");
+		g_free(test_path);
+		test_path = NULL;
 		if (err != NULL)
 			*err = -EBADR;
 		goto cleanup;
@@ -648,11 +660,10 @@ ssize_t add_reply_handle(void *buf, size_t mtu, uint8_t *hi, int handle)
 	handle_hdr = encode_img_handle(handle_str->str, handle_str->len,
 							&handle_hdr_len);
 	g_string_free(handle_str, TRUE);
+	*hi = IMG_HANDLE_HDR;
 
 	if (handle_hdr == NULL)
-		return -ENOMEM;
-
-	*hi = IMG_HANDLE_HDR;
+		return 0;
 
 	if (handle_hdr_len > mtu) {
 		g_free(handle_hdr);

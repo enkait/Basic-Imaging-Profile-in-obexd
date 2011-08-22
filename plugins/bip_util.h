@@ -33,6 +33,7 @@ int make_modified_image(const char *image_path, const char *modified_path,
 
 const gchar *convBIP2IM(const gchar *encoding);
 const gchar *convIM2BIP(const gchar *encoding);
+gboolean verify_encoding(const char *encoding);
 gboolean verify_transform(const char *transform);
 time_t parse_iso8601_bip(const gchar *str, int len);
 gboolean parse_pixel_range(const gchar *dim, unsigned int *lower,
@@ -54,8 +55,7 @@ void parse_bip_user_headers(const struct obex_session *os, obex_object_t *obj,
 char *get_att_dir(const char *image_path);
 char *safe_rename(const char *name, const char *folder, const char *orig_path,
 								int *err);
-char *insert_number(const char *path, unsigned int number);
-
 struct a_header *create_handle(const char *handle);
-ssize_t add_reply_handle(void *buf, size_t mtu, uint8_t *hi, int handle);
+char *insert_number(const char *path, unsigned int number);
 char *get_null_terminated(char *buffer, int len);
+ssize_t add_reply_handle(void *buf, size_t mtu, uint8_t *hi, int handle);
