@@ -148,8 +148,6 @@ static void transfer_free(struct transfer_data *transfer)
 	struct session_data *session = transfer->session;
     GSList *aheaders = transfer->aheaders;
 
-    printf("transfer free\n");
-
 	DBG("%p", transfer);
 
 	if (transfer->xfer) {
