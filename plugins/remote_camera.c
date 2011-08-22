@@ -127,11 +127,17 @@ struct rc_agent {
 static DBusConnection *connection = NULL;
 static struct rc_agent *agent = NULL;
 
-static void free_remote_camera_session(struct remote_camera_session *session) {
+static void free_remote_camera_session(struct remote_camera_session *session)
+{
+	DBG("");
+
 	g_free(session);
 }
 
-int get_new_handle_rc(struct remote_camera_session *session) {
+int get_new_handle_rc(struct remote_camera_session *session)
+{
+	DBG("");
+
 	if (session->next_handle >= HANDLE_LIMIT) {
 		return -1;
 	}
@@ -141,6 +147,9 @@ int get_new_handle_rc(struct remote_camera_session *session) {
 static void *remote_camera_connect(struct obex_session *os, int *err)
 {
 	struct remote_camera_session *session;
+
+	DBG("");
+
 	manager_register_session(os);
 
 	session = g_new0(struct remote_camera_session, 1);
@@ -157,6 +166,8 @@ static int remote_camera_get(struct obex_session *os, obex_object_t *obj,
 {
 	int ret;
 
+	DBG("");
+
 	if (user_data == NULL)
 		return -EBADR;
 
@@ -169,6 +180,9 @@ static int remote_camera_get(struct obex_session *os, obex_object_t *obj,
 static void remote_camera_disconnect(struct obex_session *os, void *user_data)
 {
 	struct remote_camera_session *session = user_data;
+
+	DBG("");
+
 	free_remote_camera_session(session);
 	manager_unregister_session(os);
 }
@@ -232,6 +246,8 @@ static DBusMessage *rc_register_agent(DBusConnection *conn,
 {
 	const char *path, *sender;
 
+	DBG("");
+
 	if (agent)
 		return agent_already_exists(msg);
 
@@ -257,6 +273,8 @@ static DBusMessage *rc_unregister_agent(DBusConnection *conn,
 					DBusMessage *msg, void *data)
 {
 	const char *path, *sender;
+
+	DBG("");
 
 	if (!agent)
 		return agent_does_not_exist(msg);
@@ -292,6 +310,9 @@ static void get_monitoring_image_cb(DBusPendingCall *call, void *user_data)
 	struct monit_image_data *data = user_data;
 	char *monit_image = NULL, *image = NULL;
 	DBusError err;
+
+	DBG("");
+
 	dbus_error_init(&err);
 	if (dbus_set_error_from_message(&err, reply)) {
 		dbus_error_free(&err);
@@ -319,8 +340,10 @@ int get_monitoring_image(gboolean store, monit_image_cb cb, void *user_data)
 	DBusPendingCall *call = NULL;
 	struct monit_image_data *data = NULL;
 
+	DBG("");
+
 	if (agent == NULL) {
-		printf("Get monitoring image Failed\n");
+		DBG("Failed to get monitoring image");
 		return -EBADR;
 	}
 
@@ -373,10 +396,6 @@ static gboolean rc_manager_init(void)
 			fprintf(stderr, "Can't register with session bus\n");
 		return FALSE;
 	}
-
-	printf("Service: %s\n", RC_MANAGER_SERVICE);
-	printf("Interface: %s\n", RC_MANAGER_INTERFACE);
-	printf("Path: %s\n", RC_MANAGER_PATH);
 
 	return g_dbus_register_interface(connection, RC_MANAGER_PATH,
 					RC_MANAGER_INTERFACE,
