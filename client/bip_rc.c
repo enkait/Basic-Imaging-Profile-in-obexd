@@ -57,6 +57,9 @@ static struct monit_image_aparam *new_monit_image_aparam(gboolean sf)
 {
 	struct monit_image_aparam *aparam =
 				g_new0(struct monit_image_aparam, 1);
+
+	DBG("");
+
 	aparam->sftag = STOREFLAG_TAG;
 	aparam->sflen = STOREFLAG_LEN;
 	if (sf)
@@ -72,7 +75,8 @@ static void get_monit_image_callback(struct session_data *session, GError *err,
 	struct transfer_data *transfer = session->pending->data;
 	unsigned int length = 0;
 	char *handle = NULL;
-	printf("get_monit_image_callback\n");
+
+	DBG("");
 
 	if (err != NULL) {
 		get_monit_image_failed(session, err->message);
@@ -104,7 +108,7 @@ static DBusMessage *get_monit_image(DBusConnection *connection,
 	char *image_path = NULL;
 	gboolean sf;
 
-	printf("requested get monitoring image\n");
+	DBG("");
 
 	if (dbus_message_get_args(message, NULL,
 				DBUS_TYPE_STRING, &image_path,
