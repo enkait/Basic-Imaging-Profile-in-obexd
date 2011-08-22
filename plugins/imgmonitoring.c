@@ -78,6 +78,8 @@ static int parse_aparam(const uint8_t *buffer, uint32_t hlen,
 	struct imgmonitoring_aparam_header *hdr;
 	uint32_t len = 0;
 
+	DBG("");
+
 	while (len < hlen) {
 		hdr = (void *) buffer + len;
 
@@ -104,7 +106,9 @@ static void *imgmonitoring_open(const char *name, int oflag,
 			mode_t mode, void *context, size_t *size, int *err)
 {
 	struct imgmonitoring_data *data = g_new0(struct imgmonitoring_data, 1);
-	printf("imgmonitoring_open\n");
+
+	DBG("");
+
 	data->context = context;
 	data->handle = -1;
 	return data;
@@ -114,9 +118,11 @@ static int feed_next_header(void *object, uint8_t hi, obex_headerdata_t hv,
 							uint32_t hv_size)
 {
 	struct imgmonitoring_data *data = object;
+
+	DBG("");
+
 	if (data == NULL)
 		return -EBADR;
-	printf("feed_next_header\n");
 
 	if (hi == OBEX_HDR_APPARAM) {
 		if (parse_aparam(hv.bs, hv_size, &data->storeflag) < 0)
@@ -137,7 +143,7 @@ static void get_monitoring_image_cb(void *user_data, char *monit_image,
 	struct img_listing *il = NULL;
 	struct remote_camera_session *context = data->context;
 
-	printf("get_monitoring_image_cb\n");
+	DBG("");
 
 	if (err < 0) {
 		obex_object_set_io_flags(user_data, G_IO_ERR, err);
@@ -185,7 +191,8 @@ static ssize_t imgmonitoring_get_next_header(void *object, void *buf, size_t mtu
 {
 	struct imgmonitoring_data *data = object;
 	int ret = 0;
-	printf("imgimg_get_next_header\n");
+
+	DBG("");
 
 	if (data == NULL) {
 		return -EBADR;
@@ -195,14 +202,12 @@ static ssize_t imgmonitoring_get_next_header(void *object, void *buf, size_t mtu
 		if ((ret = get_monitoring_image(data->storeflag,
 					get_monitoring_image_cb, data)) < 0)
 			return ret;
-		printf("EAGAIN\n");
 		return -EAGAIN;
 	}
 
 	if (!data->handle_sent) {
 		ssize_t len = 0;
 		if ((len = add_reply_handle(buf, mtu, hi, data->handle)) < 0) {
-			printf("LEN = %d\n", len);
 			return len;
 		}
 		data->handle_sent = TRUE;
@@ -216,7 +221,9 @@ static ssize_t imgmonitoring_read(void *object, void *buf, size_t count)
 {
 	struct imgmonitoring_data *data = object;
 	int ret;
-	printf("imgmonitoring_read\n");
+
+	DBG("");
+
 	if (data == NULL)
 		return -EBADR;
 
@@ -228,6 +235,8 @@ static ssize_t imgmonitoring_read(void *object, void *buf, size_t count)
 
 static int imgmonitoring_close(void *object)
 {
+	DBG("");
+
 	return 0;
 }
 
