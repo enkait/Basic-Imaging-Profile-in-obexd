@@ -41,6 +41,7 @@
 #include "opp.h"
 #include "ftp.h"
 #include "pbap.h"
+#include "bip_push.h"
 #include "sync.h"
 #include "map.h"
 
@@ -566,6 +567,7 @@ static struct target_module {
 } targets[] = {
 	{ "opp", opp_init, opp_exit },
 	{ "ftp", ftp_init, ftp_exit },
+	{ "bip_push", bip_push_init, bip_push_exit },
 	{ "pbap", pbap_init, pbap_exit },
 	{ "sync", sync_init, sync_exit },
 	{ "map", map_init, map_exit },
