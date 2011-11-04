@@ -120,6 +120,7 @@ client_obex_client_SOURCES = $(gdbus_sources) $(gobex_sources) \
 				client/pbap.h client/pbap.c \
 				client/ftp.h client/ftp.c \
 				client/opp.h client/opp.c \
+				client/bip_push.h client/bip_push.c \
 				client/transfer.h client/transfer.c \
 				client/agent.h client/agent.c \
 				client/driver.h client/driver.c
