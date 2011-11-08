@@ -17,9 +17,75 @@ static DBusConnection *conn = NULL;
 
 struct bip_push_data {
 	struct obc_session *session;
+	DBusMessage *msg;
 };
+static DBusMessage *failed(DBusMessage *message)
+{
+	return g_dbus_create_error(message, ERROR_INTERFACE, "Failed");
+}
 
+static DBusMessage *report_error(DBusMessage *message, char *err)
+{
+	return g_dbus_create_error(message,
+					ERROR_INTERFACE, "%s", err);
+}
+
+static void get_img_cap_cb(struct obc_session *session, GError *err,
+						void *user_data)
+{
+	struct bip_push_data *bip_push = user_data;
+	struct obc_transfer *transfer = obc_session_get_transfer(session);
+	DBusMessage *reply;
+	const char *buf;
+	int size;
+
+	DBG("");
+
+	if (err) {
+		reply = report_error(bip_push->msg, err->message);
+		goto done;
+	}
+
+	buf = obc_transfer_get_buffer(transfer, &size);
+	if (size == 0)
+		buf = "";
+
+	//get_null_terminated(buf, &size);
+
+	reply = dbus_message_new_method_return(bip_push->msg);
+	dbus_message_append_args(reply, DBUS_TYPE_STRING, &buf,
+				DBUS_TYPE_INVALID);
+	obc_transfer_clear_buffer(transfer);
+
+done:
+	g_dbus_send_message(conn, reply);
+	dbus_message_unref(bip_push->msg);
+	bip_push->msg = NULL;
+
+	obc_transfer_unregister(transfer);
+	return;
+}
+
+static DBusMessage *get_img_cap(DBusConnection *connection,
+		DBusMessage *message, void *user_data)
+{
+	struct bip_push_data *bip_push = user_data;
+	int err;
+
+	DBG("");
+
+	if ((err=obc_session_get(bip_push->session, "x-bt/img-capabilities",
+				NULL, NULL, NULL, 0,
+				get_img_cap_cb, user_data)) < 0)
+		return failed(message);
+
+	bip_push->msg = dbus_message_ref(message);
+
+	return NULL;
+}
 static GDBusMethodTable bip_push_methods[] = {
+	{ "GetImagingCapabilities",	"", "s", get_img_cap,
+		G_DBUS_METHOD_FLAG_ASYNC },
 	{ }
 };
 
