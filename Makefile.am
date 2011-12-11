@@ -128,12 +128,12 @@ client_obex_client_SOURCES = $(gdbus_sources) $(gobex_sources) \
 				client/driver.h client/driver.c \
 				src/map_ap.h src/map_ap.c
 
-client_obex_client_LDADD = @GLIB_LIBS@ @DBUS_LIBS@ @BLUEZ_LIBS@
+client_obex_client_LDADD = @GLIB_LIBS@ @DBUS_LIBS@ @BLUEZ_LIBS@ @MAGICKWAND_LIBS@
 endif
 
 service_DATA = $(service_in_files:.service.in=.service)
 
-AM_CFLAGS = @BLUEZ_CFLAGS@ @EBOOK_CFLAGS@ @GTHREAD_CFLAGS@ @GLIB_CFLAGS@ \
+AM_CFLAGS = @BLUEZ_CFLAGS@ @EBOOK_CFLAGS@ @GTHREAD_CFLAGS@ @GLIB_CFLAGS@ @MAGICKWAND_CFLAGS@ \
 			@DBUS_CFLAGS@ @LIBICAL_CFLAGS@ @TRACKER_CFLAGS@ \
 			-DOBEX_PLUGIN_BUILTIN -DPLUGINDIR=\""$(plugindir)"\" \
 			-D_FILE_OFFSET_BITS=64

@@ -94,6 +94,12 @@ PKG_CHECK_MODULES(BLUEZ, bluez, dummy=yes,
 AC_SUBST(BLUEZ_CFLAGS)
 AC_SUBST(BLUEZ_LIBS)
 
+PKG_CHECK_MODULES(MAGICKWAND, MagickWand >= 6.5, dummy=yes,
+				AC_MSG_ERROR(MagickWand 6.5 or later is required))
+AC_SUBST(MAGICKWAND_CFLAGS)
+AC_SUBST(MAGICKWAND_LIBS)
+
+
 AC_ARG_ENABLE(optimization, AC_HELP_STRING([--disable-optimization],
 			[disable code optimization through compiler]), [
 	if (test "${enableval}" = "no"); then
