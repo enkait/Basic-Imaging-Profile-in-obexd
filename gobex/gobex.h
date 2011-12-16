@@ -34,6 +34,7 @@ typedef enum {
 } GObexTransportType;
 
 typedef struct _GObex GObex;
+typedef struct _GObexTransfer GObexTransfer;
 
 typedef void (*GObexFunc) (GObex *obex, GError *err, gpointer user_data);
 typedef void (*GObexRequestFunc) (GObex *obex, GObexPacket *req,
