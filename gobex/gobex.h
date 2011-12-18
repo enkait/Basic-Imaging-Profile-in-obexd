@@ -93,19 +93,23 @@ guint g_obex_move(GObex *obex, const char *name, const char *dest,
 
 /* Transfer related high-level functions */
 
-guint g_obex_put_req(GObex *obex, GObexDataProducer data_func,
+guint g_obex_put_req(GObex *obex, GObexResponseFunc response_func,
+			GObexDataProducer data_func,
 			GObexFunc complete_func, gpointer user_data,
 			GError **err, guint8 first_hdr_id, ...);
 
 guint g_obex_put_req_pkt(GObex *obex, GObexPacket *req,
+			GObexResponseFunc response_func,
 			GObexDataProducer data_func, GObexFunc complete_func,
 			gpointer user_data, GError **err);
 
-guint g_obex_get_req(GObex *obex, GObexDataConsumer data_func,
+guint g_obex_get_req(GObex *obex, GObexResponseFunc response_func,
+			GObexDataConsumer data_func,
 			GObexFunc complete_func, gpointer user_data,
 			GError **err, guint8 first_hdr_id, ...);
 
 guint g_obex_get_req_pkt(GObex *obex, GObexPacket *req,
+			GObexResponseFunc response_func,
 			GObexDataConsumer data_func, GObexFunc complete_func,
 			gpointer user_data, GError **err);
 

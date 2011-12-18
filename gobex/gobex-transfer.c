@@ -47,6 +47,7 @@ struct _GObexTransfer {
 
 	GObexDataProducer data_producer;
 	GObexDataConsumer data_consumer;
+	GObexResponseFunc response_func;
 	GObexFunc complete_func;
 
 	gpointer user_data;
@@ -246,6 +247,7 @@ static GObexTransfer *transfer_new(GObex *obex, guint8 opcode,
 }
 
 guint g_obex_put_req_pkt(GObex *obex, GObexPacket *req,
+			GObexResponseFunc response_func,
 			GObexDataProducer data_func, GObexFunc complete_func,
 			gpointer user_data, GError **err)
 {
@@ -256,8 +258,12 @@ guint g_obex_put_req_pkt(GObex *obex, GObexPacket *req,
 	if (g_obex_packet_get_operation(req, NULL) != G_OBEX_OP_PUT)
 		return 0;
 
+	if (response_func == NULL)
+		response_func = transfer_response;
+
 	transfer = transfer_new(obex, G_OBEX_OP_PUT, complete_func, user_data);
 	transfer->data_producer = data_func;
+	transfer->response_func = response_func;
 
 	g_obex_packet_add_body(req, put_get_data, transfer);
 
@@ -273,7 +279,8 @@ guint g_obex_put_req_pkt(GObex *obex, GObexPacket *req,
 	return transfer->id;
 }
 
-guint g_obex_put_req(GObex *obex, GObexDataProducer data_func,
+guint g_obex_put_req(GObex *obex, GObexResponseFunc response_func,
+			GObexDataProducer data_func,
 			GObexFunc complete_func, gpointer user_data,
 			GError **err, guint8 first_hdr_id, ...)
 {
@@ -283,8 +290,12 @@ guint g_obex_put_req(GObex *obex, GObexDataProducer data_func,
 
 	g_obex_debug(G_OBEX_DEBUG_TRANSFER, "obex %p", obex);
 
+	if (response_func == NULL)
+		response_func = transfer_response;
+
 	transfer = transfer_new(obex, G_OBEX_OP_PUT, complete_func, user_data);
 	transfer->data_producer = data_func;
+	transfer->response_func = response_func;
 
 	va_start(args, first_hdr_id);
 	req = g_obex_packet_new_valist(G_OBEX_OP_PUT, FALSE,
@@ -429,6 +440,7 @@ guint g_obex_put_rsp(GObex *obex, GObexPacket *req,
 }
 
 guint g_obex_get_req_pkt(GObex *obex, GObexPacket *req,
+			GObexResponseFunc response_func,
 			GObexDataConsumer data_func, GObexFunc complete_func,
 			gpointer user_data, GError **err)
 {
@@ -439,8 +451,13 @@ guint g_obex_get_req_pkt(GObex *obex, GObexPacket *req,
 	if (g_obex_packet_get_operation(req, NULL) != G_OBEX_OP_GET)
 		return 0;
 
+	if (response_func == NULL)
+		response_func = transfer_response;
+
 	transfer = transfer_new(obex, G_OBEX_OP_GET, complete_func, user_data);
 	transfer->data_consumer = data_func;
+	transfer->response_func = response_func;
+
 	transfer->req_id = g_obex_send_req(obex, req, FIRST_PACKET_TIMEOUT,
 					transfer_response, transfer, err);
 	if (transfer->req_id == 0) {
@@ -453,7 +470,8 @@ guint g_obex_get_req_pkt(GObex *obex, GObexPacket *req,
 	return transfer->id;
 }
 
-guint g_obex_get_req(GObex *obex, GObexDataConsumer data_func,
+guint g_obex_get_req(GObex *obex, GObexResponseFunc response_func,
+			GObexDataConsumer data_func,
 			GObexFunc complete_func, gpointer user_data,
 			GError **err, guint8 first_hdr_id, ...)
 {
@@ -463,8 +481,12 @@ guint g_obex_get_req(GObex *obex, GObexDataConsumer data_func,
 
 	g_obex_debug(G_OBEX_DEBUG_TRANSFER, "obex %p", obex);
 
+	if (response_func == NULL)
+		response_func = transfer_response;
+
 	transfer = transfer_new(obex, G_OBEX_OP_GET, complete_func, user_data);
 	transfer->data_consumer = data_func;
+	transfer->response_func = response_func;
 
 	va_start(args, first_hdr_id);
 	req = g_obex_packet_new_valist(G_OBEX_OP_GET, TRUE,

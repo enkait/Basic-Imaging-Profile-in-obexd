@@ -548,7 +548,7 @@ int obc_transfer_get(struct obc_transfer *transfer, transfer_callback_t func,
 		transfer->xfer = g_obex_send_req(obex, req, -1, rsp_cb,
 							transfer, &err);
 	else
-		transfer->xfer = g_obex_get_req_pkt(obex, req, data_cb,
+		transfer->xfer = g_obex_get_req_pkt(obex, req, NULL, data_cb,
 							complete_cb, transfer,
 							&err);
 
@@ -600,8 +600,8 @@ done:
 						transfer->params->data,
 						transfer->params->size);
 
-	transfer->xfer = g_obex_put_req_pkt(obex, req, data_cb, xfer_complete,
-							transfer, &err);
+	transfer->xfer = g_obex_put_req_pkt(obex, req, NULL, data_cb,
+						xfer_complete, transfer, &err);
 	if (transfer->xfer == 0)
 		return -ENOTCONN;
 
