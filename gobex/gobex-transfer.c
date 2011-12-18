@@ -171,7 +171,7 @@ static gboolean handle_get_body(GObexTransfer *transfer, GObexPacket *rsp,
 	return ret;
 }
 
-static void transfer_response(GObex *obex, GError *err, GObexPacket *rsp,
+void transfer_response(GObex *obex, GError *err, GObexPacket *rsp,
 							gpointer user_data)
 {
 	GObexTransfer *transfer = user_data;
