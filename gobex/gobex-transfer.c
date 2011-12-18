@@ -215,7 +215,7 @@ void transfer_response(GObex *obex, GError *err, GObexPacket *rsp,
 							G_OBEX_HDR_INVALID);
 	}
 
-	transfer->req_id = g_obex_send_req(obex, req, -1, transfer_response,
+	transfer->req_id = g_obex_send_req(obex, req, -1, transfer->response_func,
 							transfer, &err);
 failed:
 	if (err != NULL) {
@@ -268,7 +268,7 @@ guint g_obex_put_req_pkt(GObex *obex, GObexPacket *req,
 	g_obex_packet_add_body(req, put_get_data, transfer);
 
 	transfer->req_id = g_obex_send_req(obex, req, FIRST_PACKET_TIMEOUT,
-					transfer_response, transfer, err);
+					response_func, transfer, err);
 	if (transfer->req_id == 0) {
 		transfer_free(transfer);
 		return 0;
@@ -305,7 +305,7 @@ guint g_obex_put_req(GObex *obex, GObexResponseFunc response_func,
 	g_obex_packet_add_body(req, put_get_data, transfer);
 
 	transfer->req_id = g_obex_send_req(obex, req, FIRST_PACKET_TIMEOUT,
-					transfer_response, transfer, err);
+					response_func, transfer, err);
 	if (transfer->req_id == 0) {
 		transfer_free(transfer);
 		return 0;
@@ -459,7 +459,7 @@ guint g_obex_get_req_pkt(GObex *obex, GObexPacket *req,
 	transfer->response_func = response_func;
 
 	transfer->req_id = g_obex_send_req(obex, req, FIRST_PACKET_TIMEOUT,
-					transfer_response, transfer, err);
+					response_func, transfer, err);
 	if (transfer->req_id == 0) {
 		transfer_free(transfer);
 		return 0;
@@ -494,7 +494,7 @@ guint g_obex_get_req(GObex *obex, GObexResponseFunc response_func,
 	va_end(args);
 
 	transfer->req_id = g_obex_send_req(obex, req, FIRST_PACKET_TIMEOUT,
-					transfer_response, transfer, err);
+					response_func, transfer, err);
 	if (transfer->req_id == 0) {
 		transfer_free(transfer);
 		return 0;
