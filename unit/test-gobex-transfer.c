@@ -226,7 +226,7 @@ static void test_put_req(void)
 
 	timer_id = g_timeout_add_seconds(1, test_timeout, &d);
 
-	g_obex_put_req(obex, provide_data, transfer_complete, &d, &d.err,
+	g_obex_put_req(obex, NULL, provide_data, transfer_complete, &d, &d.err,
 				G_OBEX_HDR_TYPE, hdr_type, sizeof(hdr_type),
 				G_OBEX_HDR_NAME, "file.txt",
 				G_OBEX_HDR_INVALID);
@@ -344,7 +344,7 @@ static void test_get_req(void)
 
 	timer_id = g_timeout_add_seconds(1, test_timeout, &d);
 
-	g_obex_get_req(obex, rcv_data, transfer_complete, &d, &d.err,
+	g_obex_get_req(obex, NULL, rcv_data, transfer_complete, &d, &d.err,
 				G_OBEX_HDR_TYPE, hdr_type, sizeof(hdr_type),
 				G_OBEX_HDR_NAME, "file.txt",
 				G_OBEX_HDR_INVALID);
@@ -387,7 +387,7 @@ static void test_get_req_app(void)
 
 	timer_id = g_timeout_add_seconds(1, test_timeout, &d);
 
-	g_obex_get_req(obex, rcv_data, transfer_complete, &d, &d.err,
+	g_obex_get_req(obex, NULL, rcv_data, transfer_complete, &d, &d.err,
 				G_OBEX_HDR_TYPE, hdr_type, sizeof(hdr_type),
 				G_OBEX_HDR_NAME, "file.txt",
 				G_OBEX_HDR_APPARAM, hdr_app, sizeof(hdr_app),
@@ -473,7 +473,7 @@ static void test_put_req_random(int sock_type)
 
 	timer_id = g_timeout_add_seconds(1, test_timeout, &d);
 
-	g_obex_put_req(obex, provide_random, transfer_complete, &d, &d.err,
+	g_obex_put_req(obex, NULL, provide_random, transfer_complete, &d, &d.err,
 					G_OBEX_HDR_TYPE, hdr_type, sizeof(hdr_type),
 					G_OBEX_HDR_NAME, "random.bin",
 					G_OBEX_HDR_INVALID);
@@ -526,7 +526,7 @@ static void test_put_req_eagain(void)
 
 	timer_id = g_timeout_add_seconds(1, test_timeout, &d);
 
-	g_obex_put_req(obex, provide_eagain, transfer_complete, &d, &d.err,
+	g_obex_put_req(obex, NULL, provide_eagain, transfer_complete, &d, &d.err,
 					G_OBEX_HDR_TYPE, hdr_type, sizeof(hdr_type),
 					G_OBEX_HDR_NAME, "file.txt",
 					G_OBEX_HDR_INVALID);
@@ -677,7 +677,7 @@ static void test_put_req_delay(void)
 
 	timer_id = g_timeout_add_seconds(1, test_timeout, &d);
 
-	g_obex_put_req(obex, provide_data, transfer_complete, &d, &d.err,
+	g_obex_put_req(obex, NULL, provide_data, transfer_complete, &d, &d.err,
 					G_OBEX_HDR_TYPE, hdr_type, sizeof(hdr_type),
 					G_OBEX_HDR_NAME, "file.txt",
 					G_OBEX_HDR_INVALID);
@@ -847,7 +847,7 @@ static void test_get_req_delay(void)
 
 	timer_id = g_timeout_add_seconds(1, test_timeout, &d);
 
-	g_obex_get_req(obex, rcv_data_delay, transfer_complete, &d, &d.err,
+	g_obex_get_req(obex, NULL, rcv_data_delay, transfer_complete, &d, &d.err,
 				G_OBEX_HDR_TYPE, hdr_type, sizeof(hdr_type),
 				G_OBEX_HDR_NAME, "file.txt",
 				G_OBEX_HDR_INVALID);
@@ -1030,7 +1030,7 @@ static void conn_complete_get_req(GObex *obex, GError *err, GObexPacket *rsp,
 		g_main_loop_quit(d->mainloop);
 	}
 
-	g_obex_get_req(obex, rcv_data, transfer_complete, d, &d->err,
+	g_obex_get_req(obex, NULL, rcv_data, transfer_complete, d, &d->err,
 				G_OBEX_HDR_TYPE, hdr_type, sizeof(hdr_type),
 				G_OBEX_HDR_NAME, "file.txt",
 				G_OBEX_HDR_INVALID);
@@ -1136,7 +1136,7 @@ static void conn_complete_put_req(GObex *obex, GError *err, GObexPacket *rsp,
 		g_main_loop_quit(d->mainloop);
 	}
 
-	g_obex_put_req(obex, provide_data, transfer_complete, d, &d->err,
+	g_obex_put_req(obex, NULL, provide_data, transfer_complete, d, &d->err,
 				G_OBEX_HDR_TYPE, hdr_type, sizeof(hdr_type),
 				G_OBEX_HDR_NAME, "file.txt",
 				G_OBEX_HDR_INVALID);
@@ -1285,7 +1285,7 @@ static void conn_complete_put_req_random(GObex *obex, GError *err,
 		g_main_loop_quit(d->mainloop);
 	}
 
-	g_obex_put_req(obex, provide_random, transfer_complete, d, &d->err,
+	g_obex_put_req(obex, NULL, provide_random, transfer_complete, d, &d->err,
 					G_OBEX_HDR_TYPE, hdr_type, sizeof(hdr_type),
 					G_OBEX_HDR_NAME, "random.bin",
 					G_OBEX_HDR_INVALID);
