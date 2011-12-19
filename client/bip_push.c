@@ -38,6 +38,16 @@ static DBusMessage *report_error(DBusMessage *message, char *err)
 					ERROR_INTERFACE, "%s", err);
 }
 
+static void bip_transfer_response(GObex *obex, GError *err, GObexPacket *rsp,
+							gpointer user_data)
+{
+	transfer_response(obex, err, rsp, user_data);
+}
+
+gssize bip_producer(void *buf, gsize len, gpointer user_data) {
+	struct bip_push_data *bip_push = user_data;
+}
+
 static void get_img_cap_cb(struct obc_session *session, GError *err,
 						void *user_data)
 {
@@ -91,6 +101,7 @@ static DBusMessage *get_img_cap(DBusConnection *connection,
 static DBusMessage *put_img(DBusConnection *connection,
 					DBusMessage *message, void *user_data)
 {
+	struct bip_push_data *bip_push = user_data;
 	char *image_path;
 	DBusMessage *reply;
 
@@ -108,7 +119,13 @@ static DBusMessage *put_img(DBusConnection *connection,
 		goto cleanup;
 	}
 
+	remote_image = g_path_get_basename(image_path);
+
+	g_obex_put_req(obc_session_get_gobex(bip_push), bip_transfer_response,
+
 	reply = dbus_message_new_method_return(message);
+
+	reply = put_transformed_image(message, session, image_path, remote_image, NULL);
 cleanup:
 	return reply;
 }
