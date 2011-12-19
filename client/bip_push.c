@@ -7,6 +7,7 @@
 #include <gdbus.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <string.h>
 
 #include "log.h"
 #include "transfer.h"
@@ -23,6 +24,12 @@ struct bip_push_data {
 static DBusMessage *failed(DBusMessage *message)
 {
 	return g_dbus_create_error(message, ERROR_INTERFACE, "Failed");
+}
+
+static DBusMessage *invalid_argument(DBusMessage *message)
+{
+	return g_dbus_create_error(message, ERROR_INTERFACE,
+							"InvalidArgument");
 }
 
 static DBusMessage *report_error(DBusMessage *message, char *err)
@@ -81,8 +88,35 @@ static DBusMessage *get_img_cap(DBusConnection *connection,
 	return NULL;
 }
 
+static DBusMessage *put_img(DBusConnection *connection,
+					DBusMessage *message, void *user_data)
+{
+	char *image_path;
+	DBusMessage *reply;
+
+	DBG("");
+
+	if (dbus_message_get_args(message, NULL,
+				DBUS_TYPE_STRING, &image_path,
+				DBUS_TYPE_INVALID) == FALSE) {
+		reply = invalid_argument(message);
+		goto cleanup;
+	}
+
+	if (image_path == NULL || strlen(image_path)==0) {
+		reply = invalid_argument(message);
+		goto cleanup;
+	}
+
+	reply = dbus_message_new_method_return(message);
+cleanup:
+	return reply;
+}
+
 static GDBusMethodTable bip_push_methods[] = {
 	{ "GetImagingCapabilities",	"", "s", get_img_cap,
+		G_DBUS_METHOD_FLAG_ASYNC },
+	{ "PutImage",	"s", "", put_img,
 		G_DBUS_METHOD_FLAG_ASYNC },
 	{ }
 };
