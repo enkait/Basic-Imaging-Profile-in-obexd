@@ -124,8 +124,10 @@ guint g_obex_get_rsp(GObex *obex, GObexDataProducer data_func,
 
 gboolean g_obex_cancel_transfer(guint id);
 
-const char *g_obex_strerror(guint8 err_code);
 void transfer_response(GObex *obex, GError *err, GObexPacket *rsp,
 							gpointer user_data);
+gpointer transfer_get_data(GObexTransfer *transfer);
+
+const char *g_obex_strerror(guint8 err_code);
 
 #endif /* __GOBEX_H */

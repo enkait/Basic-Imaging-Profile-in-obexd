@@ -53,6 +53,10 @@ struct _GObexTransfer {
 	gpointer user_data;
 };
 
+gpointer transfer_get_data(GObexTransfer *transfer) {
+	return transfer->user_data;
+}
+
 static void transfer_free(GObexTransfer *transfer)
 {
 	g_obex_debug(G_OBEX_DEBUG_TRANSFER, "transfer %u", transfer->id);
